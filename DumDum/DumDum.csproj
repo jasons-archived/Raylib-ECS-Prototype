@@ -20,4 +20,8 @@
     <DefineConstants>$(DefineConstants);CHECKED</DefineConstants>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Folder Include="Engine\_internal\" />
+  </ItemGroup>
+
 </Project>
