@@ -66,14 +66,13 @@ public class ExecManager
 			&& _tempNowUpdating.Count == 0
 			, "algo error: below should clear these before exiting fcn"
 		);
+		this._tempToUpdateThisTick.UnionWith(_nodes);
 
 		_execState.Update(elapsed);
 
-		this._tempToUpdateThisTick.UnionWith(_nodes);
-
-		//__DEBUG.WriteLine(gameTime.FrameCount.ToString());
 
 
+		//randomize execution order of those nodes that can execute now (good for debugging dependency problems)
 		while (this._tempToUpdateThisTick.Count > 0)
 		{
 
@@ -88,8 +87,11 @@ public class ExecManager
 
 			var loopExecCount = 0;
 
-			//randomize execution order of those nodes that can execute now (good for debugging dependency problems)
-			while (_tempAboutToUpdate.Count > 0)
+			//NOTE: this was a WHILE loop.
+			//changing to an IF so that we can maximize randomness of node execution order.
+			// Why this change to IF allows it:  only execute one node randomly from all "_tempAboutToUpdate" choices,
+			//then go back to the above WHILE to add any more just-unblocked nodes to our choices.
+			if (_tempAboutToUpdate.Count > 0)
 			{
 				//get a random node
 				var index = _rand.Next(0, _tempAboutToUpdate.Count);
