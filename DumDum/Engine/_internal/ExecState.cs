@@ -19,7 +19,7 @@ namespace DumDum.Engine._internal
 			//simple fps metrics calculated
 
 			_frameElapsed = frameElapsed;
-			_totalElapsed.Add(frameElapsed);
+			_totalElapsed = _totalElapsed.Add(frameElapsed);
 			_totalFrames++;
 			var instantFps = (float)(1f / frameElapsed.TotalSeconds);
 
