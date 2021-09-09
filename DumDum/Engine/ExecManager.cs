@@ -16,24 +16,29 @@ namespace DumDum.Engine;
 /// </summary>
 public class ExecManager
 {
-	private List<IExecNode> _nodes = new();
-	public IEnumerable<IExecNode> Nodes => _nodes;
+	private List<ExecNodeBase> _nodes = new();
+	public IEnumerable<ExecNodeBase> Nodes => _nodes;
 
+	private HashSet<string> _registeredNodeNames = new();
 
 	/// <summary>
 	/// registers your node for execution in the proper order
 	/// </summary>
 	/// <param name="node"></param>
-	public void Register(IExecNode node)
+	public void Register(ExecNodeBase node)
 	{
+		__ERROR.Throw(_registeredNodeNames.Add(node.Name), $"Another node with name '{node.Name}' has already been added");
 		_nodes.Add(node);
-		node.OnAdd(this);
+		node.OnRegister(this);
 	}
 
-	public void Unregister(IExecNode node)
+	public void Unregister(ExecNodeBase node)
 	{
+		__ERROR.Throw(_registeredNodeNames.Remove(node.Name), $"Node with name '{node.Name}' was not found to be removed");
 		var result = _nodes.Remove(node);
 		__DEBUG.Assert(result);
+
+		node.OnUnregister(this);
 	}
 
 	public void BeginRun()
@@ -42,10 +47,10 @@ public class ExecManager
 
 	}
 
-	private HashSet<IExecNode> _tempFinished = new();
-	private HashSet<IExecNode> _tempToUpdateThisTick = new();
-	private List<IExecNode> _tempAboutToUpdate = new();
-	private HashSet<IExecNode> _tempNowUpdating = new();
+	private HashSet<string> _tempFinished = new();
+	private HashSet<ExecNodeBase> _tempToUpdateThisTick = new();
+	private List<ExecNodeBase> _tempAboutToUpdate = new();
+	private HashSet<ExecNodeBase> _tempNowUpdating = new();
 	private ExecState _execState = new();
 	private Random _rand = new();
 	public void Update(TimeSpan elapsed)
@@ -75,10 +80,9 @@ public class ExecManager
 			foreach (var node in this._tempToUpdateThisTick)
 			{
 				//if the current node has no blocks or all its blocks have already finished
-				if (!node.UpdateAfter.Any() || _tempFinished.IsSupersetOf(node.UpdateAfter))
+				if (!node._updateAfter.Any() || _tempFinished.IsSupersetOf(node._updateAfter))
 				{
 					_tempAboutToUpdate.Add(node);
-
 				}
 			}
 
@@ -95,12 +99,12 @@ public class ExecManager
 
 				//execute it
 				_tempNowUpdating.Add(node);
-				node.ExecUpdate(_execState);
+				node.Update(_execState);
 				_tempNowUpdating.Remove(node);
 
 
 				//mark it as finished
-				_tempFinished.Add(node);
+				_tempFinished.Add(node.Name);
 				loopExecCount++;
 			}
 
@@ -118,26 +122,37 @@ public class ExecManager
 }
 
 
-public abstract class SystemBase : IExecNode
+
+public abstract class ExecNodeBase
 {
-	IEnumerable<IExecNode> IExecNode.UpdateAfter => _updateAfter;
-	//private ExecManager _execManager;
-
-	protected List<SystemBase> _updateAfter = new();
-
-	void IExecNode.OnAdd(ExecManager execManager)
+	public string Name{ get; init; }
+	/// <summary>
+	/// names of nodes this will update after
+	/// </summary>
+	internal List<string> _updateAfter = new();
+	protected void UpdateAfter(string nodeName)
 	{
-		this.OnAdd(execManager);
+		_updateAfter.Add(nodeName);
+	}
+	protected void UpdateAfter(ExecNodeBase node)
+	{
+		_updateAfter.Add(node.Name);
 	}
 
-	protected abstract void OnAdd(ExecManager execManager);
+	/// <summary>
+	/// triggered when attaching to the engine.  
+	/// </summary>
+	/// <param name="execManager"></param>
+	internal abstract void OnRegister(ExecManager execManager);
 
-	void IExecNode.ExecUpdate(ExecState state)
-	{
-		this.Update(state);
-	}
+	/// <summary>
+	/// triggered when detached
+	/// </summary>
+	/// <param name="execManager"></param>
+	internal abstract void OnUnregister(ExecManager execManager);
 
-	protected abstract void Update(ExecState state);
+
+	internal abstract void Update(ExecState state);
 
 }
 
