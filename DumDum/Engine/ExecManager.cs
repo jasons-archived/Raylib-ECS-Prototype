@@ -46,7 +46,7 @@ public class ExecManager
 
 	}
 
-	private HashSet<string> _tempFinished = new();
+	private HashSet<ExecNodeBase> _tempFinishedNodes = new();
 	private HashSet<ExecNodeBase> _tempToUpdateThisTick = new();
 	/// <summary>
 	/// helper to track what nodes are ready for updating.  removed as soon as they are updated.
@@ -67,7 +67,7 @@ public class ExecManager
 		__DEBUG.Assert(
 			_tempUnblockedAndReadyForUpdate.Count == 0
 			&& _tempToUpdateThisTick.Count == 0
-			&& _tempFinished.Count == 0
+			&& _tempFinishedNodes.Count == 0
 			&& _tempNowUpdating.Count == 0
 			, "algo error: below should clear these before exiting fcn"
 		);
@@ -80,22 +80,51 @@ public class ExecManager
 
 		_execState.Update(elapsed);
 
+		//TODO:  ensure that all nodes that wait on named nodes actually have nodes of that name added.
+		//throw new NotImplementedException();
 
 
 		//randomize execution order of those nodes that can execute now (good for debugging dependency problems)
 		while (this._tempToUpdateThisTick.Count > 0)
 		{
+			
+			
 
-			foreach (var node in this._tempToUpdateThisTick)
+			//try to add all unblocked nodes 
+			foreach (var currentInspectedPending in this._tempToUpdateThisTick)
 			{
-				//if the current node has no blocks or all its blocks have already finished
-				if (!node._updateAfter.Any() || _tempFinished.IsSupersetOf(node._updateAfter))
+				if (_tempUnblockedAndReadyForUpdate_Lookup.Contains(currentInspectedPending))
 				{
-					if (_tempUnblockedAndReadyForUpdate_Lookup.Add(node))
+					//already marked as unblocked so skip checking again
+					continue;
+				}
+
+				var isBlocked = false;
+				//if the current node has no blocks or all its blocks have already finished
+				foreach (var otherPending in _tempToUpdateThisTick)
+				{
+					if (currentInspectedPending._updateAfter.IsBlockedBy(otherPending))
 					{
-						_tempUnblockedAndReadyForUpdate.Add(node);
+						isBlocked = true;
+						break;
 					}
 				}
+
+				if (isBlocked)
+				{
+					continue;
+				}
+				//not blocked
+				_tempUnblockedAndReadyForUpdate_Lookup.Add(currentInspectedPending);
+				_tempUnblockedAndReadyForUpdate.Add(currentInspectedPending);
+
+				//if (!node._updateAfter.Any() || _tempFinished.IsSupersetOf(node._updateAfter))
+				//{
+				//	if (_tempUnblockedAndReadyForUpdate_Lookup.Add(node))
+				//	{
+				//		_tempUnblockedAndReadyForUpdate.Add(node);
+				//	}
+				//}
 			}
 
 			var loopExecCount = 0;
@@ -119,7 +148,8 @@ public class ExecManager
 
 
 				//mark it as finished
-				_tempFinished.Add(node.Name);
+				var result = _tempFinishedNodes.Add(node);
+				__DEBUG.Assert(result);
 				loopExecCount++;
 			}
 
@@ -134,20 +164,42 @@ public class ExecManager
 		__DEBUG.Assert(_tempUnblockedAndReadyForUpdate.Count == 0, "above should have cleared as part of algo");
 		_tempUnblockedAndReadyForUpdate_Lookup.Clear();
 		this._tempToUpdateThisTick.Clear();
-		_tempFinished.Clear();
+		_tempFinishedNodes.Clear();
 	}
 
 
 
 }
 
+public class UpdateAfterCriteria
+{
+	public List<string> _nodeNames=new();
+	public List<string> _nodeCategories = new();
+
+	internal bool IsBlockedBy(ExecNodeBase otherPending)
+	{
+		if (_nodeNames.Contains(otherPending.Name))
+		{
+			return true;
+		}
+
+		foreach (var cat in _nodeCategories)
+		{
+			if (otherPending.Categories.Contains(cat))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+}
 
 
 public abstract class ExecNodeBase
 {
 	private static HashSet<string> _names = new();
 //	private string _name;
-
+	public List<string> Categories = new();
 	public string Name
 	{
 		get;init;
@@ -169,18 +221,19 @@ public abstract class ExecNodeBase
 		}
 	}
 
-	/// <summary>
-	/// names of nodes this will update after
-	/// </summary>
-	internal List<string> _updateAfter = new();
-	protected void UpdateAfter(string nodeName)
-	{
-		_updateAfter.Add(nodeName);
-	}
-	protected void UpdateAfter(ExecNodeBase node)
-	{
-		_updateAfter.Add(node.Name);
-	}
+	public UpdateAfterCriteria _updateAfter = new();
+	///// <summary>
+	///// names of nodes this will update after
+	///// </summary>
+	//internal List<string> _updateAfter = new();
+	//protected void UpdateAfter(string nodeName)
+	//{
+	//	_updateAfter.Add(nodeName);
+	//}
+	//protected void UpdateAfter(ExecNodeBase node)
+	//{
+	//	_updateAfter.Add(node.Name);
+	//}
 
 	/// <summary>
 	/// triggered when attaching to the engine.  
@@ -209,7 +262,7 @@ public class A : ExecNodeBase
 
 	internal override void OnRegister(ExecManager execManager)
 	{
-		this.UpdateAfter("B");
+		this._updateAfter._nodeNames.Add("B");
 	}
 
 	internal override void OnUnregister(ExecManager execManager)
@@ -232,7 +285,7 @@ public class B : ExecNodeBase
 
 	internal override void OnRegister(ExecManager execManager)
 	{
-		this.UpdateAfter("C");
+		this._updateAfter._nodeNames.Add("C");
 	}
 
 	internal override void OnUnregister(ExecManager execManager)
@@ -255,7 +308,6 @@ public class C : ExecNodeBase
 
 	internal override void OnRegister(ExecManager execManager)
 	{
-		//this.UpdateAfter("C");
 	}
 
 	internal override void OnUnregister(ExecManager execManager)
