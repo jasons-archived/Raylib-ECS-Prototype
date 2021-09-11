@@ -85,7 +85,7 @@ public class ExecManager
 
 		foreach (var node in _nodes)
 		{
-			foreach (var updateAfterName in node._updateAfter._nodeNames)
+			foreach (var updateAfterName in node._execCriteria._updateAfterNodeNames)
 			{
 				__CHECKED.AssertOnce(_registeredNodeNames.Contains(updateAfterName),$"The node {node.Name} is specified to update after node {updateAfterName} but that node is not registered with the ExecManager.  This dependency will be assumed to be fulfuilled (nothing to wait on)");
 			}
@@ -116,7 +116,7 @@ public class ExecManager
 				//if the current node has no blocks or all its blocks have already finished
 				foreach (var otherPending in _tempToUpdateThisTick)
 				{
-					if (currentInspectedPending._updateAfter.IsBlockedBy(otherPending))
+					if (currentInspectedPending._execCriteria.IsUpdateAfterBlockedBy(otherPending))
 					{
 						isBlocked = true;
 						break;
@@ -187,19 +187,23 @@ public class ExecManager
 /// <summary>
 /// constrain your node's execution by specifying what nodes need to run first, and what components your node needs read/write access to.
 /// </summary>
-public class UpdateAfterCriteria
+public class ExecCriteria
 {
-	public List<string> _nodeNames=new();
-	public List<string> _nodeCategories = new();
+	public List<string> _updateAfterNodeNames=new();
+	public List<string> _updateAfterNodeCategories = new();
 
-	internal bool IsBlockedBy(ExecNodeBase otherPending)
+	//TODO: figure out compnent r/w access
+	public List<Type> _readAccess = new();
+	public List<Type> _writeAccess = new();
+
+	internal bool IsUpdateAfterBlockedBy(ExecNodeBase otherPending)
 	{
-		if (_nodeNames.Contains(otherPending.Name))
+		if (_updateAfterNodeNames.Contains(otherPending.Name))
 		{
 			return true;
 		}
 
-		foreach (var cat in _nodeCategories)
+		foreach (var cat in _updateAfterNodeCategories)
 		{
 			if (otherPending.Categories.Contains(cat))
 			{
@@ -237,7 +241,7 @@ public abstract class ExecNodeBase
 		}
 	}
 
-	public UpdateAfterCriteria _updateAfter = new();
+	public ExecCriteria _execCriteria = new();
 	///// <summary>
 	///// names of nodes this will update after
 	///// </summary>
@@ -278,7 +282,7 @@ public class A : ExecNodeBase
 
 	internal override void OnRegister(ExecManager execManager)
 	{
-		this._updateAfter._nodeNames.Add("B");
+		this._execCriteria._updateAfterNodeNames.Add("B");
 	}
 
 	internal override void OnUnregister(ExecManager execManager)
@@ -301,7 +305,7 @@ public class B : ExecNodeBase
 
 	internal override void OnRegister(ExecManager execManager)
 	{
-		this._updateAfter._nodeNames.Add("C");
+		this._execCriteria._updateAfterNodeNames.Add("C");
 	}
 
 	internal override void OnUnregister(ExecManager execManager)
