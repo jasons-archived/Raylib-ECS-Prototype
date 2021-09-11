@@ -9,62 +9,7 @@ namespace DumDum.Bcl;
 
 public static class zz__Extensions_Array
 {
-	//public static float _SUM(this IEnumerable<float> target)
-	//{
-	//	var total = 0f;
-	//	foreach (var item in target)
-	//	{
-	//		total += item;
-	//	}
-	//	return total;
-	//}
-	//public static float _AVG(this IEnumerable<float> source)
-	//{
-	//	var total = 0f;
-	//	var loopCount = 0;
-	//	foreach (var item in source)
-	//	{
-	//		loopCount++;
-	//		total += item;
-	//	}
-	//	return total / loopCount;
 
-	//}
-	//public static float _MAX(this IEnumerable<float> target)
-	//{
-
-	//	var loopCount = 0;
-	//	var max = float.NegativeInfinity;
-	//	foreach (var item in target)
-	//	{
-	//		loopCount++;
-	//		max = item > max ? item : max;
-	//	}
-	//	if (loopCount == 0)
-	//	{
-	//		return float.NaN;
-	//	}
-
-
-	//	return max;
-	//}
-	//public static float _MIN(this IEnumerable<float> target)
-	//{
-	//	var loopCount = 0;
-	//	var min = float.PositiveInfinity;
-	//	foreach (var item in target)
-	//	{
-	//		loopCount++;
-	//		min = item < min ? item : min;
-	//	}
-	//	if (loopCount == 0)
-	//	{
-	//		return float.NaN;
-	//	}
-
-
-	//	return min;
-	//}
 
 	public static float _SUM(this float[] target)
 	{
@@ -113,5 +58,28 @@ public static class zz__Extensions_Array
 		}
 
 		return min;
+	}
+}
+
+public static class zz__Extensions_List
+{
+	private static Random _rand = new();
+
+	public static bool _TryRemoveRandom<T>(this List<T> target, out T value)
+	{
+		if (target.Count == 0)
+		{
+			value = default;
+			return false;
+		}
+		var index = -1;
+		lock (_rand)
+		{
+			index = _rand.Next(0, target.Count);
+		}
+
+		value = target[index];
+		target.RemoveAt(index);
+		return true;
 	}
 }
