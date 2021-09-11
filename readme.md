@@ -4,7 +4,7 @@
 # DumDum?
 A codename?
 
-This is an *execution engine* and an *ecs* framework.  Not library.  You must build your game on top of, not next to this.
+This is an **execution engine** and an **ecs** framework.  Not library.  You must build your game on top of, not next to this.
 
 # Current status
 
@@ -48,3 +48,22 @@ Logical object structure is
     - RenderingSystem
     - 
 
+
+### goals
+- engine that runs on modern desktop platforms
+- multithreaded.  take advantage of a 16 core system effectively.
+- code based game development
+- focus on modularity
+- documentation:  Class and namespace summaries at minimum.
+
+
+
+### feature notes
+- networking using either Steamworks or Epic Services
+- messaging system: try out https://github.com/Cysharp/MessagePipe
+- utils:  DotNext?
+- physics: https://github.com/bepu/bepuphysics2
+- math helper libs: Silk.net
+- input and other platform libs: Silk.net
+- kitbash:  https://kenney.nl/tools/assetforge and https://kenney.itch.io/kenshape
+- 
