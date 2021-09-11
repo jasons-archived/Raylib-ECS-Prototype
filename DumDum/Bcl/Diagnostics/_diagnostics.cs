@@ -6,66 +6,100 @@ namespace DumDum.Bcl.Diagnostics
 	/// <summary>
 	/// Debug helper used in #CHECKED builds.  Checked builds perform extra checks to ensure thread safety and detect data corruption
 	/// </summary>
+	[DebuggerNonUserCode]
 	public static class __CHECKED
 	{
 		[Conditional("CHECKED")]
-		public static void Assert(bool condition, string message = "__CHECKED condition failed")
+		[DebuggerNonUserCode, DebuggerHidden]
+		public static void Assert(bool condition, string? message = null)
 		{
-			Debug.Assert(condition, message);
+			_internal.DebugLogic.Assert(condition, message);
 		}
 		[Conditional("CHECKED")]
-		public static void Throw(bool condition, string message = "__CHECKED condition failed")
+		[DebuggerNonUserCode, DebuggerHidden]
+		public static void Throw(bool condition, string? message = null)
 		{
-			if (condition == true)
-			{
-				return;
-			}
-
-			Assert(false, message);
-			throw new(message);
+			_internal.DebugLogic.Throw(condition, message);
+		}
+		[Conditional("CHECKED")]
+		[DebuggerNonUserCode, DebuggerHidden]
+		public static void WriteLine(string message)
+		{
+			_internal.DebugLogic.WriteLine(message);
 		}
 	}
+	[DebuggerNonUserCode]
 	public static class __DEBUG
 	{
 		[Conditional("DEBUG")]
-		public static void Assert(bool condition, string message = "__DEBUG condition failed")
+		[DebuggerNonUserCode, DebuggerHidden]
+		public static void Assert(bool condition, string? message=null)
 		{
-			Debug.Assert(condition, message);
+			_internal.DebugLogic.Assert(condition, message);
 		}
 		[Conditional("DEBUG")]
-		public static void Throw(bool condition, string message = "__DEBUG condition failed")
+		[DebuggerNonUserCode, DebuggerHidden]
+		public static void Throw(bool condition, string? message = null)
 		{
-			if (condition == true)
-			{
-				return;
-			}
-
-			Assert(false, message);
-			throw new(message);
+			_internal.DebugLogic.Throw(condition, message);
 		}
-
-		public static void WriteLine(string? value)
+		[DebuggerNonUserCode, DebuggerHidden]
+		[Conditional("DEBUG")]
+		public static void WriteLine(string message)
 		{
-			Console.WriteLine(value);
+			_internal.DebugLogic.WriteLine(message);
 		}
 	}
+	[DebuggerNonUserCode]
 	public static class __ERROR
 	{
 		[Conditional("CHECKED")]
-		public static void Assert(bool condition, string message = "__ERROR condition failed")
+		[DebuggerNonUserCode, DebuggerHidden]
+		public static void Assert(bool condition, string? message = null)
 		{
-			Debug.Assert(condition, message);
+			_internal.DebugLogic.Assert(condition, message);
 		}
 		[Conditional("CHECKED")]
-		public static void Throw(bool condition, string message = "__ERROR condition failed")
+		[DebuggerNonUserCode, DebuggerHidden]
+		public static void Throw(bool condition, string? message = null)
 		{
-			if (condition == true)
+			_internal.DebugLogic.Throw(condition, message);
+		}
+		[Conditional("CHECKED")]
+		[DebuggerNonUserCode, DebuggerHidden]
+		public static void WriteLine(string message)
+		{
+			_internal.DebugLogic.WriteLine(message);
+		}
+	}
+
+	namespace _internal
+	{
+		[DebuggerNonUserCode]
+		public static class DebugLogic
+		{
+			[DebuggerNonUserCode, DebuggerHidden]
+			public static void Assert(bool condition, string message = "Assert condition failed")
 			{
-				return;
+				Debug.Assert(condition, message);
+			}
+			[DebuggerNonUserCode, DebuggerHidden]
+			public static void Throw(bool condition, string message = "Throw condition failed")
+			{
+				if (condition == true)
+				{
+					return;
+				}
+
+				Assert(false, message);
+				throw new(message);
 			}
 
-			Assert(false, message);
-			throw new(message);
+			[DebuggerNonUserCode]
+			public static void WriteLine(string message)
+			{
+				Console.WriteLine(message);
+			}
 		}
 	}
 }
