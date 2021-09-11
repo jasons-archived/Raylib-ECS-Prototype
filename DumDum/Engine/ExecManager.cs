@@ -44,12 +44,18 @@ public class ExecManager
 	public void BeginRun()
 	{
 
-
 	}
 
 	private HashSet<string> _tempFinished = new();
 	private HashSet<ExecNodeBase> _tempToUpdateThisTick = new();
-	private List<ExecNodeBase> _tempAboutToUpdate = new();
+	/// <summary>
+	/// helper to track what nodes are ready for updating.  removed as soon as they are updated.
+	/// </summary>
+	private List<ExecNodeBase> _tempUnblockedAndReadyForUpdate = new();
+	/// <summary>
+	/// helper to track what nodes we have already marked as "ready to execute" this tick.
+	/// </summary>
+	private HashSet<ExecNodeBase> _tempUnblockedAndReadyForUpdate_Lookup = new();
 	private HashSet<ExecNodeBase> _tempNowUpdating = new();
 	private ExecState _execState = new();
 	private Random _rand = new();
@@ -59,14 +65,18 @@ public class ExecManager
 
 
 		__DEBUG.Assert(
-			_tempAboutToUpdate.Count == 0
+			_tempUnblockedAndReadyForUpdate.Count == 0
 			&& _tempToUpdateThisTick.Count == 0
-			&& _tempAboutToUpdate.Count == 0
-			&& _tempNowUpdating.Count == 0
+			&& _tempFinished.Count == 0
 			&& _tempNowUpdating.Count == 0
 			, "algo error: below should clear these before exiting fcn"
 		);
-		this._tempToUpdateThisTick.UnionWith(_nodes);
+
+		foreach (var item in _nodes)
+		{
+			_tempToUpdateThisTick.Add(item);
+		}
+		//_tempToUpdateThisTick.UnionWith(_nodes);
 
 		_execState.Update(elapsed);
 
@@ -81,7 +91,10 @@ public class ExecManager
 				//if the current node has no blocks or all its blocks have already finished
 				if (!node._updateAfter.Any() || _tempFinished.IsSupersetOf(node._updateAfter))
 				{
-					_tempAboutToUpdate.Add(node);
+					if (_tempUnblockedAndReadyForUpdate_Lookup.Add(node))
+					{
+						_tempUnblockedAndReadyForUpdate.Add(node);
+					}
 				}
 			}
 
@@ -89,14 +102,14 @@ public class ExecManager
 
 			//NOTE: this was a WHILE loop.
 			//changing to an IF so that we can maximize randomness of node execution order.
-			// Why this change to IF allows it:  only execute one node randomly from all "_tempAboutToUpdate" choices,
+			// Why this change to IF allows it:  only execute one node randomly from all "_tempUnblockedAndReadyForUpdate" choices,
 			//then go back to the above WHILE to add any more just-unblocked nodes to our choices.
-			if (_tempAboutToUpdate.Count > 0)
+			if (_tempUnblockedAndReadyForUpdate.Count > 0)
 			{
 				//get a random node
-				var index = _rand.Next(0, _tempAboutToUpdate.Count);
-				var node = _tempAboutToUpdate[index];
-				_tempAboutToUpdate.RemoveAt(index);
+				var index = _rand.Next(0, _tempUnblockedAndReadyForUpdate.Count);
+				var node = _tempUnblockedAndReadyForUpdate[index];
+				_tempUnblockedAndReadyForUpdate.RemoveAt(index);
 				this._tempToUpdateThisTick.Remove(node);
 
 				//execute it
@@ -111,10 +124,15 @@ public class ExecManager
 			}
 
 
-			__DEBUG.Assert(_tempAboutToUpdate.Count == 0, "above should have cleared as part of algo");
-			__DEBUG.Throw(loopExecCount > 0, "at least one node should have executed, or we will be stuck in an infinite loop");
+			
+
+			__DEBUG.Throw(loopExecCount > 0, $"No nodes executed.  We are in a deadlock state.  There are {_tempToUpdateThisTick.Count} nodes still remaining.  " +
+			                                 $"At least one node should have executed per WHILE loop, or we will be stuck in an infinite loop." +
+			                                 $" Possible cause is a node that has an invalid .UpdateAfter() dependency");
 		}
 
+		__DEBUG.Assert(_tempUnblockedAndReadyForUpdate.Count == 0, "above should have cleared as part of algo");
+		_tempUnblockedAndReadyForUpdate_Lookup.Clear();
 		this._tempToUpdateThisTick.Clear();
 		_tempFinished.Clear();
 	}
@@ -127,7 +145,30 @@ public class ExecManager
 
 public abstract class ExecNodeBase
 {
-	public string Name{ get; init; }
+	private static HashSet<string> _names = new();
+//	private string _name;
+
+	public string Name
+	{
+		get;init;
+	}
+
+	public ExecNodeBase(string name)
+	{
+		Name = name;
+		lock (_names)
+		{
+			_names.Add(Name);
+		}
+	}
+	~ExecNodeBase()
+	{
+		lock (_names)
+		{
+			_names.Remove(Name);
+		}
+	}
+
 	/// <summary>
 	/// names of nodes this will update after
 	/// </summary>
@@ -158,24 +199,71 @@ public abstract class ExecNodeBase
 
 }
 
-//public class A : SystemBase
-//{
-//	protected override void OnAdd(ExecManager execManager)
-//	{
-//		this._updateAfter.Add(typeof(B))
-//	}
-//}
-//public class B : SystemBase
-//{
-//	protected override void OnAdd(ExecManager execManager)
-//	{
-//		this._updateAfter.Add()
-//	}
-//}
-//public class A : SystemBase
-//{
-//	protected override void OnAdd(ExecManager execManager)
-//	{
-//		this._updateAfter.Add()
-//	}
-//}
+public class A : ExecNodeBase
+{
+	public A(string name = "A") : base(name)
+	{
+
+	}
+
+
+	internal override void OnRegister(ExecManager execManager)
+	{
+		this.UpdateAfter("B");
+	}
+
+	internal override void OnUnregister(ExecManager execManager)
+	{
+	}
+
+	internal override void Update(ExecState state)
+	{
+		Console.WriteLine($"{Name} @{state._totalFrames} ({state._totalElapsed})");
+	}
+}
+
+public class B : ExecNodeBase
+{
+	public B(string name = "B") : base(name)
+	{
+
+	}
+
+
+	internal override void OnRegister(ExecManager execManager)
+	{
+		this.UpdateAfter("C");
+	}
+
+	internal override void OnUnregister(ExecManager execManager)
+	{
+	}
+
+	internal override void Update(ExecState state)
+	{
+		Console.WriteLine($"{Name} @{state._totalFrames} ({state._totalElapsed})");
+	}
+}
+
+public class C : ExecNodeBase
+{
+	public C(string name = "C") : base(name)
+	{
+
+	}
+
+
+	internal override void OnRegister(ExecManager execManager)
+	{
+		//this.UpdateAfter("C");
+	}
+
+	internal override void OnUnregister(ExecManager execManager)
+	{
+	}
+
+	internal override void Update(ExecState state)
+	{
+		Console.WriteLine($"{Name} @{state._totalFrames} ({state._totalElapsed})");
+	}
+}
