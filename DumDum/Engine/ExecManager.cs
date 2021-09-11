@@ -9,6 +9,97 @@ using DumDum.Engine._internal;
 
 namespace DumDum.Engine;
 
+/**
+ * A special node that specifies groupings of nodes that should update together
+ */
+public class SystemGroup : ExecNodeBase
+{
+
+
+
+	/// <summary>
+	/// the target framerate you want to execute at.
+	/// Note that nested groups will already be constrained by the parent group TargetFrameRate,
+	/// but this property can still be set for the child group. In that case the child group will update at the slowest of the two TargetFrameRates.
+	/// <para>default is int.MaxValue (update as fast as possible (every tick))</para>
+	/// </summary>
+	public double TargetFrameRate
+	{
+		get => 1 / _targetUpdateInterval.TotalSeconds;
+		set => _targetUpdateInterval = TimeSpan.FromSeconds(1 / value);
+	}
+	private TimeSpan _targetUpdateInterval = TimeSpan.Zero;
+	/// <summary>
+	/// If set to true, attempts to ensure we update at precisely the rate specified.  if we execute slightly later than the TargetFrameRate, the extra delay is not ignored and is taken into consideration on future updates.  
+	/// </summary>
+	public bool FixedStep = false;
+
+	/// <summary>
+	/// if our update is more than this many frames out of date, we ignore others.
+	/// <para> only matters if FixedStep==true</para>
+	/// </summary>
+	public int CatchUpMaxFrames = 1;
+
+	public SystemGroup _parent;
+	public List<ExecNodeBase> _children = new();
+	public TimeSpan _elapsedSinceLastUpdate = TimeSpan.Zero;
+
+	private ExecManager _execManager;
+
+
+
+	internal override void OnRegister(ExecManager execManager)
+	{
+		_execManager = execManager;
+	}
+
+	internal override void OnUnregister(ExecManager execManager)
+	{
+		_execManager = null;
+	}
+
+	internal override void Update(ExecState state)
+	{
+		//determine if we should execute
+		_elapsedSinceLastUpdate.Add(state._frameElapsed);
+		if (_elapsedSinceLastUpdate < _targetUpdateInterval)
+		{
+			//not yet time
+			return;
+		}
+
+		if (FixedStep == false)
+		{
+			//don't keep extra
+			_elapsedSinceLastUpdate = TimeSpan.Zero;
+		}
+		else
+		{
+			//time to execute, lets update our internal tracking of when next to update (_elapsedSinceLastUpdate)
+			if (CatchUpMaxFrames == 0)
+			{
+				//no catchup so skip frames if we are way too out of date
+				_elapsedSinceLastUpdate = TimeSpan.FromSeconds(_elapsedSinceLastUpdate.TotalSeconds % _targetUpdateInterval.TotalSeconds);
+			}
+			else
+			{
+				//logic to deal with catchup frames
+				if (_elapsedSinceLastUpdate > (_targetUpdateInterval * CatchUpMaxFrames))
+				{
+					_elapsedSinceLastUpdate = (_targetUpdateInterval * CatchUpMaxFrames).Add(state._frameElapsed);
+				}
+				_elapsedSinceLastUpdate -= _targetUpdateInterval;
+			}
+		}
+
+		//now executing.   enqueue our children to execute.
+		foreach (var childNode in _children)
+		{
+			_execManager._ScheduleNodeForThisFrame(childNode);
+		}
+	}
+}
+
 
 
 /// <summary>
@@ -87,7 +178,7 @@ public class ExecManager
 		{
 			foreach (var updateAfterName in node._execCriteria._updateAfterNodeNames)
 			{
-				__CHECKED.AssertOnce(_registeredNodeNames.Contains(updateAfterName),$"The node {node.Name} is specified to update after node {updateAfterName} but that node is not registered with the ExecManager.  This dependency will be assumed to be fulfuilled (nothing to wait on)");
+				__CHECKED.AssertOnce(_registeredNodeNames.Contains(updateAfterName), $"The node {node.Name} is specified to update after node {updateAfterName} but that node is not registered with the ExecManager.  This dependency will be assumed to be fulfuilled (nothing to wait on)");
 			}
 		}
 #endif
@@ -100,8 +191,8 @@ public class ExecManager
 		//randomize execution order of those nodes that can execute now (good for debugging dependency problems)
 		while (this._tempToUpdateThisTick.Count > 0)
 		{
-			
-			
+
+
 
 			//try to add all unblocked nodes 
 			foreach (var currentInspectedPending in this._tempToUpdateThisTick)
@@ -167,11 +258,11 @@ public class ExecManager
 			}
 
 
-			
+
 
 			__DEBUG.Throw(loopExecCount > 0, $"No nodes executed.  We are in a deadlock state.  There are {_tempToUpdateThisTick.Count} nodes still remaining.  " +
-			                                 $"At least one node should have executed per WHILE loop, or we will be stuck in an infinite loop." +
-			                                 $" Possible cause is a node that has an invalid .UpdateAfter() dependency");
+											 $"At least one node should have executed per WHILE loop, or we will be stuck in an infinite loop." +
+											 $" Possible cause is a node that has an invalid .UpdateAfter() dependency");
 		}
 
 		__DEBUG.Assert(_tempUnblockedAndReadyForUpdate.Count == 0, "above should have cleared as part of algo");
@@ -180,8 +271,10 @@ public class ExecManager
 		_tempFinishedNodes.Clear();
 	}
 
-
-
+	internal void _ScheduleNodeForThisFrame(ExecNodeBase childNode)
+	{
+		throw new NotImplementedException();
+	}
 }
 
 /// <summary>
@@ -189,7 +282,7 @@ public class ExecManager
 /// </summary>
 public class ExecCriteria
 {
-	public List<string> _updateAfterNodeNames=new();
+	public List<string> _updateAfterNodeNames = new();
 	public List<string> _updateAfterNodeCategories = new();
 
 	//TODO: figure out compnent r/w access
@@ -218,19 +311,22 @@ public class ExecCriteria
 public abstract class ExecNodeBase
 {
 	private static HashSet<string> _names = new();
-//	private string _name;
+
 	public List<string> Categories = new();
+
+	private string _name;
 	public string Name
 	{
-		get;init;
-	}
-
-	public ExecNodeBase(string name)
-	{
-		Name = name;
-		lock (_names)
+		get => _name;
+		init
 		{
-			_names.Add(Name);
+			lock (_names)
+			{
+				var result = _names.Add(value);
+				__ERROR.Throw(result,
+					$"Error naming node '{value}' because another node already exists with the same name");
+			}
+			_name = value;
 		}
 	}
 	~ExecNodeBase()
