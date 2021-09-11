@@ -26,9 +26,9 @@ namespace DumDum.Engine._internal
 
 			//TODO: instead of doing calculations on last 100 frames, store avg/min/max for last 10 seconds.
 			_lastFpsSamples[_totalFrames % _lastFpsSamples.Length] = instantFps;
-			_avgFps = _lastFpsSamples._AVG();
-			_maxFps= _lastFpsSamples._MAX();
-			_minFps= _lastFpsSamples._MIN();
+			_avgFps =MathF.Round(_lastFpsSamples._AVG(),1);
+			_maxFps= MathF.Round(_lastFpsSamples._MAX(), 1);
+			_minFps = MathF.Round(_lastFpsSamples._MIN(), 1);
 
 		}
 	}

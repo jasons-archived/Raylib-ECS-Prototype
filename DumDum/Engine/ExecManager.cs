@@ -80,6 +80,19 @@ public class ExecManager
 
 		_execState.Update(elapsed);
 
+
+#if CHECKED
+
+		foreach (var node in _nodes)
+		{
+			foreach (var updateAfterName in node._updateAfter._nodeNames)
+			{
+				__CHECKED.AssertOnce(_registeredNodeNames.Contains(updateAfterName),$"The node {node.Name} is specified to update after node {updateAfterName} but that node is not registered with the ExecManager.  This dependency will be assumed to be fulfuilled (nothing to wait on)");
+			}
+		}
+#endif
+
+
 		//TODO:  ensure that all nodes that wait on named nodes actually have nodes of that name added.
 		//throw new NotImplementedException();
 
@@ -171,6 +184,9 @@ public class ExecManager
 
 }
 
+/// <summary>
+/// constrain your node's execution by specifying what nodes need to run first, and what components your node needs read/write access to.
+/// </summary>
 public class UpdateAfterCriteria
 {
 	public List<string> _nodeNames=new();
@@ -271,7 +287,7 @@ public class A : ExecNodeBase
 
 	internal override void Update(ExecState state)
 	{
-		Console.WriteLine($"{Name} @{state._totalFrames} ({state._totalElapsed})");
+		Console.WriteLine($"{Name} @{state._totalFrames} ({state._totalElapsed})  FPS={state._avgFps} ({state._minFps}/{state._maxFps})");
 	}
 }
 
