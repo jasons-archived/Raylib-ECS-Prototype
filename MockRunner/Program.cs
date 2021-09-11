@@ -18,12 +18,12 @@ long lastElapsed = 0;
 execManager.BeginRun();
 
 //add some test nodes
-execManager.Register(new A());
-execManager.Register(new B());
-execManager.Register(new C());
-execManager.Register(new B("b2"));
-execManager.Register(new B("b3"));
-execManager.Register(new B("b1"));
+//execManager.Register(new A());
+//execManager.Register(new B());
+//execManager.Register(new C());
+//execManager.Register(new B("b2"));
+//execManager.Register(new B("b3"));
+//execManager.Register(new B("b1"));
 
 while (true)
 {
