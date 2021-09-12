@@ -1,5 +1,4 @@
-﻿using DumDum.Bcl;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,52 +6,126 @@ using System.Threading.Tasks;
 using DumDum.Bcl.Diagnostics;
 using DumDum.Engine._internal;
 
-namespace DumDum.Engine.Obsolete;
+namespace DumDum.Engine.Ecs;
 
+
+
+
+public abstract class Node
+{
+	public string _parentName;
+	protected Node _parent;
+	protected ExecManager _execManager;
+	public List<string> Categories = new();
+	public string Name{ get; init; }
+
+	public ExecCriteria _execCriteria = new();
+
+
+
+
+	/// <summary>
+	/// triggered when attaching to the engine.  
+	/// </summary>
+	/// <param name="execManager"></param>
+	internal void OnRegister(SystemGroup parent, ExecManager execManager)
+	{
+		if (_parentName != null)
+		{
+			__DEBUG.Assert(parent.Name == _parentName);
+		}
+		_parent = parent;
+		_execManager = execManager;
+	}
+
+	/// <summary>
+	/// triggered when detached
+	/// </summary>
+	/// <param name="execManager"></param>
+	internal void OnUnregister(SystemGroup parent, ExecManager execManager)
+	{
+		_parent = null;
+		_execManager = null;
+	}
+
+
+	internal abstract void Update(ExecState state);
+
+
+	private int _frameCurrentlyScheduled = 0;
+	private int _frameLastFinished = 0;
+	/// <summary>
+	/// this gets triggered when the node becomes scheduled for execution in the current tick.
+	/// execution may not happen immediately because of other nodes
+	/// </summary>
+	internal void UpdateScheduled(ExecState execState)
+	{
+		__DEBUG.Assert(_frameCurrentlyScheduled < execState._totalFrames && _frameCurrentlyScheduled == _frameLastFinished);
+		_frameCurrentlyScheduled = execState._totalFrames;
+
+		//inform parent hiearchy that we are updating (blocking it's completion)
+		var curParent = _parent;
+		while (curParent != null)
+		{
+			lock (curParent._childrenCurrentlyUpdating)
+			{
+				curParent._childrenCurrentlyUpdating.Add(this);
+				curParent = curParent._parent;
+			}
+		}
+
+		_execCriteria.UpdateScheduled(this, _execManager);
+	}
+
+	internal bool IsUpdateBlocked()
+	{
+		return _execCriteria.IsUpdateBlocked(this, _execManager);
+	}
+	/// <summary>
+	/// any housekeeping your node needs to do after the main update loop can go here
+	/// </summary>
+	internal void EndUpdate(ExecState execState)
+	{
+		//inform parent hiearchy that we are updating (blocking it's completion)
+		var curParent = _parent;
+		while (curParent != null)
+		{
+			lock (curParent._childrenCurrentlyUpdating)
+			{
+				curParent._childrenCurrentlyUpdating.Remove(this);
+				curParent = curParent._parent;
+			}
+		}
+
+		__DEBUG.Assert(_frameCurrentlyScheduled == execState._totalFrames &&
+					   _frameLastFinished < _frameCurrentlyScheduled);
+		_frameLastFinished = execState._totalFrames;
+
+	}
+
+	internal abstract bool CurrentFrameIsRunning();
+}
 
 
 
 /**
  * A special node that specifies groupings of nodes that should update together
  */
-public class SystemGroup : ExecNodeBase
+public class SystemGroup : Node
 {
 
 
 
-	/// <summary>
-	/// the target framerate you want to execute at.
-	/// Note that nested groups will already be constrained by the parent group TargetFrameRate,
-	/// but this property can still be set for the child group. In that case the child group will update at the slowest of the two TargetFrameRates.
-	/// <para>default is int.MaxValue (update as fast as possible (every tick))</para>
-	/// </summary>
-	public double TargetFrameRate
-	{
-		get => 1 / _targetUpdateInterval.TotalSeconds;
-		set => _targetUpdateInterval = TimeSpan.FromSeconds(1 / value);
-	}
-	private TimeSpan _targetUpdateInterval = TimeSpan.Zero;
-	/// <summary>
-	/// If set to true, attempts to ensure we update at precisely the rate specified.  if we execute slightly later than the TargetFrameRate, the extra delay is not ignored and is taken into consideration on future updates.  
-	/// </summary>
-	public bool FixedStep = false;
-
-	/// <summary>
-	/// if our update is more than this many frames out of date, we ignore others.
-	/// <para> only matters if FixedStep==true</para>
-	/// </summary>
-	public int CatchUpMaxFrames = 1;
-
 	public SystemGroup _parent;
-	public List<ExecNodeBase> _children = new();
-	public HashSet<ExecNodeBase> _childrenCurrentlyUpdating = new();
+	public List<Node> _children = new();
+	public HashSet<Node> _childrenCurrentlyUpdating = new();
 	public TimeSpan _elapsedSinceLastUpdate = TimeSpan.Zero;
 
 	private ExecManager _execManager;
 
 
 
-	public void Register(ExecNodeBase node)
+	public void Register(Node node)
 	{
 		//check with exec mnager to be sure node name is unique
 		_execManager._InformOnRegister(node);
@@ -64,7 +137,7 @@ public class SystemGroup : ExecNodeBase
 		node.OnRegister(this, _execManager);
 	}
 
-	public void Unregister(ExecNodeBase node)
+	public void Unregister(Node node)
 	{
 		_execManager._InformOnUnregister(node);
 
@@ -134,8 +207,8 @@ public class ExecManager
 
 
 	//private HashSet<string> _registeredNodeNames = new();
-	private Dictionary<string, ExecNodeBase> _registeredNodes = new();
-	public IReadOnlyDictionary<string, ExecNodeBase> RegisteredNodes => _registeredNodes;
+	private Dictionary<string, Node> _registeredNodes = new();
+	public IReadOnlyDictionary<string, Node> RegisteredNodes => _registeredNodes;
 
 
 
@@ -143,11 +216,11 @@ public class ExecManager
 	/// called by SystemGroup when a child registers
 	/// </summary>
 	/// <param name="node"></param>
-	internal void _InformOnRegister(ExecNodeBase node)
+	internal void _InformOnRegister(Node node)
 	{
 		__ERROR.Throw(_registeredNodes.TryAdd(node.Name, node), $"Another node with name '{node.Name}' has already been added");
 	}
-	internal void _InformOnUnregister(ExecNodeBase node)
+	internal void _InformOnUnregister(Node node)
 	{
 		__ERROR.Throw(_registeredNodes.Remove(node.Name), $"Node with name '{node.Name}' was not found to be removed");
 	}
@@ -182,41 +255,31 @@ public class ExecManager
 	private Random _rand = new();
 
 
-	/// <summary>
-	/// key should not update yet, because it's being stopped by value, which wants to complete first.
-	/// <para>records added by VALUE</para>
-	/// </summary>
-	public Dictionary<string, ExecNodeBase> _currentFrameUpdateBeforeBlocks = new();
-	/// <summary>
-	/// key should not update yet, becasue it wants to wait until VALUE has completed.
-	/// <para>records added by KEY</para>
-	/// </summary>
-	public Dictionary<ExecNodeBase, string> _currentFrameUpdateAfterBlocks = new();
 
 
 	public Dictionary<string, ExecStatus> _currentFrameNodeStatus = new();
-	//private HashSet<ExecNodeBase> _tempFinishedNodes = new();
-	private List<ExecNodeBase> _currentFrameScheduled = new();
+	//private HashSet<Node> _tempFinishedNodes = new();
+	private List<Node> _currentFrameScheduled = new();
 	/// <summary>
 	/// helper to track what nodes are ready for updating.  removed as soon as they are updated.
 	/// </summary>
-	private List<ExecNodeBase> _currentFrameIMMINENT = new();
+	private List<Node> _currentFrameIMMINENT = new();
 	///// <summary>
 	///// helper to track what nodes we have already marked as "ready to execute" this tick.
 	///// </summary>
-	//private HashSet<ExecNodeBase> _tempUnblockedAndReadyForUpdate_Lookup = new();
-	private List<ExecNodeBase> _currentFrameRunning = new();
-	private HashSet<ExecNodeBase> _currentFrameFinished = new();
+	//private HashSet<Node> _tempUnblockedAndReadyForUpdate_Lookup = new();
+	private List<Node> _currentFrameRunning = new();
+	private HashSet<Node> _currentFrameFinished = new();
 
 
-	internal void _ScheduleNodesForThisFrame(ExecNodeBase childNode, List<ExecNodeBase> _children)
+	internal void _ScheduleNodesForThisFrame(Node childNode, List<Node> _children)
 	{
 		foreach (var node in _children)
 		{
 			CurrentFrameScheduleNode(node);
 		}
 	}
-	internal void _SkipNodesForThisFrame(ExecNodeBase childNode, List<ExecNodeBase> _children)
+	internal void _SkipNodesForThisFrame(Node childNode, List<Node> _children)
 	{
 		foreach (var node in _children)
 		{
@@ -226,7 +289,7 @@ public class ExecManager
 		}
 	}
 
-	protected internal void CurrentFrameScheduleNode(ExecNodeBase node)
+	protected internal void CurrentFrameScheduleNode(Node node)
 	{
 		__DEBUG.Assert(_currentFrameNodeStatus.ContainsKey(node.Name) == false, "being added, shouldn't exist");
 		_currentFrameNodeStatus.Add(node.Name, ExecStatus.SCHEDULED);
@@ -252,7 +315,7 @@ public class ExecManager
 		);
 
 		//loop through all registered nodes and record their blockers
-		foreach((var nodeName, var node) in _registeredNodes)
+		foreach ((var nodeName, var node) in _registeredNodes)
 		{
 			node._execCriteria.
 		}
@@ -457,13 +520,13 @@ public class ExecCriteria
 	public List<Type> _readAccess = new();
 	public List<Type> _writeAccess = new();
 
-	internal bool IsUpdateBlocked(ExecNodeBase execNodeBase, ExecManager execManager)
+	internal bool IsUpdateBlocked(Node node, ExecManager execManager)
 	{
 		//ensure updateAfter nodes 
 		throw new NotImplementedException();
 	}
 
-	internal bool IsUpdateAfterBlockedBy(ExecNodeBase otherPending)
+	internal bool IsUpdateAfterBlockedBy(Node otherPending)
 	{
 		if (_updateAfterNodeNames.Contains(otherPending.Name))
 		{
@@ -480,208 +543,36 @@ public class ExecCriteria
 		return false;
 	}
 
-	internal void UpdateScheduled(ExecNodeBase execNodeBase, ExecManager execManager)
+	internal void UpdateScheduled(Node node, ExecManager execManager)
 	{
 		throw new NotImplementedException();
 	}
+
+
+
+
+	/// <summary>
+	/// the target framerate you want to execute at.
+	/// Note that nested groups will already be constrained by the parent group TargetFrameRate,
+	/// but this property can still be set for the child group. In that case the child group will update at the slowest of the two TargetFrameRates.
+	/// <para>default is int.MaxValue (update as fast as possible (every tick))</para>
+	/// </summary>
+	public double TargetFrameRate
+	{
+		get => 1 / _targetUpdateInterval.TotalSeconds;
+		set => _targetUpdateInterval = TimeSpan.FromSeconds(1 / value);
+	}
+	private TimeSpan _targetUpdateInterval = TimeSpan.Zero;
+	/// <summary>
+	/// If set to true, attempts to ensure we update at precisely the rate specified.  if we execute slightly later than the TargetFrameRate, the extra delay is not ignored and is taken into consideration on future updates.  
+	/// </summary>
+	public bool FixedStep = false;
+
+	/// <summary>
+	/// if our update is more than this many frames out of date, we ignore others.
+	/// <para> only matters if FixedStep==true</para>
+	/// </summary>
+	public int CatchUpMaxFrames = 1;
+
+
 }
-
-
-public abstract class ExecNodeBase
-{
-	public string _parentSystemGroupName;
-
-	protected SystemGroup _parent;
-	protected ExecManager _execManager;
-
-	private static HashSet<string> _names = new();
-
-	public List<string> Categories = new();
-
-	private string _name;
-	public string Name
-	{
-		get => _name;
-		init
-		{
-			lock (_names)
-			{
-				var result = _names.Add(value);
-				__ERROR.Throw(result,
-					$"Error naming node '{value}' because another node already exists with the same name");
-			}
-			_name = value;
-
-		}
-	}
-	~ExecNodeBase()
-	{
-		lock (_names)
-		{
-			_names.Remove(Name);
-		}
-	}
-
-	public ExecCriteria _execCriteria = new();
-	///// <summary>
-	///// names of nodes this will update after
-	///// </summary>
-	//internal List<string> _updateAfter = new();
-	//protected void UpdateAfter(string nodeName)
-	//{
-	//	_updateAfter.Add(nodeName);
-	//}
-	//protected void UpdateAfter(ExecNodeBase node)
-	//{
-	//	_updateAfter.Add(node.Name);
-	//}
-
-	/// <summary>
-	/// triggered when attaching to the engine.  
-	/// </summary>
-	/// <param name="execManager"></param>
-	internal void OnRegister(SystemGroup parent, ExecManager execManager)
-	{
-		if (_parentSystemGroupName != null)
-		{
-			__DEBUG.Assert(parent.Name == _parentSystemGroupName);
-		}
-		_parent = parent;
-		_execManager = execManager;
-	}
-
-	/// <summary>
-	/// triggered when detached
-	/// </summary>
-	/// <param name="execManager"></param>
-	internal void OnUnregister(SystemGroup parent, ExecManager execManager)
-	{
-		_parent = null;
-		_execManager = null;
-	}
-
-
-	internal abstract void Update(ExecState state);
-
-
-	private int _frameCurrentlyScheduled = 0;
-	private int _frameLastFinished = 0;
-	/// <summary>
-	/// this gets triggered when the node becomes scheduled for execution in the current tick.
-	/// execution may not happen immediately because of other nodes
-	/// </summary>
-	internal void UpdateScheduled(ExecState execState)
-	{
-		__DEBUG.Assert(_frameCurrentlyScheduled < execState._totalFrames && _frameCurrentlyScheduled==_frameLastFinished);
-		_frameCurrentlyScheduled = execState._totalFrames;
-
-		//inform parent hiearchy that we are updating (blocking it's completion)
-		var curParent = _parent;
-		while (curParent != null)
-		{
-			lock (curParent._childrenCurrentlyUpdating)
-			{
-				curParent._childrenCurrentlyUpdating.Add(this);
-				curParent = curParent._parent;
-			}
-		}
-
-		_execCriteria.UpdateScheduled(this, _execManager);
-	}
-
-	internal bool IsUpdateBlocked()
-	{
-		return _execCriteria.IsUpdateBlocked(this, _execManager);
-	}
-	/// <summary>
-	/// any housekeeping your node needs to do after the main update loop can go here
-	/// </summary>
-	internal void EndUpdate(ExecState execState)
-	{
-		//inform parent hiearchy that we are updating (blocking it's completion)
-		var curParent = _parent;
-		while (curParent != null)
-		{
-			lock (curParent._childrenCurrentlyUpdating)
-			{
-				curParent._childrenCurrentlyUpdating.Remove(this);
-				curParent = curParent._parent;
-			}
-		}
-
-		__DEBUG.Assert(_frameCurrentlyScheduled == execState._totalFrames &&
-		               _frameLastFinished < _frameCurrentlyScheduled);
-		_frameLastFinished = execState._totalFrames;
-
-	}
-
-	internal abstract bool CurrentFrameIsRunning();
-}
-
-//public class A : ExecNodeBase
-//{
-//	public A(string name = "A") : base(name)
-//	{
-
-//	}
-
-
-//	internal override void OnRegister(ExecManager execManager)
-//	{
-//		this._execCriteria._updateAfterNodeNames.Add("B");
-//	}
-
-//	internal override void OnUnregister(ExecManager execManager)
-//	{
-//	}
-
-//	internal override void Update(ExecState state)
-//	{
-//		Console.WriteLine($"{Name} @{state._totalFrames} ({state._totalElapsed})  FPS={state._avgFps} ({state._minFps}/{state._maxFps})");
-//	}
-//}
-
-//public class B : ExecNodeBase
-//{
-//	public B(string name = "B") : base(name)
-//	{
-
-//	}
-
-
-//	internal override void OnRegister(ExecManager execManager)
-//	{
-//		this._execCriteria._updateAfterNodeNames.Add("C");
-//	}
-
-//	internal override void OnUnregister(ExecManager execManager)
-//	{
-//	}
-
-//	internal override void Update(ExecState state)
-//	{
-//		Console.WriteLine($"{Name} @{state._totalFrames} ({state._totalElapsed})");
-//	}
-//}
-
-//public class C : ExecNodeBase
-//{
-//	public C(string name = "C") : base(name)
-//	{
-
-//	}
-
-
-//	internal override void OnRegister(ExecManager execManager)
-//	{
-//	}
-
-//	internal override void OnUnregister(ExecManager execManager)
-//	{
-//	}
-
-//	internal override void Update(ExecState state)
-//	{
-//		Console.WriteLine($"{Name} @{state._totalFrames} ({state._totalElapsed})");
-//	}
-//}
