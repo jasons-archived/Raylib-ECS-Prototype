@@ -42,4 +42,16 @@ public unsafe struct TimeStats
 
 
 	}
+	//TODO: add stopwatch showing current frame execution time
+}
+
+
+public enum ExecStatus
+{
+	NONE,
+	SCHEDULED,
+	PENDING,
+	RUNNING,
+	FINISHED,
+	SKIPPED,
 }

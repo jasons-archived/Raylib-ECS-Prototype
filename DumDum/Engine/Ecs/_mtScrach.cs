@@ -498,16 +498,6 @@ public class ExecManager
 
 }
 
-public enum ExecStatus
-{
-	NONE,
-	SCHEDULED,
-	PENDING,
-	RUNNING,
-	FINISHED,
-	SKIPPED,
-}
-
 /// <summary>
 /// constrain your node's execution by specifying what nodes need to run first, and what components your node needs read/write access to.
 /// </summary>
