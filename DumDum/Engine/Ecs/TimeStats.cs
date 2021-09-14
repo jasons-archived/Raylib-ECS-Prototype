@@ -11,7 +11,7 @@ public unsafe struct TimeStats
 {
 	public TimeSpan _frameElapsed;
 	public TimeSpan _totalElapsed;
-	public int _totalFrames = 0;
+	public int _frameId = 0;
 
 	private const int SAMPLE_COUNT = 100;
 	private fixed float _lastFpsSamples[SAMPLE_COUNT];
@@ -25,7 +25,7 @@ public unsafe struct TimeStats
 
 		_frameElapsed = frameElapsed;
 		_totalElapsed = _totalElapsed.Add(frameElapsed);
-		_totalFrames++;
+		_frameId++;
 		var instantFps = (float)(1f / frameElapsed.TotalSeconds);
 
 		//TODO: instead of doing calculations on last 100 frames, store avg/min/max for last 10 seconds.
@@ -34,7 +34,7 @@ public unsafe struct TimeStats
 		{
 			var samples = new Span<float>(ptr, SAMPLE_COUNT);
 
-			_lastFpsSamples[_totalFrames % samples.Length] = instantFps;
+			_lastFpsSamples[_frameId % samples.Length] = instantFps;
 			_avgFps = MathF.Round(samples._AVG(), 1);
 			_maxFps = MathF.Round(samples._MAX(), 1);
 			_minFps = MathF.Round(samples._MIN(), 1);
@@ -42,11 +42,15 @@ public unsafe struct TimeStats
 
 
 	}
+	public override string ToString()
+	{
+		return $"frame:{_frameId} @ {_totalElapsed} ({_frameElapsed.TotalMilliseconds.Round(2)}ms - FPS: {_maxFps.Round(1)} max : {_avgFps.Round(1)} avg : {_minFps.Round(1)} min";
+	}
 	//TODO: add stopwatch showing current frame execution time
 }
 
 
-public enum ExecStatus
+public enum FrameStatus
 {
 	NONE,
 	SCHEDULED,

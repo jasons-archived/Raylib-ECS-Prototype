@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -127,7 +129,23 @@ public static class zz__Extensions_List
 		target.RemoveAt(index);
 		return true;
 	}
+
+	public static void _Randomize<T>(this List<T> target)
+	{
+		lock (_rand)
+		{
+			for (var index = 0; index < target.Count; index++)
+			{
+				var swapIndex = _rand.Next(0, target.Count);
+				var value = target[index];
+				target[index] = target[swapIndex];
+				target[swapIndex] = value;
+			}
+		}
+		
+	}
 }
+
 
 /// <summary>Extension methods for <see cref="TaskCompletionSource{TResult}"/>.</summary>
 /// <threadsafety static="true" instance="false"/>
@@ -450,5 +468,20 @@ public static class zz_Extensions_TaskCompletionSource
 			default:
 				throw new InvalidOperationException("The task was not completed.");
 		}
+	}
+}
+
+public static class zz_Extensions_Float
+{
+	public static float Round(this float value, int digits)
+	{
+		return MathF.Round(value, digits);
+	}
+}
+public static class zz_Extensions_Double
+{
+	public static double Round(this double value, int digits)
+	{
+		return Math.Round(value, digits);
 	}
 }

@@ -25,4 +25,8 @@
     <Folder Include="Engine\_internal\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\.editorconfig" Link=".editorconfig" />
+  </ItemGroup>
+
 </Project>

@@ -572,8 +572,8 @@ namespace DumDum.Engine.Obsolete;
 //	/// </summary>
 //	internal void UpdateScheduled(ExecState execState)
 //	{
-//		__DEBUG.Assert(_frameCurrentlyScheduled < execState._totalFrames && _frameCurrentlyScheduled==_frameLastFinished);
-//		_frameCurrentlyScheduled = execState._totalFrames;
+//		__DEBUG.Assert(_frameCurrentlyScheduled < execState._frameId && _frameCurrentlyScheduled==_frameLastFinished);
+//		_frameCurrentlyScheduled = execState._frameId;
 
 //		//inform parent hiearchy that we are updating (blocking it's completion)
 //		var curParent = _parent;
@@ -609,9 +609,9 @@ namespace DumDum.Engine.Obsolete;
 //			}
 //		}
 
-//		__DEBUG.Assert(_frameCurrentlyScheduled == execState._totalFrames &&
+//		__DEBUG.Assert(_frameCurrentlyScheduled == execState._frameId &&
 //		               _frameLastFinished < _frameCurrentlyScheduled);
-//		_frameLastFinished = execState._totalFrames;
+//		_frameLastFinished = execState._frameId;
 
 //	}
 
@@ -637,7 +637,7 @@ namespace DumDum.Engine.Obsolete;
 
 //	internal override void Update(ExecState state)
 //	{
-//		Console.WriteLine($"{Name} @{state._totalFrames} ({state._totalElapsed})  FPS={state._avgFps} ({state._minFps}/{state._maxFps})");
+//		Console.WriteLine($"{Name} @{state._frameId} ({state._totalElapsed})  FPS={state._avgFps} ({state._minFps}/{state._maxFps})");
 //	}
 //}
 
@@ -660,7 +660,7 @@ namespace DumDum.Engine.Obsolete;
 
 //	internal override void Update(ExecState state)
 //	{
-//		Console.WriteLine($"{Name} @{state._totalFrames} ({state._totalElapsed})");
+//		Console.WriteLine($"{Name} @{state._frameId} ({state._totalElapsed})");
 //	}
 //}
 
@@ -682,6 +682,6 @@ namespace DumDum.Engine.Obsolete;
 
 //	internal override void Update(ExecState state)
 //	{
-//		Console.WriteLine($"{Name} @{state._totalFrames} ({state._totalElapsed})");
+//		Console.WriteLine($"{Name} @{state._frameId} ({state._totalElapsed})");
 //	}
 //}
