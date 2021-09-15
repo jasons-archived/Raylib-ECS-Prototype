@@ -34,17 +34,18 @@ var start = Stopwatch.GetTimestamp();
 long lastElapsed = 0;
 
 
-manager.Register(new DebugPrint { ParentName = "root", Name = "DebugPrint" });
+manager.Register(new DebugPrint { ParentName = "root", Name = "DebugPrint", _updateBefore = { "A" } });
 manager.Register(new HierarchyTest { ParentName = "root", Name = "A" });
 manager.Register(new HierarchyTest { ParentName = "root", Name = "A2" });
 
-manager.Register(new HierarchyTest { ParentName = "A", Name = "B" });
+manager.Register(new HierarchyTest { ParentName = "A", Name = "B", _updateBefore = { "A2" } });
 manager.Register(new HierarchyTest { ParentName = "A", Name = "B2" });
 manager.Register(new HierarchyTest { ParentName = "A", Name = "B3" });
+manager.Register(new DelayTest { ParentName = "A", Name = "B4!", _updateAfter = { "A2" } });
 
-manager.Register(new HierarchyTest { ParentName = "B", Name = "C1" });
-manager.Register(new HierarchyTest { ParentName = "B", Name = "C2" });
-manager.Register(new HierarchyTest { ParentName = "B", Name = "C3" });
+//manager.Register(new HierarchyTest { ParentName = "B", Name = "C" });
+//manager.Register(new HierarchyTest { ParentName = "B", Name = "C2" });
+//manager.Register(new HierarchyTest { ParentName = "B", Name = "C3" });
 
 //add some test nodes
 //execManager.Register(new A());
@@ -58,11 +59,11 @@ var loop = 0;
 while (true)
 {
 	loop++;
-lastElapsed = Stopwatch.GetTimestamp() - start;
-start = Stopwatch.GetTimestamp();
-	Console.WriteLine($" ======================== {loop} ({Math.Round(TimeSpan.FromTicks(lastElapsed).TotalMilliseconds,1)}ms) ============================================== ");
-await manager.Update(TimeSpan.FromTicks(lastElapsed));
-//Console.WriteLine($"last Elapsed = {lastElapsed}");
+	lastElapsed = Stopwatch.GetTimestamp() - start;
+	start = Stopwatch.GetTimestamp();
+	//Console.WriteLine($" ======================== {loop} ({Math.Round(TimeSpan.FromTicks(lastElapsed).TotalMilliseconds,1)}ms) ============================================== ");
+	await manager.Update(TimeSpan.FromTicks(lastElapsed));
+	//Console.WriteLine($"last Elapsed = {lastElapsed}");
 }
 
 
@@ -82,12 +83,26 @@ public class HierarchyTest : SimNode
 {
 	public override async Task Update(Frame frame)
 	{
+		await Task.Delay(0);
 		//Console.WriteLine("WHUT");
-		//if (frame._stats._frameId % 200 == 0)
+		if (frame._stats._frameId % 200 == 0)
 		{
-			var indent = GetHierarchyChain().Count *3;
+			var indent = GetHierarchyChain().Count * 3;
 			Console.WriteLine($"{Name.PadLeft(indent + Name.Length)}");
 		}
 		//await Task.Delay(100000);
+	}
+}
+public class DelayTest : SimNode
+{
+	public override async Task Update(Frame frame)
+	{
+		await Task.Delay(0);
+		////Console.WriteLine("WHUT");
+		if (frame._stats._frameId % 200 == 0)
+		{
+			var indent = GetHierarchyChain().Count * 3;
+			Console.WriteLine($"{Name.PadLeft(indent + Name.Length)}");
+		}
 	}
 }

@@ -255,6 +255,10 @@ public abstract partial class SimNode : IComparable<SimNode> //frame blocking / 
 		return _executionPriority - other._executionPriority;
 	}
 
+	public List<string> _updateBefore = new();
+	public List<string> _updateAfter = new();
+
+
 
 }
 
@@ -408,6 +412,39 @@ public partial class Frame ////node graph setup and execution
 			//TODO: calculate and store all runBefore/ runAfter dependencies
 
 
+			//updateAfter
+			foreach(var afterName in node._updateAfter)
+			{				
+				if(!node.FindNode(afterName, out var afterNode))
+				{
+					__DEBUG.Assert(false, "missing?  maybe not okay.  target node not registered");
+					continue;
+				}
+				if(!_frameStates.TryGetValue(afterNode, out var afterNodeState))
+				{
+					__DEBUG.Assert(false, "missing?  maybe ok.  node not participating in this frame");
+					continue;
+				}
+				frameState._updateAfter.Add(afterNodeState);
+			}
+
+			//updateBefore
+			foreach (var beforeName in node._updateBefore)
+			{
+				if (!node.FindNode(beforeName, out var beforeNode))
+				{
+					__DEBUG.Assert(false, "missing?  maybe not okay.  target node not registered");
+					continue;
+				}
+				if (!_frameStates.TryGetValue(beforeNode, out var beforeNodeState))
+				{
+					__DEBUG.Assert(false, "missing?  maybe ok.  node not participating in this frame");
+					continue;
+				}
+				beforeNodeState._updateAfter.Add(frameState);
+			}
+
+
 
 
 
@@ -466,6 +503,7 @@ public partial class Frame ////node graph setup and execution
 					currentTasks.Add(updateTask);
 					DEBUG_startedThisPass++;
 				}
+
 
 				if (currentTasks.Count >= maxThreads)
 				{
@@ -559,6 +597,11 @@ public class NodeFrameState
 	/// </summary>
 	public TimeSpan _updateTime = TimeSpan.Zero;
 
+	/// <summary>
+	/// nodes that this node must run after
+	/// </summary>
+	public List<NodeFrameState> _updateAfter = new();
+
 
 	public bool CanUpdateNow()
 	{
@@ -590,6 +633,15 @@ public class NodeFrameState
 			var result = testStatus is FrameStatus.SELF_FINISHED or FrameStatus.SCHEDULED or FrameStatus.PENDING or FrameStatus.RUNNING;
 			__DEBUG.Assert(result);
 			if (_parent._status != FrameStatus.SELF_FINISHED)
+			{
+				return false;
+			}
+		}
+
+		//ensure nodes we run after are completed
+		foreach(var otherNode in _updateAfter)
+		{
+			if (otherNode._status != FrameStatus.HIERARCHY_FINISHED)
 			{
 				return false;
 			}
