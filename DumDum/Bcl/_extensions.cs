@@ -6,14 +6,19 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DumDum.Bcl;
 
 
+public static class zz__Extensions_Object
+{
+	//public static bool _IsAny
+}
 
 
-public static class zz__Extensions_List
+	public static class zz__Extensions_List
 {
 	static ThreadLocal<Random> _rand = new(() => new());	
 
@@ -450,42 +455,53 @@ public static class zz_Extensions_Dictionary
 	/// get by reference!   ref returns allow efficient storage of structs in dictionaries
 	/// These are UNSAFE in that further modifying (adding/removing) the dictionary while using the ref return will break things!
 	/// </summary>
-	public static ref TValue _GetValueRef_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, out bool exists) where TKey : notnull
+	public static ref TValue _GetValueRef_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, out bool exists)
+		where TKey : notnull
+		where TValue : struct
 	{
 		ref var toReturn = ref CollectionsMarshal.GetValueRefOrNullRef(dict, key);
 		exists = System.Runtime.CompilerServices.Unsafe.IsNullRef(ref toReturn) == false;
 		return ref toReturn;
 	}
-	public static ref TValue _GetValueRef_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key) where TKey : notnull
+	public static ref TValue _GetValueRef_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key)
+		where TKey : notnull
+		where TValue : struct
 	{
 		return ref CollectionsMarshal.GetValueRefOrNullRef(dict, key);
 	}
-	public static ref TValue _GetValueRefOrAddDefault_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, out bool exists) where TKey : notnull
+	public static ref TValue _GetValueRefOrAddDefault_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, out bool exists)
+		where TKey : notnull
+		where TValue : struct
 	{
 		return ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out exists);
 	}
-	public static unsafe ref TValue _GetValueRefOrAddDefault_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key) where TKey : notnull
+	public static unsafe ref TValue _GetValueRefOrAddDefault_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key)
+		where TKey : notnull
+		where TValue : struct
 	{
 		bool exists;
 		return ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out *&exists);
 	}
-	public static unsafe ref TValue _GetValueRefOrAdd_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, Func_Ref<TValue> onAddNew) where TKey : notnull
-	{		
-		bool exists;
-		ref var toReturn = ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out *&exists);
-		if (exists != true)
-		{
-			ref var toAdd = ref onAddNew();
-			dict.Add(key, toAdd);
-#if DEBUG
-			toReturn = ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out *&exists);
-			__DEBUG.Assert(exists);
-#else
-			toReturn = ref dict._GetValueRef_Unsafe(key);
-#endif		
-		}
-		return ref toReturn;
-	}
+//	//below is bad pattern:  instead just set the ref returned value to the new.  (avoid struct copy)
+//	public static unsafe ref TValue _GetValueRefOrAdd_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, Func_Ref<TValue> onAddNew) 
+//		where TKey : notnull
+//		where TValue : struct
+//	{		
+//		bool exists;
+//		ref var toReturn = ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out *&exists);
+//		if (exists != true)
+//		{
+//			ref var toAdd = ref onAddNew();
+//			dict.Add(key, toAdd);
+//#if DEBUG
+//			toReturn = ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out *&exists);
+//			__DEBUG.Assert(exists);
+//#else
+//			toReturn = ref dict._GetValueRef_Unsafe(key);
+//#endif		
+//		}
+//		return ref toReturn;
+//	}
 }
 
 
@@ -513,6 +529,16 @@ public static class zz_Extensions_Span
 	{
 		return span;
 	}
+
+
+	///// <summary>
+	///// get ref to item at index 0
+	///// </summary>
+	//public static ref T _GetRef<T>(this Span<T> span)
+	//{		
+	//	return System.Runtime.InteropServices.MemoryMarshal.GetReference(span);
+	//}
+	
 
 	public static T _Sum_Generic<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
 	{

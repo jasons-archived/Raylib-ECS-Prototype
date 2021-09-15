@@ -51,7 +51,7 @@ public unsafe struct TimeStats
 		var gcTime = GC.GetGCMemoryInfo().PauseDurations._Sum_Generic();
 		var frameInfo = $"frame= {_frameId} @ {_totalElapsed.TotalSeconds._Round_Generic(0)}sec ";
 		var historyInfo = $" history = {_frameElapsed.TotalMilliseconds._Round_Generic(2)}cur {_maxMs._Round_Generic(1)}max {_avgMs._Round_Generic(1)}avg {_minMs._Round_Generic(1)}min  ";
-		var gcInfo = $" GC={GC.CollectionCount(1)} ({gcTime.TotalMilliseconds._Round_Generic(1)} ms)";
+		var gcInfo = $" GC={GC.CollectionCount(0)} ({gcTime.TotalMilliseconds._Round_Generic(1)} ms)";
 
 		return frameInfo + historyInfo + gcInfo;
 	}
@@ -65,6 +65,12 @@ public enum FrameStatus
 	SCHEDULED,
 	PENDING,
 	RUNNING,
-	FINISHED,
-	SKIPPED,
+	/// <summary>
+	/// this node update() method completed, but it's children nodes ative (this frame) are not yet known to be finished.
+	/// </summary>
+	SELF_FINISHED,
+	/// <summary>
+	/// this node and all children (active this frame) are finished
+	/// </summary>
+	HIERARCHY_FINISHED,
 }

@@ -27,7 +27,7 @@ public partial class SimManager //tree management
 		SimNode parent;
 		lock (_nodeRegistry)
 		{
-			__ERROR.Throw(_nodeRegistry.TryAdd(node.Name, node));
+			__ERROR.Throw(_nodeRegistry.TryAdd(node.Name, node),$"A node with the same name of '{node.Name}' is already registered");
 			var result = _nodeRegistry.TryGetValue(node.ParentName, out parent);
 			__ERROR.Throw(result);
 		}
@@ -115,6 +115,25 @@ public abstract partial class SimNode  //tree logic
 	public SimManager _manager;
 
 	public List<SimNode> _children = new();
+
+	public List<SimNode> GetHierarchyChain()
+	{
+		var toReturn = new List<SimNode>();
+		toReturn.Add(this);
+		var curNode = this;
+		while(curNode._parent != null)
+		{
+			toReturn.Add(curNode._parent);
+			curNode = curNode._parent;
+		}
+		return toReturn;
+	}
+
+	public override string ToString()
+	{
+		return $"{Name}  parent={ParentName}";
+
+	}
 
 	/// <summary>
 	/// count of all nodes under this node (children+their children)
@@ -316,7 +335,7 @@ public partial class Frame //general setup
 	internal static Frame FromPool(TimeStats stats, Frame priorFrame)
 	{
 		//TODO: make chain, recycle old stuff every update
-		return new Frame() {_stats=stats };
+		return new Frame() { _stats = stats };
 
 	}
 	public override string ToString()
@@ -335,9 +354,9 @@ public partial class Frame ////node graph setup and execution
 
 	public async Task InitializeNodeGraph(RootNode root)
 	{
-		
+
 		//notify all nodes of our intent to execute a frame, and obtain a flat listing of all nodes
-		__DEBUG.Assert(_allNodesInFrame.Count == 0 && _allNodesToProcess.Count==0 && _frameStates.Count==0, 
+		__DEBUG.Assert(_allNodesInFrame.Count == 0 && _allNodesToProcess.Count == 0 && _frameStates.Count == 0,
 			"should be cleared at end of last frame / from pool recycle");
 		root.OnFrameStarting(this, _allNodesInFrame);
 
@@ -359,9 +378,14 @@ public partial class Frame ////node graph setup and execution
 		//generate per-frame tracking state for each node
 		foreach (var node in _allNodesInFrame)
 		{
-			_frameStates.Add(node, new());
+			var nodeState = new NodeFrameState()
+			{
+				_node = node
+			};
+			_frameStates.Add(node, nodeState);
 		}
 		//reloop building tree of children active in scene (for this frame)
+		////This could probably be combined with prior foreach, but leaving sepearate for clarity and not assuming certain implementation
 		foreach (var node in _allNodesInFrame)
 		{
 			if (node._parent == null)
@@ -369,8 +393,27 @@ public partial class Frame ////node graph setup and execution
 				__DEBUG.Assert(node.GetType() == typeof(RootNode), "only root node should not have parent");
 				continue;
 			}
-			_frameStates[node._parent]._activeChildren.Add(_frameStates[node]);
+			var thisNodeState = _frameStates[node];
+			var parentNodeState = _frameStates[node._parent];
+			parentNodeState._activeChildren.Add(thisNodeState);
+			thisNodeState._parent = parentNodeState;
 		}
+
+		//now that our tree of NodeFrameStates is setup properly, reloop calculating execution order dependencies
+		foreach (var node in _allNodesInFrame)
+		{
+			var frameState = _frameStates[node];
+
+
+			//TODO: calculate and store all runBefore/ runAfter dependencies
+
+
+
+
+
+			//TODO: calc and store resource R/W locking
+		}
+
 
 	}
 	//gc perf cleanup
@@ -385,9 +428,15 @@ public partial class Frame ////node graph setup and execution
 		//process nodes
 		var maxThreads = Environment.ProcessorCount + 2;
 		var currentTasks = new List<Task>();
-		while (_allNodesToProcess.Count > 0)
+		var activeNodes = new List<NodeFrameState>();
+		var finishedNodes = new List<NodeFrameState>();
+
+		while (_allNodesToProcess.Count > 0 || currentTasks.Count>0)
 		{
-			var startedThisPass = 0;
+			var DEBUG_startedThisPass = 0;
+			var DEBUG_finishedNodeUpdate = 0;
+			var DEBUG_finishedHierarchy = 0;
+
 
 			//try to execute highest priority first
 			for (var i = _allNodesToProcess.Count - 1; i >= 0; i--)
@@ -405,17 +454,17 @@ public partial class Frame ////node graph setup and execution
 
 					__DEBUG.Assert(frameState._status == FrameStatus.PENDING);
 					frameState._status = FrameStatus.RUNNING;
+					activeNodes.Add(frameState);
 
-					var updateTask = node.Update(this).ContinueWith((task) =>
+					var updateTask = node.Update(this).ContinueWith(async (task) =>
 					{
 						__DEBUG.Assert(frameState._status == FrameStatus.RUNNING);
-						frameState._status = FrameStatus.FINISHED;
+						frameState._status = FrameStatus.SELF_FINISHED;
 						frameState._updateTime = updateTimer.Elapsed;
 						frameState._updateTcs.SetFromTask(task);
 					});
-
 					currentTasks.Add(updateTask);
-					startedThisPass++;
+					DEBUG_startedThisPass++;
 				}
 
 				if (currentTasks.Count >= maxThreads)
@@ -425,20 +474,55 @@ public partial class Frame ////node graph setup and execution
 				}
 			}
 
-			//wait on at least one task
+			//wait on at least one task			
 			await Task.WhenAny(currentTasks);
 			//remove done
 			for (var i = currentTasks.Count - 1; i >= 0; i--)
 			{
 				if (currentTasks[i].IsCompleted)
 				{
+					//NOTE: task may complete LONG AFTER the actual update() is finished.
+					//so we have a counter to help debuggers understand this.
+					DEBUG_finishedNodeUpdate++;
 					currentTasks.RemoveAt(i);
 				}
 			}
 
-			__DEBUG.Assert(startedThisPass > 0 || currentTasks.Count > 0, "deadlock?");
+			//loop through all active nodes, and if FINISHED and all children are HIERARCHY_FINISHED then mark this as finished and remove from active
+			for (var i = activeNodes.Count - 1; i >= 0; i--)
+			{
+				var nodeState = activeNodes[i];
+				__DEBUG.Assert(nodeState._status == FrameStatus.RUNNING || nodeState._status == FrameStatus.SELF_FINISHED);
+
+				if (nodeState._status != FrameStatus.SELF_FINISHED)
+				{
+					continue;
+				}
+				//node is finished, check children if can remove
+				var childrenFinished = true;
+				foreach (var child in nodeState._activeChildren)
+				{
+					if (child._status != FrameStatus.HIERARCHY_FINISHED)
+					{
+						childrenFinished = false;
+						break;
+					}
+				}
+				if (childrenFinished)
+				{
+					DEBUG_finishedHierarchy++;
+					nodeState._status = FrameStatus.HIERARCHY_FINISHED;
+					activeNodes.RemoveAt(i);
+					finishedNodes.Add(nodeState);
+				}
+			}
+
+
+
+			__DEBUG.Assert(DEBUG_startedThisPass > 0 || DEBUG_finishedHierarchy > 0 || currentTasks.Count > 0 || DEBUG_finishedNodeUpdate>0, "deadlock?");
 		}
 
+		__DEBUG.Assert(currentTasks.Count == 0);
 		//nothing else to process, wait on all remaining tasks
 		await Task.WhenAll(currentTasks);
 
@@ -452,6 +536,7 @@ public partial class Frame ////node graph setup and execution
 
 }
 
+
 public class NodeFrameState
 {
 	/// <summary>
@@ -460,8 +545,8 @@ public class NodeFrameState
 	public List<NodeFrameState> _activeChildren = new();
 
 	/// <summary> the target node </summary>
-	public SimNode _node{ get; init; }
-
+	public SimNode _node { get; init; }
+	public NodeFrameState _parent;
 	public TaskCompletionSource _updateTcs { get; init; } = new();
 	public FrameStatus _status { get; set; } = FrameStatus.SCHEDULED;
 	public Task UpdateTask
@@ -477,20 +562,40 @@ public class NodeFrameState
 
 	public bool CanUpdateNow()
 	{
+
+
 		//TODO:  check for blocking nodes (update before/after)
 		//TODO:  check for r/w locks
 		//TODO:  check prior frame:  this node complete + r/w locks
 
-		__DEBUG.Assert(_status == FrameStatus.SCHEDULED,"only should run this method if scheduled and trying to put to pending");
+		__DEBUG.Assert(_status == FrameStatus.SCHEDULED, "only should run this method if scheduled and trying to put to pending");
 
-		//ensure all children are finished
-		foreach (var child in _activeChildren)
+		////ensure all children are finished
+		//foreach (var child in _activeChildren)
+		//{
+		//	if (child._status < FrameStatus.HIERARCHY_FINISHED)
+		//	{
+		//		return false;
+		//	}
+		//}
+
+		//ensure parent has run to SELF_FINISHED before starting		
+		if (_parent == null)
 		{
-			if (child._status < FrameStatus.FINISHED)
+			__DEBUG.Assert(_node is RootNode);
+		}
+		else
+		{
+			var testStatus = _parent._status;
+			var result = testStatus is FrameStatus.SELF_FINISHED or FrameStatus.SCHEDULED or FrameStatus.PENDING or FrameStatus.RUNNING;
+			__DEBUG.Assert(result);
+			if (_parent._status != FrameStatus.SELF_FINISHED)
 			{
 				return false;
 			}
 		}
+
+
 		return true;
 	}
 }
