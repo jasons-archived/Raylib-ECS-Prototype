@@ -335,7 +335,7 @@ public partial class Frame ////node graph setup and execution
 
 	public async Task InitializeNodeGraph(RootNode root)
 	{
-
+		
 		//notify all nodes of our intent to execute a frame, and obtain a flat listing of all nodes
 		__DEBUG.Assert(_allNodesInFrame.Count == 0 && _allNodesToProcess.Count==0 && _frameStates.Count==0, 
 			"should be cleared at end of last frame / from pool recycle");

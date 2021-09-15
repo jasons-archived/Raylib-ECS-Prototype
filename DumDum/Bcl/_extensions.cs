@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DumDum.Bcl.Diagnostics;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -447,6 +448,7 @@ public static class zz_Extensions_Dictionary
 {
 	/// <summary>
 	/// get by reference!   ref returns allow efficient storage of structs in dictionaries
+	/// These are UNSAFE in that further modifying (adding/removing) the dictionary while using the ref return will break things!
 	/// </summary>
 	public static ref TValue _GetValueRef_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, out bool exists) where TKey : notnull
 	{
@@ -454,29 +456,38 @@ public static class zz_Extensions_Dictionary
 		exists = System.Runtime.CompilerServices.Unsafe.IsNullRef(ref toReturn) == false;
 		return ref toReturn;
 	}
-	/// <summary>
-	/// get by reference!   ref returns allow efficient storage of structs in dictionaries
-	/// </summary>
 	public static ref TValue _GetValueRef_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key) where TKey : notnull
 	{
 		return ref CollectionsMarshal.GetValueRefOrNullRef(dict, key);
 	}
-	/// <summary>
-	/// get by reference!   ref returns allow efficient storage of structs in dictionaries
-	/// </summary>
 	public static ref TValue _GetValueRefOrAddDefault_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, out bool exists) where TKey : notnull
 	{
 		return ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out exists);
 	}
-	/// <summary>
-	/// get by reference!   ref returns allow efficient storage of structs in dictionaries
-	/// </summary>
-	static unsafe ref TValue _GetValueRefOrAddDefault_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key) where TKey : notnull
+	public static unsafe ref TValue _GetValueRefOrAddDefault_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key) where TKey : notnull
 	{
-		bool unused;
-		return ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out *&unused);
+		bool exists;
+		return ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out *&exists);
+	}
+	public static unsafe ref TValue _GetValueRefOrAdd_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, Func_Ref<TValue> onAddNew) where TKey : notnull
+	{		
+		bool exists;
+		ref var toReturn = ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out *&exists);
+		if (exists != true)
+		{
+			ref var toAdd = ref onAddNew();
+			dict.Add(key, toAdd);
+#if DEBUG
+			toReturn = ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out *&exists);
+			__DEBUG.Assert(exists);
+#else
+			toReturn = ref dict._GetValueRef_Unsafe(key);
+#endif		
+		}
+		return ref toReturn;
 	}
 }
+
 
 public static class zz_Extensions_Span
 {
