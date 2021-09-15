@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,120 +10,23 @@ using System.Threading.Tasks;
 namespace DumDum.Bcl;
 
 
-public static class zz__Extensions_Array
-{
 
-
-	public static float _SUM(ref this Span<float> target)
-	{
-		var total = 0f;
-		for (var i = 0; i < target.Length; i++)
-		{
-			total += target[i];
-		}
-
-		return total;
-	}
-	public static float _AVG(ref this Span<float> target)
-	{
-
-		var total = target._SUM();
-		return total / target.Length;
-	}
-	public static float _MAX(ref this Span<float> target)
-	{
-		if (target.Length == 0)
-		{
-			return float.NaN;
-		}
-
-		var max = float.NegativeInfinity;
-		for (var i = 0; i < target.Length; i++)
-		{
-			max = target[i] > max ? target[i] : max;
-		}
-
-		return max;
-	}
-	public static float _MIN(ref this Span<float> target)
-	{
-		if (target.Length == 0)
-		{
-			return float.NaN;
-		}
-
-		var min = float.PositiveInfinity;
-		for (var i = 0; i < target.Length; i++)
-		{
-			min = target[i] < min ? target[i] : min;
-		}
-
-		return min;
-	}
-
-	public static float _SUM(this float[] target)
-	{
-		var total = 0f;
-		for (var i = 0; i < target.Length; i++)
-		{
-			total += target[i];
-		}
-
-		return total;
-	}
-	public static float _AVG(this float[] target)
-	{
-
-		var total = target._SUM();
-		return total / target.Length;
-	}
-	public static float _MAX(this float[] target)
-	{
-		if (target.Length == 0)
-		{
-			return float.NaN;
-		}
-
-		var max = float.NegativeInfinity;
-		for (var i = 0; i < target.Length; i++)
-		{
-			max = target[i] > max ? target[i] : max;
-		}
-
-		return max;
-	}
-	public static float _MIN(this float[] target)
-	{
-		if (target.Length == 0)
-		{
-			return float.NaN;
-		}
-
-		var min = float.PositiveInfinity;
-		for (var i = 0; i < target.Length; i++)
-		{
-			min = target[i] < min ? target[i] : min;
-		}
-
-		return min;
-	}
-}
 
 public static class zz__Extensions_List
 {
-	private static Random _rand = new();
+	static ThreadLocal<Random> _rand = new(() => new());	
 
-	public static bool _TryRemoveRandom<T>(this List<T> target, out T value)
-	{
+	public static bool _TryRemoveRandom<T>(this IList<T> target, out T value)
+	{		
 		if (target.Count == 0)
 		{
 			value = default;
 			return false;
 		}
 		var index = -1;
-		lock (_rand)
+		//lock (_rand)
 		{
-			index = _rand.Next(0, target.Count);
+			index = _rand.Value.Next(0, target.Count);
 		}
 
 		value = target[index];
@@ -130,20 +34,29 @@ public static class zz__Extensions_List
 		return true;
 	}
 
-	public static void _Randomize<T>(this List<T> target)
+	public static void _Randomize<T>(this IList<T> target)
 	{
-		lock (_rand)
+		//lock (_rand)
 		{
 			for (var index = 0; index < target.Count; index++)
 			{
-				var swapIndex = _rand.Next(0, target.Count);
+				var swapIndex = _rand.Value.Next(0, target.Count);
 				var value = target[index];
 				target[index] = target[swapIndex];
 				target[swapIndex] = value;
 			}
 		}
-		
+
 	}
+
+	/// <summary>
+	/// warning: do not modify list while enumerating span
+	/// </summary>
+	public static Span<T> _AsSpan_Unsafe<T>(this List<T> list)
+	{
+		return CollectionsMarshal.AsSpan(list);		
+	}
+
 }
 
 
@@ -471,17 +384,186 @@ public static class zz_Extensions_TaskCompletionSource
 	}
 }
 
-public static class zz_Extensions_Float
+public static class zz_Extensions_Numeric
 {
-	public static float Round(this float value, int digits)
+	public static T _Round_Generic<T>(this T value, int digits, MidpointRounding mode= MidpointRounding.AwayFromZero) where T : IFloatingPoint<T>
 	{
-		return MathF.Round(value, digits);
+		return T.Round(value,digits,mode);
 	}
 }
-public static class zz_Extensions_Double
+
+
+//public static class zz_Extensions_IEnumerable
+//{
+//	public static T _Sum_Generic<T>(this IEnumerable<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
+//	{
+//		var toReturn = T.AdditiveIdentity;
+//		foreach (var val in values)
+//		{
+//			toReturn += val;
+//		}
+//		return toReturn;
+//	}
+//	public static T _Avg_Generic<T>(this IEnumerable<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>, IDivisionOperators<T, float, T>
+//	{
+//		var count = 0;
+//		var toReturn = T.AdditiveIdentity;
+//		foreach (var val in values)
+//		{
+//			count++;
+//			toReturn += val;
+//		}
+//		return toReturn / count;
+//	}
+//	public static T _Min_Generic<T>(this IEnumerable<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+//	{
+//		var toReturn = T.MaxValue;
+
+//		foreach (var val in values)
+//		{
+//			if (toReturn > val)
+//			{
+//				toReturn = val;
+//			}
+//		}
+//		return toReturn;
+//	}
+//	public static T _Max_Generic<T>(this IEnumerable<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+//	{
+//		var toReturn = T.MinValue;
+
+//		foreach (var val in values)
+//		{
+//			if (toReturn < val)
+//			{
+//				toReturn = val;
+//			}
+//		}
+//		return toReturn;
+//	}
+//}
+
+public static class zz_Extensions_Dictionary
 {
-	public static double Round(this double value, int digits)
+	/// <summary>
+	/// get by reference!   ref returns allow efficient storage of structs in dictionaries
+	/// </summary>
+	public static ref TValue _GetValueRef_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, out bool exists) where TKey : notnull
 	{
-		return Math.Round(value, digits);
+		ref var toReturn = ref CollectionsMarshal.GetValueRefOrNullRef(dict, key);
+		exists = System.Runtime.CompilerServices.Unsafe.IsNullRef(ref toReturn) == false;
+		return ref toReturn;
+	}
+	/// <summary>
+	/// get by reference!   ref returns allow efficient storage of structs in dictionaries
+	/// </summary>
+	public static ref TValue _GetValueRef_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key) where TKey : notnull
+	{
+		return ref CollectionsMarshal.GetValueRefOrNullRef(dict, key);
+	}
+	/// <summary>
+	/// get by reference!   ref returns allow efficient storage of structs in dictionaries
+	/// </summary>
+	public static ref TValue _GetValueRefOrAddDefault_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, out bool exists) where TKey : notnull
+	{
+		return ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out exists);
+	}
+	/// <summary>
+	/// get by reference!   ref returns allow efficient storage of structs in dictionaries
+	/// </summary>
+	static unsafe ref TValue _GetValueRefOrAddDefault_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key) where TKey : notnull
+	{
+		bool unused;
+		return ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out *&unused);
+	}
+}
+
+public static class zz_Extensions_Span
+{
+	[ThreadStatic]
+	static Random _rand = new();
+
+	public static void _Randomize<T>(this Span<T> target)
+	{
+		//lock (_rand)
+		{
+			for (var index = 0; index < target.Length; index++)
+			{
+				var swapIndex = _rand.Next(0, target.Length);
+				var value = target[index];
+				target[index] = target[swapIndex];
+				target[swapIndex] = value;
+			}
+		}
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
+	public static ReadOnlySpan<T> _AsReadOnly<T>(this Span<T> span)
+	{
+		return span;
+	}
+
+	public static T _Sum_Generic<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
+	{
+		return values._AsReadOnly()._Sum_Generic();
+	}
+	public static T _Sum_Generic<T>(this ReadOnlySpan<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
+	{
+		var toReturn = T.AdditiveIdentity;
+		foreach (var val in values)
+		{
+			toReturn += val;
+		}
+		return toReturn;
+	}
+
+	public static T _Avg_Generic<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>, IDivisionOperators<T, float, T>
+	{
+		return values._AsReadOnly()._Avg_Generic();
+	}
+	public static T _Avg_Generic<T>(this ReadOnlySpan<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>, IDivisionOperators<T, float, T>
+	{
+		var count = 0;
+		var toReturn = T.AdditiveIdentity;
+		foreach (var val in values)
+		{
+			count++;
+			toReturn += val;
+		}
+		return toReturn / count;
+	}
+	public static T _Min_Generic<T>(this Span<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	{
+		return values._AsReadOnly()._Min_Generic();
+	}
+	public static T _Min_Generic<T>(this ReadOnlySpan<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	{
+		var toReturn = T.MaxValue;
+
+		foreach (var val in values)
+		{
+			if (toReturn > val)
+			{
+				toReturn = val;
+			}
+		}
+		return toReturn;
+	}
+	public static T _Max_Generic<T>(this Span<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	{
+		return values._AsReadOnly()._Max_Generic();
+	}
+	public static T _Max_Generic<T>(this ReadOnlySpan<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	{
+		var toReturn = T.MinValue;
+
+		foreach (var val in values)
+		{
+			if (toReturn < val)
+			{
+				toReturn = val;
+			}
+		}
+		return toReturn;
 	}
 }

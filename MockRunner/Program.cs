@@ -62,6 +62,10 @@ public class A : SimNode
 	public override async Task Update(Frame frame)
 	{
 		//Console.WriteLine("WHUT");
-		Console.WriteLine($"{Name} frame {frame}");
+		if (frame._stats._frameId % 200 == 0)
+		{
+			Console.WriteLine($"{Name} frame {frame}");
+		}
+		//await Task.Delay(100000);
 	}
 }

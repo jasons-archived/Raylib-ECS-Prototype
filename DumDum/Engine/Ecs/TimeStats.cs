@@ -14,11 +14,12 @@ public unsafe struct TimeStats
 	public int _frameId = 0;
 
 	private const int SAMPLE_COUNT = 100;
-	private fixed float _lastFpsSamples[SAMPLE_COUNT];
+	//private fixed float _lastFpsSamples[SAMPLE_COUNT];
+	private fixed float _elapsedSamples[SAMPLE_COUNT];
 
-	public float _avgFps = 0;
-	public float _minFps = 0;
-	public float _maxFps = 0;
+	public float _avgMs = 0;
+	public float _minMs = 0;
+	public float _maxMs = 0;
 	internal void Update(TimeSpan frameElapsed)
 	{
 		//simple fps metrics calculated
@@ -26,25 +27,33 @@ public unsafe struct TimeStats
 		_frameElapsed = frameElapsed;
 		_totalElapsed = _totalElapsed.Add(frameElapsed);
 		_frameId++;
-		var instantFps = (float)(1f / frameElapsed.TotalSeconds);
+		//var instantFps = (float)(1f / frameElapsed.TotalSeconds);
+		var elapsedMs =(float) frameElapsed.TotalMilliseconds._Round_Generic(2);
 
 		//TODO: instead of doing calculations on last 100 frames, store avg/min/max for last 10 seconds.
 
-		fixed (float* ptr = _lastFpsSamples)
+		fixed (float* ptr = _elapsedSamples)
 		{
 			var samples = new Span<float>(ptr, SAMPLE_COUNT);
 
-			_lastFpsSamples[_frameId % samples.Length] = instantFps;
-			_avgFps = MathF.Round(samples._AVG(), 1);
-			_maxFps = MathF.Round(samples._MAX(), 1);
-			_minFps = MathF.Round(samples._MIN(), 1);
+			samples[_frameId % samples.Length] = elapsedMs;
+			_avgMs = samples._Avg_Generic();
+			_maxMs = samples._Max_Generic();
+			_minMs = samples._Min_Generic();
 		}
-
+		var lst = new List<float>();
+		
+		
 
 	}
 	public override string ToString()
 	{
-		return $"frame:{_frameId} @ {_totalElapsed} ({_frameElapsed.TotalMilliseconds.Round(2)}ms - FPS: {_maxFps.Round(1)} max : {_avgFps.Round(1)} avg : {_minFps.Round(1)} min";
+		var gcTime = GC.GetGCMemoryInfo().PauseDurations._Sum_Generic();
+		var frameInfo = $"frame= {_frameId} @ {_totalElapsed.TotalSeconds._Round_Generic(0)}sec ";
+		var historyInfo = $" history = {_frameElapsed.TotalMilliseconds._Round_Generic(2)}cur {_maxMs._Round_Generic(1)}max {_avgMs._Round_Generic(1)}avg {_minMs._Round_Generic(1)}min  ";
+		var gcInfo = $" GC={GC.CollectionCount(1)} ({gcTime.TotalMilliseconds._Round_Generic(1)} ms)";
+
+		return frameInfo + historyInfo + gcInfo;
 	}
 	//TODO: add stopwatch showing current frame execution time
 }

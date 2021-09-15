@@ -373,6 +373,11 @@ public partial class Frame ////node graph setup and execution
 		}
 
 	}
+	//gc perf cleanup
+	//todo now:  add before/after node features
+	//test with example nodes
+	//fixup files/namespaces ("runtime" namespace)
+	//generic node exclusion (read/write) policy
 
 	public async Task ExecuteNodeGraph()
 	{
@@ -400,23 +405,14 @@ public partial class Frame ////node graph setup and execution
 
 					__DEBUG.Assert(frameState._status == FrameStatus.PENDING);
 					frameState._status = FrameStatus.RUNNING;
-					//var updateTask = node.Update(this).ContinueWith((task) =>
-					//{
-					//	__DEBUG.Assert(frameState._status == FrameStatus.RUNNING);
-					//	frameState._status = FrameStatus.FINISHED;
-					//	frameState._updateTime = updateTimer.Elapsed;
-					//	frameState._updateTcs.SetFromTask(task); 
-					//});
 
-
-					var updateTask = Task.Run(() => node.Update(this)).ContinueWith((task) =>
+					var updateTask = node.Update(this).ContinueWith((task) =>
 					{
 						__DEBUG.Assert(frameState._status == FrameStatus.RUNNING);
 						frameState._status = FrameStatus.FINISHED;
 						frameState._updateTime = updateTimer.Elapsed;
 						frameState._updateTcs.SetFromTask(task);
 					});
-
 
 					currentTasks.Add(updateTask);
 					startedThisPass++;

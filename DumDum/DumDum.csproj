@@ -2,6 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
+		<EnablePreviewFeatures>True</EnablePreviewFeatures>
+		<LangVersion>Preview</LangVersion>
     <Nullable>enable</Nullable>
     <AssemblyVersion></AssemblyVersion>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
@@ -27,6 +29,10 @@
 
   <ItemGroup>
     <None Include="..\.editorconfig" Link=".editorconfig" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Runtime.Experimental" Version="6.0.0-preview.7.21377.19" />
   </ItemGroup>
 
 </Project>
