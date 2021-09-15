@@ -68,7 +68,7 @@ public enum FrameStatus
 	/// <summary>
 	/// this node update() method completed, but it's children nodes ative (this frame) are not yet known to be finished.
 	/// </summary>
-	SELF_FINISHED,
+	FINISHED_WAITING_FOR_CHILDREN,
 	/// <summary>
 	/// this node and all children (active this frame) are finished
 	/// </summary>

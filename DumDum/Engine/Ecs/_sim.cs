@@ -126,12 +126,27 @@ public abstract partial class SimNode  //tree logic
 			toReturn.Add(curNode._parent);
 			curNode = curNode._parent;
 		}
+		toReturn.Reverse();
 		return toReturn;
+	}
+
+	/// <summary>
+	/// returns hierarchy in the string format "NodeName|root->ParentName->NodeName"
+	/// </summary>
+	/// <returns></returns>
+	public string GetHierarchyString()
+	{
+		var chain = GetHierarchyChain();
+
+		var query = from node in chain select node.Name;
+		return $"{Name}|{String.Join("->", query)}";
 	}
 
 	public override string ToString()
 	{
-		return $"{Name}  parent={ParentName}";
+		return $"{GetHierarchyString()}" ;
+
+		//return $"{Name}  parent={ParentName}";
 
 	}
 
@@ -417,7 +432,7 @@ public partial class Frame ////node graph setup and execution
 			{				
 				if(!node.FindNode(afterName, out var afterNode))
 				{
-					__DEBUG.Assert(false, "missing?  maybe not okay.  target node not registered");
+					__DEBUG.AssertOnce(false, $"'{afterName}' node is listed as an updateAfter dependency in '{node.GetHierarchyString()}' node.  target node not registered");
 					continue;
 				}
 				if(!_frameStates.TryGetValue(afterNode, out var afterNodeState))
@@ -433,7 +448,7 @@ public partial class Frame ////node graph setup and execution
 			{
 				if (!node.FindNode(beforeName, out var beforeNode))
 				{
-					__DEBUG.Assert(false, "missing?  maybe not okay.  target node not registered");
+					__DEBUG.AssertOnce(false, $"'{beforeName}' node is listed as an updateBefore dependency in '{node.Name}' node.  target node not registered");
 					continue;
 				}
 				if (!_frameStates.TryGetValue(beforeNode, out var beforeNodeState))
@@ -496,7 +511,7 @@ public partial class Frame ////node graph setup and execution
 					var updateTask = node.Update(this).ContinueWith(async (task) =>
 					{
 						__DEBUG.Assert(frameState._status == FrameStatus.RUNNING);
-						frameState._status = FrameStatus.SELF_FINISHED;
+						frameState._status = FrameStatus.FINISHED_WAITING_FOR_CHILDREN;
 						frameState._updateTime = updateTimer.Elapsed;
 						frameState._updateTcs.SetFromTask(task);
 					});
@@ -512,8 +527,13 @@ public partial class Frame ////node graph setup and execution
 				}
 			}
 
-			//wait on at least one task			
-			await Task.WhenAny(currentTasks);
+			if (currentTasks.Count != 0)
+			{
+				//wait on at least one task			
+				await Task.WhenAny(currentTasks);
+
+			}
+
 			//remove done
 			for (var i = currentTasks.Count - 1; i >= 0; i--)
 			{
@@ -530,9 +550,9 @@ public partial class Frame ////node graph setup and execution
 			for (var i = activeNodes.Count - 1; i >= 0; i--)
 			{
 				var nodeState = activeNodes[i];
-				__DEBUG.Assert(nodeState._status == FrameStatus.RUNNING || nodeState._status == FrameStatus.SELF_FINISHED);
+				__DEBUG.Assert(nodeState._status == FrameStatus.RUNNING || nodeState._status == FrameStatus.FINISHED_WAITING_FOR_CHILDREN);
 
-				if (nodeState._status != FrameStatus.SELF_FINISHED)
+				if (nodeState._status != FrameStatus.FINISHED_WAITING_FOR_CHILDREN)
 				{
 					continue;
 				}
@@ -556,8 +576,23 @@ public partial class Frame ////node graph setup and execution
 			}
 
 
-
-			__DEBUG.Assert(DEBUG_startedThisPass > 0 || DEBUG_finishedHierarchy > 0 || currentTasks.Count > 0 || DEBUG_finishedNodeUpdate>0, "deadlock?");
+			if(DEBUG_startedThisPass > 0 || DEBUG_finishedHierarchy > 0 || currentTasks.Count > 0 || DEBUG_finishedNodeUpdate > 0)
+			{
+				//ok
+			}
+			else
+			{
+				var errorStr = $"Node execution deadlocked for frame {_stats._frameId}.  " +
+					$"There are {_allNodesToProcess.Count} nodes that can not execute due to circular dependencies in UpdateBefore/After settings.  " +
+					$"These are their settings (set in code) and their runtimeUpdateAfter computed values for this frame.  Check any nodes mentioned:\n";
+				foreach(var node in _allNodesToProcess)
+				{
+					var nodeState = _frameStates[node];
+					errorStr += $"   {node.GetHierarchyString()} " +
+						$"updateBefore=[{String.Join(',', node._updateBefore)}] updateAfter=[{String.Join(',', node._updateAfter)}]  runtimeUpdateAfter=[{String.Join(',', nodeState._updateAfter)}]\n";
+				}
+				__ERROR.Throw(false, errorStr);
+			}
 		}
 
 		__DEBUG.Assert(currentTasks.Count == 0);
@@ -602,6 +637,10 @@ public class NodeFrameState
 	/// </summary>
 	public List<NodeFrameState> _updateAfter = new();
 
+	public override string ToString()
+	{
+		return $"{_node.Name} ({_status})";
+	}
 
 	public bool CanUpdateNow()
 	{
@@ -630,9 +669,9 @@ public class NodeFrameState
 		else
 		{
 			var testStatus = _parent._status;
-			var result = testStatus is FrameStatus.SELF_FINISHED or FrameStatus.SCHEDULED or FrameStatus.PENDING or FrameStatus.RUNNING;
+			var result = testStatus is FrameStatus.FINISHED_WAITING_FOR_CHILDREN or FrameStatus.SCHEDULED or FrameStatus.PENDING or FrameStatus.RUNNING;
 			__DEBUG.Assert(result);
-			if (_parent._status != FrameStatus.SELF_FINISHED)
+			if (_parent._status != FrameStatus.FINISHED_WAITING_FOR_CHILDREN)
 			{
 				return false;
 			}

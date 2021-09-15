@@ -40,12 +40,12 @@ manager.Register(new HierarchyTest { ParentName = "root", Name = "A2" });
 
 manager.Register(new HierarchyTest { ParentName = "A", Name = "B", _updateBefore = { "A2" } });
 manager.Register(new HierarchyTest { ParentName = "A", Name = "B2" });
-manager.Register(new HierarchyTest { ParentName = "A", Name = "B3" });
+manager.Register(new HierarchyTest { ParentName = "A", Name = "B3" }); 
 manager.Register(new DelayTest { ParentName = "A", Name = "B4!", _updateAfter = { "A2" } });
 
-//manager.Register(new HierarchyTest { ParentName = "B", Name = "C" });
-//manager.Register(new HierarchyTest { ParentName = "B", Name = "C2" });
-//manager.Register(new HierarchyTest { ParentName = "B", Name = "C3" });
+manager.Register(new HierarchyTest { ParentName = "B", Name = "C" });
+manager.Register(new HierarchyTest { ParentName = "B", Name = "C2" });
+manager.Register(new HierarchyTest { ParentName = "B", Name = "C3", _updateAfter = { "AA" } }); //bug
 
 //add some test nodes
 //execManager.Register(new A());
