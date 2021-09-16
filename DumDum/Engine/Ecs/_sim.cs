@@ -94,7 +94,7 @@ public interface IIgnoreUpdate { }
 /// </summary>
 public class RootNode : SimNode, IIgnoreUpdate
 {
-	public override Task Update(Frame frame)
+	public override Task Update(Frame frame, NodeFrameState frameState)
 	{
 		throw new Exception("This exception will never be thrown because this implements IIgnoreUpdate");
 	}
@@ -222,7 +222,7 @@ public abstract partial class SimNode //update logic
 	/// </summary>
 	/// <param name="frame"></param>
 	/// <returns></returns>
-	public abstract Task Update(Frame frame);
+	public abstract Task Update(Frame frame, NodeFrameState frameState);
 
 
 
@@ -320,7 +320,7 @@ public partial class Frame ////node graph setup and execution
 		//TODO: this section  should be moved into Frame class probably, as it is per-frame data.   will need to do this when we allow starting next frame early.
 
 		//sort so at bottom are those that should be executed at highest priority
-		_allNodesInFrame.Sort();
+		_allNodesInFrame.Sort();  //TODO: sort by hierarchy execution time. so longest running nodes get executed first.
 #if CHECKED
 		//when #CHECKED, randomize order to uncover order-of-execution bugs
 		_allNodesInFrame._Randomize();
@@ -481,7 +481,7 @@ public partial class Frame ////node graph setup and execution
 					else
 					{
 						//node update() may be async, so need to monitor it to track when it completes.
-						var updateTask = Task.Run(() => node.Update(this)).ContinueWith(doneUpdateTask);
+						var updateTask = Task.Run(() => node.Update(this, frameState)).ContinueWith(doneUpdateTask);
 						currentTasks.Add(updateTask);
 						DEBUG_startedThisPass++;
 

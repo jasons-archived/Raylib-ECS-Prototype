@@ -6,6 +6,7 @@
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using DumDum.Bcl.Diagnostics;
 using DumDum.Engine.Ecs;
 
 
@@ -70,7 +71,7 @@ while (true)
 
 public class DebugPrint : SimNode
 {
-	public override async Task Update(Frame frame)
+	public override async Task Update(Frame frame, NodeFrameState frameState)
 	{
 		//Console.WriteLine("WHUT");
 		if (frame._stats._frameId % 200 == 0)
@@ -83,7 +84,7 @@ public class DebugPrint : SimNode
 }
 public class HierarchyTest : SimNode
 {
-	public override async Task Update(Frame frame)
+	public override async Task Update(Frame frame, NodeFrameState frameState)
 	{
 		await Task.Delay(0);
 		//Console.WriteLine("WHUT");
@@ -98,15 +99,17 @@ public class HierarchyTest : SimNode
 public class DelayTest : SimNode
 {
 	private Random _rand = new();
-	public override async Task Update(Frame frame)
+	public override async Task Update(Frame frame, NodeFrameState frameState)
 	{
+		
 		////Console.WriteLine("WHUT");
 		if (frame._stats._frameId % 200 == 0)
 		{
 			var indent = GetHierarchy().Count * 3;
-
+			
 			Console.WriteLine($"{Name.PadLeft(indent + Name.Length)}       START");
 			await Task.Delay(_rand.Next(10,100));
+			//__DEBUG.Assert(false);
 			Console.WriteLine($"{Name.PadLeft(indent + Name.Length)}       END");
 		}
 	}
