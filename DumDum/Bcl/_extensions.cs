@@ -18,12 +18,12 @@ public static class zz__Extensions_Object
 }
 
 
-	public static class zz__Extensions_List
+public static class zz__Extensions_List
 {
-	static ThreadLocal<Random> _rand = new(() => new());	
+	static ThreadLocal<Random> _rand = new(() => new());
 
 	public static bool _TryRemoveRandom<T>(this IList<T> target, out T value)
-	{		
+	{
 		if (target.Count == 0)
 		{
 			value = default;
@@ -60,7 +60,7 @@ public static class zz__Extensions_Object
 	/// </summary>
 	public static Span<T> _AsSpan_Unsafe<T>(this List<T> list)
 	{
-		return CollectionsMarshal.AsSpan(list);		
+		return CollectionsMarshal.AsSpan(list);
 	}
 
 }
@@ -392,9 +392,9 @@ public static class zz_Extensions_TaskCompletionSource
 
 public static class zz_Extensions_Numeric
 {
-	public static T _Round_Generic<T>(this T value, int digits, MidpointRounding mode= MidpointRounding.AwayFromZero) where T : IFloatingPoint<T>
+	public static T _Round_Generic<T>(this T value, int digits, MidpointRounding mode = MidpointRounding.AwayFromZero) where T : IFloatingPoint<T>
 	{
-		return T.Round(value,digits,mode);
+		return T.Round(value, digits, mode);
 	}
 }
 
@@ -449,15 +449,35 @@ public static class zz_Extensions_Numeric
 //	}
 //}
 
+public static class zz_Extensions_Task
+{
+	/// <summary>
+	/// like Task.ContinueWith() but if the task is already completed, gives the callback an opportunity to complete synchronously.
+	/// </summary>
+	/// <param name="task"></param>
+	/// <param name="callback"></param>
+	/// <returns></returns>
+	public static Task _ContinueWithSyncOrAsync(this Task task,Func<Task,Task> callback)
+	{
+		if (task.IsCompleted)
+		{
+			return callback(task);
+		}
+		else
+		{
+			return task.ContinueWith(callback);
+		}
+	}
+}
 public static class zz_Extensions_Dictionary
 {
 
-	public static TValue _GetOrAdd<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, Func<TValue> onAddNew)
+	public static TValue _GetOrAdd<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, Func<TValue> onAddNew) where TKey : notnull
 	{
-		if(!dict.TryGetValue(key, out var value))
+		if (!dict.TryGetValue(key, out var value))
 		{
 			value = onAddNew();
-			dict.Add(key,value);
+			dict.Add(key, value);
 		}
 		return value;
 	}
@@ -493,26 +513,26 @@ public static class zz_Extensions_Dictionary
 		bool exists;
 		return ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out *&exists);
 	}
-//	//below is bad pattern:  instead just set the ref returned value to the new.  (avoid struct copy)
-//	public static unsafe ref TValue _GetValueRefOrAdd_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, Func_Ref<TValue> onAddNew) 
-//		where TKey : notnull
-//		where TValue : struct
-//	{		
-//		bool exists;
-//		ref var toReturn = ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out *&exists);
-//		if (exists != true)
-//		{
-//			ref var toAdd = ref onAddNew();
-//			dict.Add(key, toAdd);
-//#if DEBUG
-//			toReturn = ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out *&exists);
-//			__DEBUG.Assert(exists);
-//#else
-//			toReturn = ref dict._GetValueRef_Unsafe(key);
-//#endif		
-//		}
-//		return ref toReturn;
-//	}
+	//	//below is bad pattern:  instead just set the ref returned value to the new.  (avoid struct copy)
+	//	public static unsafe ref TValue _GetValueRefOrAdd_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, Func_Ref<TValue> onAddNew) 
+	//		where TKey : notnull
+	//		where TValue : struct
+	//	{		
+	//		bool exists;
+	//		ref var toReturn = ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out *&exists);
+	//		if (exists != true)
+	//		{
+	//			ref var toAdd = ref onAddNew();
+	//			dict.Add(key, toAdd);
+	//#if DEBUG
+	//			toReturn = ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out *&exists);
+	//			__DEBUG.Assert(exists);
+	//#else
+	//			toReturn = ref dict._GetValueRef_Unsafe(key);
+	//#endif		
+	//		}
+	//		return ref toReturn;
+	//	}
 }
 
 
@@ -549,7 +569,7 @@ public static class zz_Extensions_Span
 	//{		
 	//	return System.Runtime.InteropServices.MemoryMarshal.GetReference(span);
 	//}
-	
+
 
 	public static T _Sum_Generic<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
 	{

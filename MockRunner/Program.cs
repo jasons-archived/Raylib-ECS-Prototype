@@ -9,8 +9,6 @@ using System.Threading.Tasks;
 using DumDum.Engine.Ecs;
 
 
-using System;
-using System.Threading.Tasks;
 //static async Task Main(string[] args)
 //{
 //	var task = Task.Run(() => { Console.WriteLine("HELLO"); });
@@ -80,6 +78,7 @@ public class DebugPrint : SimNode
 			Console.WriteLine($"{Name} frame {frame}");
 		}
 		//await Task.Delay(100000);
+		
 	}
 }
 public class HierarchyTest : SimNode

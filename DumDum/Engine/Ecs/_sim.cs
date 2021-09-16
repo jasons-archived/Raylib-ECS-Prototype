@@ -83,16 +83,20 @@ public partial class SimManager //thread execution
 
 }
 
-
+/// <summary>
+/// apply this interface to SimNodes that you do not need to invoke the Update() method for.  
+/// This optimizes our execution engine so it does not need to asynchronously wait for an empty update method to execute in the thread pool before invoking dependent nodes.
+/// </summary>
+public interface IIgnoreUpdate { }
 
 /// <summary>
 /// a dummy node, special because it is the root of the simulation hierarchy.  All other <see cref="SimNode"/> get added under it.
 /// </summary>
-public class RootNode : SimNode
+public class RootNode : SimNode, IIgnoreUpdate
 {
 	public override Task Update(Frame frame)
 	{
-		return Task.CompletedTask;
+		throw new Exception("This exception will never be thrown because this implements IIgnoreUpdate");
 	}
 }
 /// <summary>
@@ -420,11 +424,12 @@ public partial class Frame ////node graph setup and execution
 	/// Execute the nodes Update methods.
 	/// </summary>
 	/// <returns></returns>
-	public async Task ExecuteNodeGraph()
+	public async Task ExecuteNodeGraph()  //TODO: this should be moved to an execution manager class, shared by all Frames of the same SimManager, otherwise each Frame has it's own threadpool.
 	{
-
+		//TODO: when Frames executed in parallel, do at least 1 pass through prior frame nodes before starting next frame.
 		//process nodes
 		var maxThreads = Environment.ProcessorCount + 2;
+		var greedyFillThreads = Environment.ProcessorCount / 2;
 		var currentTasks = new List<Task>();
 		var activeNodes = new List<NodeFrameState>();
 		var waitingOnChildrenNodes = new List<NodeFrameState>();
@@ -444,6 +449,7 @@ public partial class Frame ////node graph setup and execution
 				var frameState = _frameStates[node];
 				if (frameState.CanUpdateNow() && AreResourcesAvailable(node))
 				{
+					//execute the node's .Update() method
 					__DEBUG.Assert(frameState._status == FrameStatus.SCHEDULED);
 					frameState._status = FrameStatus.PENDING;
 					LockResources(node);
@@ -456,15 +462,41 @@ public partial class Frame ////node graph setup and execution
 					frameState._status = FrameStatus.RUNNING;
 					activeNodes.Add(frameState);
 
-					var updateTask = node.Update(this).ContinueWith(async (task) =>
+
+					//helper to update our frameState when the update method is done running
+					var doneUpdateTask = (Task updateTask) =>
 					{
 						__DEBUG.Assert(frameState._status == FrameStatus.RUNNING);
 						frameState._status = FrameStatus.FINISHED_WAITING_FOR_CHILDREN;
 						frameState._updateTime = updateTimer.Elapsed;
-						frameState._updateTcs.SetFromTask(task);
-					});
-					currentTasks.Add(updateTask);
-					DEBUG_startedThisPass++;
+						frameState._updateTcs.SetFromTask(updateTask);
+					};
+
+					if (node is IIgnoreUpdate)
+					{
+						//node has no update loop, it's done immediately.
+						doneUpdateTask(Task.CompletedTask);
+						DEBUG_finishedNodeUpdate++;
+					}
+					else
+					{
+						//node update() may be async, so need to monitor it to track when it completes.
+						var updateTask = Task.Run(() => node.Update(this)).ContinueWith(doneUpdateTask);
+						currentTasks.Add(updateTask);
+						DEBUG_startedThisPass++;
+
+					}
+
+					if (currentTasks.Count > greedyFillThreads)
+					{
+						//OPTIMIZATION?: once our threads are half filled, we become more picky about node prioritization.
+						//Since our _allNodesToProccess is sorted in priority order,
+						//With the following line (starting the for loop over) we will always pick the higest priority node that's available.
+						//we don't do this by default in case the simulation has hundreds of nodes with lots of blocking.
+						//(constantly starting the for-loop over every Task start seems wasteful)
+						i = _allNodesToProcess.Count - 1;
+					}
+
 				}
 
 
@@ -473,6 +505,7 @@ public partial class Frame ////node graph setup and execution
 					//too many enqueued, stop trying to enqueue more
 					break;
 				}
+
 			}
 
 			if (currentTasks.Count != 0)
@@ -563,7 +596,7 @@ public partial class Frame ////node graph setup and execution
 
 		foreach (var (resource, resourceRequests) in _readRequestsRemaining)
 		{
-			__DEBUG.Assert(resourceRequests.Count == 0,"in single frame execution mode, expect all resourcesRequests to be fulfilled by end of frame");
+			__DEBUG.Assert(resourceRequests.Count == 0, "in single frame execution mode, expect all resourcesRequests to be fulfilled by end of frame");
 		}
 		foreach (var (resource, resourceRequests) in _writeRequestsRemaining)
 		{
@@ -603,8 +636,8 @@ public partial class Frame //resource locking
 		{
 			//for a READ resource, make sure no WRITES remaining from last frame, otherwise can not proceed yet.
 			foreach (var obj in node._readResources)
-			{	
-				if(_priorFrame._writeRequestsRemaining.TryGetValue(obj,out var nodesRemaining) && nodesRemaining.Count>0)
+			{
+				if (_priorFrame._writeRequestsRemaining.TryGetValue(obj, out var nodesRemaining) && nodesRemaining.Count > 0)
 				{
 					return false;
 				}

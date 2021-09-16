@@ -33,7 +33,7 @@ namespace DumDum.Bcl.Collections._unused
 			}
 		}
 
-		public T Get(int id)
+		public T? Get(int id)
 		{
 			lock (this._lock)
 			{
