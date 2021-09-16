@@ -10,7 +10,9 @@ using DumDum.Bcl.Diagnostics;
 
 namespace DumDum.Engine.Ecs;
 
-
+/// <summary>
+/// Manages execution of <see cref="SimNode"/> in parallel based on order-of-execution requirements (see <see cref="SimNode._updateBefore"/>) and resource requirements (see <see cref="SimNode._readResources"/> and <see cref="SimNode._writeResources"/>)
+/// </summary>
 public partial class SimManager //tree management
 {
 	public Dictionary<string, SimNode> _nodeRegistry = new();
@@ -76,28 +78,6 @@ public partial class SimManager //thread execution
 		await _frame.ExecuteNodeGraph();
 
 
-
-
-
-
-
-		////////////////////  OLD BELOW
-
-
-
-		//TODO: let prior frame run late, as inter-frame coordination is taken care of in the frame object
-		//if (_priorFrameTask != null)
-		//{
-		//	while (_priorFrameTask.IsCompleted == false)
-		//	{
-		//		_priorFrameTask.Wait(TimeSpan.FromMilliseconds(10));
-		//	}
-		//	_priorFrameTask.Dispose();
-		//}
-		//_priorFrameTask = task;
-
-
-
 	}
 
 
@@ -105,7 +85,9 @@ public partial class SimManager //thread execution
 
 
 
-
+/// <summary>
+/// a dummy node, special because it is the root of the simulation hierarchy.  All other <see cref="SimNode"/> get added under it.
+/// </summary>
 public class RootNode : SimNode
 {
 	public override Task Update(Frame frame)
@@ -113,7 +95,9 @@ public class RootNode : SimNode
 		return Task.CompletedTask;
 	}
 }
-
+/// <summary>
+/// A node holds logic in it's <see cref="Update(Frame)"/> method that is executed in parallel with other Simnodes.  See <see cref="SimManager"/> for detail.
+/// </summary>
 public abstract partial class SimNode  //tree logic
 {
 	public string Name { get; init; }
@@ -123,7 +107,8 @@ public abstract partial class SimNode  //tree logic
 
 	public List<SimNode> _children = new();
 
-	public List<SimNode> GetHierarchyChain()
+
+	public List<SimNode> GetHierarchy()
 	{
 		var toReturn = new List<SimNode>();
 		toReturn.Add(this);
@@ -141,9 +126,9 @@ public abstract partial class SimNode  //tree logic
 	/// returns hierarchy in the string format "NodeName|root->ParentName->NodeName"
 	/// </summary>
 	/// <returns></returns>
-	public string GetHierarchyString()
+	public string GetHierarchyName()
 	{
-		var chain = GetHierarchyChain();
+		var chain = GetHierarchy();
 
 		var query = from node in chain select node.Name;
 		return $"{Name}|{String.Join("->", query)}";
@@ -151,7 +136,7 @@ public abstract partial class SimNode  //tree logic
 
 	public override string ToString()
 	{
-		return $"{GetHierarchyString()}";
+		return $"{GetHierarchyName()}";
 
 		//return $"{Name}  parent={ParentName}";
 
@@ -236,26 +221,6 @@ public abstract partial class SimNode //update logic
 	public abstract Task Update(Frame frame);
 
 
-	///////// <summary>
-	///////// allows await of this and all children
-	///////// </summary>
-	///////// <param name="frame"></param>
-	///////// <returns></returns>
-	//////internal async Task FrameUpdateHiearchyFinished(Frame frame)
-	//////{
-	//////	await _frameStates[frame].UpdateTask;
-
-	//////	__DEBUG.Assert(_frameStates[frame].UpdateTask.IsCompletedSuccessfully);
-
-	//////	//unblock when self and all children are complete
-	//////	foreach (var child in _children)
-	//////	{
-	//////		await child.FrameUpdateHiearchyFinished(frame);
-	//////	}
-	//////	kjhkhlkhj //remove above FrameUpdateHiearchyFinished() function.  instead have a per-frame (framestate) counter for children remaining
-	//////	//that is allocated during the FrameUpdateHiearchyStart() method.  and decremented (down hiearchy) on every Update() complete.
-	//////	//when completed, logic in the FrameState should unblock a CountdownLockSlim
-	//////}
 
 	/// <summary> frame is totally done.  clean up anything created/stored for this frame </summary>
 	internal void OnFrameFinished(Frame frame)
@@ -277,86 +242,34 @@ public abstract partial class SimNode : IComparable<SimNode> //frame blocking / 
 		return _executionPriority - other._executionPriority;
 	}
 
+	/// <summary>
+	/// name of nodes this needs to update before
+	/// </summary>
 	public List<string> _updateBefore = new();
+	/// <summary>
+	/// name of nodes this needs to update after
+	/// </summary>
 	public List<string> _updateAfter = new();
 
 
-
+	/// <summary>
+	/// object "token" used as a shared read-access key when trying to execute this node.  
+	/// <para>Nodes with read access to the same key may execute in parallel</para>
+	/// </summary>
 	public List<object> _readResources = new();
+
+	/// <summary>
+	/// object "token" used as an exclusive write-access key when trying to execute this node.  
+	/// <para>Nodes with write access to a key will run seperate from any other node using the same resource (Read or Write)</para>
+	/// </summary>
 	public List<object> _writeResources = new();
 }
 
 
 
-
-//public abstract partial class SimNode  //frame logic
-//{
-//	public List<string> _updateBefore = new();
-//	public List<string> _updateAfter = new();
-
-//	internal void OnFrameInitialize(Frame frame)
-//	{
-//		_updateCriteria.OnFrameInitialize(frame);
-//		foreach (var child in _children)
-//		{
-//			child.OnFrameInitialize(frame);
-//		}
-
-//		if (_updateCriteria.ShouldSkipFrame(frame))
-//		{
-//			SkipFrame(frame);
-//		}
-//	}
-
-//}
-
-
-//public class NodeFrameState
-//{
-//	public Frame _frame;
-//	public HashSet<SimNode> _blockedBy = new();
-//	public HashSet<SimNode> _blocking = new();
-
-//	public int Priority
-//	{
-//		get
-//		{
-//			if (_blockedBy.Count > 0)
-//			{
-//				return 0;
-//			}
-
-//			return _blocking.Count;
-//		}
-//	}
-
-//}
-
-//public class UpdateCriteria
-//{
-//	public List<string> _updateBefore = new();
-//	public List<string> _updateAfter = new();
-
-//	public SimNode _owner{ get; init; }
-
-//	public void OnFrameInitialize(Frame frame)
-//	{asdfasdfasdfasdfa  
-//			//TODO: start here with constructing the blocking criterias
-//		//populate frame with blocking criteria
-//		throw new NotImplementedException();
-//	}
-
-//	public bool IsBlocked(Frame frame)
-//	{
-//		throw new NotImplementedException();
-//	}
-
-//	internal bool ShouldSkipFrame(Frame frame)
-//	{
-//		throw new NotImplementedException();
-//	}
-//}
-
+/// <summary>
+/// A frame of execution.  We need to store state regarding SimNode execution status and that is done here, with the accompanying logic.
+/// </summary>
 public partial class Frame //general setup
 {
 	public TimeStats _stats;
@@ -381,7 +294,12 @@ public partial class Frame ////node graph setup and execution
 	private List<SimNode> _allNodesToProcess = new();
 	private Dictionary<SimNode, NodeFrameState> _frameStates = new();
 
-
+	/// <summary>
+	/// informs all registered nodes that a frame is going to start.  
+	/// This initializes the frame's state.
+	/// </summary>
+	/// <param name="root"></param>
+	/// <returns></returns>
 	public async Task InitializeNodeGraph(RootNode root)
 	{
 
@@ -443,7 +361,7 @@ public partial class Frame ////node graph setup and execution
 			{
 				if (!node.FindNode(afterName, out var afterNode))
 				{
-					__DEBUG.AssertOnce(false, $"'{afterName}' node is listed as an updateAfter dependency in '{node.GetHierarchyString()}' node.  target node not registered");
+					__DEBUG.AssertOnce(false, $"'{afterName}' node is listed as an updateAfter dependency in '{node.GetHierarchyName()}' node.  target node not registered");
 					continue;
 				}
 				if (!_frameStates.TryGetValue(afterNode, out var afterNodeState))
@@ -498,7 +416,10 @@ public partial class Frame ////node graph setup and execution
 
 
 
-
+	/// <summary>
+	/// Execute the nodes Update methods.
+	/// </summary>
+	/// <returns></returns>
 	public async Task ExecuteNodeGraph()
 	{
 
@@ -523,9 +444,9 @@ public partial class Frame ////node graph setup and execution
 				var frameState = _frameStates[node];
 				if (frameState.CanUpdateNow() && AreResourcesAvailable(node))
 				{
-					LockResources(node);
 					__DEBUG.Assert(frameState._status == FrameStatus.SCHEDULED);
 					frameState._status = FrameStatus.PENDING;
+					LockResources(node);
 
 					_allNodesToProcess.RemoveAt(i);
 
@@ -629,7 +550,7 @@ public partial class Frame ////node graph setup and execution
 				foreach (var node in _allNodesToProcess)
 				{
 					var nodeState = _frameStates[node];
-					errorStr += $"   {node.GetHierarchyString()} " +
+					errorStr += $"   {node.GetHierarchyName()} " +
 						$"updateBefore=[{String.Join(',', node._updateBefore)}] updateAfter=[{String.Join(',', node._updateAfter)}]  runtimeUpdateAfter=[{String.Join(',', nodeState._updateAfter)}]\n";
 				}
 				__ERROR.Throw(false, errorStr);
@@ -639,6 +560,15 @@ public partial class Frame ////node graph setup and execution
 		__DEBUG.Assert(currentTasks.Count == 0);
 		//nothing else to process, wait on all remaining tasks
 		await Task.WhenAll(currentTasks);
+
+		foreach (var (resource, resourceRequests) in _readRequestsRemaining)
+		{
+			__DEBUG.Assert(resourceRequests.Count == 0,"in single frame execution mode, expect all resourcesRequests to be fulfilled by end of frame");
+		}
+		foreach (var (resource, resourceRequests) in _writeRequestsRemaining)
+		{
+			__DEBUG.Assert(resourceRequests.Count == 0, "in single frame execution mode, expect all resourcesRequests to be fulfilled by end of frame");
+		}
 
 		//notify all nodes that our frame is done
 		foreach (var node in _allNodesInFrame)
@@ -661,6 +591,11 @@ public partial class Frame //resource locking
 	/// </summary>
 	public Dictionary<object, HashSet<SimNode>> _writeRequestsRemaining = new();
 
+	/// <summary>
+	/// Returns true if the read/write resources used by this frame are available.
+	/// </summary>
+	/// <param name="node"></param>
+	/// <returns></returns>
 	private bool AreResourcesAvailable(SimNode node)
 	{
 		//make sure that there are no pending resource usage in prior frames
@@ -839,49 +774,6 @@ public class NodeFrameState
 		return true;
 	}
 }
-
-
-
-///// <summary>
-///// constrain your node's execution by specifying what nodes need to run first, and what components your node needs read/write access to.
-///// </summary>
-//public class ExecCriteria
-//{
-//	public List<string> _updateAfterNodeNames = new();
-//	public List<string> _updateAfterNodeCategories = new();
-
-//	//TODO: figure out compnent r/w access
-//	public List<Type> _readAccess = new();
-//	public List<Type> _writeAccess = new();
-
-//	internal bool IsUpdateBlocked(Node node, ExecManager execManager)
-//	{
-//		//ensure updateAfter nodes 
-//		throw new NotImplementedException();
-//	}
-
-//	internal bool IsUpdateAfterBlockedBy(Node otherPending)
-//	{
-//		if (_updateAfterNodeNames.Contains(otherPending.Name))
-//		{
-//			return true;
-//		}
-
-//		foreach (var cat in _updateAfterNodeCategories)
-//		{
-//			if (otherPending.Categories.Contains(cat))
-//			{
-//				return true;
-//			}
-//		}
-//		return false;
-//	}
-
-//	internal void UpdateScheduled(Node node, ExecManager execManager)
-//	{
-//		throw new NotImplementedException();
-//	}
-
 
 
 

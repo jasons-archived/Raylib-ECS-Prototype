@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace DumDum.Engine.Ecs;
 
+/// <summary>
+/// Time stats about the execution of a frame.
+/// </summary>
 public unsafe struct TimeStats
 {
 	public TimeSpan _frameElapsed;
@@ -59,11 +62,27 @@ public unsafe struct TimeStats
 }
 
 
+/// <summary>
+/// The status of a <see cref="SimNode"/> execution during a Frame.
+/// </summary>
 public enum FrameStatus
 {
+	/// <summary>
+	/// empty.  uninitialized.  error state.
+	/// </summary>
 	NONE,
+	/// <summary>
+	/// node is scheduled for execution this frame
+	/// </summary>
 	SCHEDULED,
+	/// <summary>
+	/// Node is about to execute  .
+	/// <para>OBSOLETE: only briefly (a few nanoseconds) in this state before moving to RUNNING</para>
+	/// </summary>
 	PENDING,
+	/// <summary>
+	/// The node <see cref="SimNode.Update(Frame)"/> method is executing.
+	/// </summary>
 	RUNNING,
 	/// <summary>
 	/// this node update() method completed, but it's children nodes ative (this frame) are not yet known to be finished.

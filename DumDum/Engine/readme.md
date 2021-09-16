@@ -69,6 +69,10 @@ Later the system will also allow for negative filters.  such as Transform+Turret
  a great article explaining "Entity Component" architectures vs "Entity Component System" architectures: https://medium.com/ingeniouslysimple/entities-components-and-systems-89c31464240d
 
 
+ ## How the SimNode execution framework works:
+ The basic features for multithreaded "SimNode" execution framework.  `SimNode` will be the base type of a `System`.  You  attach them in a tree hierarchy, with the parent executing first, children executing in parallel.      
+To control execution order you can specify both "updateAfter" and "updateBefore" lists, so that you can make sure a system like `PhysicsWorldUpdate` finishes before `Rendering` starts.   
+Each node can specify resources they need Read or Write access to.  This is how multithreading is made "invisible" to the developer.  So that a system that needs Write access to Transform components will run singularly (no other systems that read/write Transform will be allowed to run at the same time), while Systems that need Read access to Transform can run in parallel.
 
 
 

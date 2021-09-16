@@ -90,7 +90,7 @@ public class HierarchyTest : SimNode
 		//Console.WriteLine("WHUT");
 		if (frame._stats._frameId % 200 == 0)
 		{
-			var indent = GetHierarchyChain().Count * 3;
+			var indent = GetHierarchy().Count * 3;
 			Console.WriteLine($"{Name.PadLeft(indent + Name.Length)}");
 		}
 		//await Task.Delay(100000);
@@ -104,7 +104,7 @@ public class DelayTest : SimNode
 		////Console.WriteLine("WHUT");
 		if (frame._stats._frameId % 200 == 0)
 		{
-			var indent = GetHierarchyChain().Count * 3;
+			var indent = GetHierarchy().Count * 3;
 
 			Console.WriteLine($"{Name.PadLeft(indent + Name.Length)}       START");
 			await Task.Delay(_rand.Next(10,100));
