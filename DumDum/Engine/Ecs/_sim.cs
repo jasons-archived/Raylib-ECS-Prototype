@@ -27,7 +27,7 @@ public partial class SimManager //tree management
 		SimNode parent;
 		lock (_nodeRegistry)
 		{
-			__ERROR.Throw(_nodeRegistry.TryAdd(node.Name, node),$"A node with the same name of '{node.Name}' is already registered");
+			__ERROR.Throw(_nodeRegistry.TryAdd(node.Name, node), $"A node with the same name of '{node.Name}' is already registered");
 			var result = _nodeRegistry.TryGetValue(node.ParentName, out parent);
 			__ERROR.Throw(result);
 		}
@@ -57,6 +57,10 @@ public partial class SimManager //tree management
 }
 public partial class SimManager //thread execution
 {
+	/// <summary>
+	/// stores current locks of all resources used by SimNodes.   This central location is needed for coordination of frame executions.
+	/// </summary>
+	public Dictionary<object, ReadWriteCounter> _resourceLocks = new();
 
 	private TimeStats _stats;
 	private Task _priorFrameTask;
@@ -64,7 +68,7 @@ public partial class SimManager //thread execution
 	public async Task Update(TimeSpan elapsed)
 	{
 		_stats.Update(elapsed);
-		_frame = Frame.FromPool(_stats, _frame);
+		_frame = Frame.FromPool(_stats, _frame, this);
 
 
 		await _frame.InitializeNodeGraph(_root);
@@ -99,6 +103,9 @@ public partial class SimManager //thread execution
 
 }
 
+
+
+
 public class RootNode : SimNode
 {
 	public override Task Update(Frame frame)
@@ -121,7 +128,7 @@ public abstract partial class SimNode  //tree logic
 		var toReturn = new List<SimNode>();
 		toReturn.Add(this);
 		var curNode = this;
-		while(curNode._parent != null)
+		while (curNode._parent != null)
 		{
 			toReturn.Add(curNode._parent);
 			curNode = curNode._parent;
@@ -144,7 +151,7 @@ public abstract partial class SimNode  //tree logic
 
 	public override string ToString()
 	{
-		return $"{GetHierarchyString()}" ;
+		return $"{GetHierarchyString()}";
 
 		//return $"{Name}  parent={ParentName}";
 
@@ -275,7 +282,10 @@ public abstract partial class SimNode : IComparable<SimNode> //frame blocking / 
 
 
 
+	public List<object> _readResources = new();
+	public List<object> _writeResources = new();
 }
+
 
 
 
@@ -350,11 +360,12 @@ public abstract partial class SimNode : IComparable<SimNode> //frame blocking / 
 public partial class Frame //general setup
 {
 	public TimeStats _stats;
+	public SimManager _manager;
 
-	internal static Frame FromPool(TimeStats stats, Frame priorFrame)
+	internal static Frame FromPool(TimeStats stats, Frame priorFrame, SimManager manager)
 	{
 		//TODO: make chain, recycle old stuff every update
-		return new Frame() { _stats = stats };
+		return new Frame() { _stats = stats, _manager = manager };
 
 	}
 	public override string ToString()
@@ -428,14 +439,14 @@ public partial class Frame ////node graph setup and execution
 
 
 			//updateAfter
-			foreach(var afterName in node._updateAfter)
-			{				
-				if(!node.FindNode(afterName, out var afterNode))
+			foreach (var afterName in node._updateAfter)
+			{
+				if (!node.FindNode(afterName, out var afterNode))
 				{
 					__DEBUG.AssertOnce(false, $"'{afterName}' node is listed as an updateAfter dependency in '{node.GetHierarchyString()}' node.  target node not registered");
 					continue;
 				}
-				if(!_frameStates.TryGetValue(afterNode, out var afterNodeState))
+				if (!_frameStates.TryGetValue(afterNode, out var afterNodeState))
 				{
 					__DEBUG.Assert(false, "missing?  maybe ok.  node not participating in this frame");
 					continue;
@@ -459,20 +470,34 @@ public partial class Frame ////node graph setup and execution
 				beforeNodeState._updateAfter.Add(frameState);
 			}
 
+			var lockTest = new DotNext.Threading.AsyncReaderWriterLock();
 
 
 
+			//calc and store resource R/W locking
 
-			//TODO: calc and store resource R/W locking
+			//reads
+			foreach (var obj in node._readResources)
+			{
+				var readRequests = _readRequestsRemaining._GetOrAdd(obj, () => new());
+				readRequests.Add(node);
+			}
+			//writes
+			foreach (var obj in node._writeResources)
+			{
+				var writeRequests = _writeRequestsRemaining._GetOrAdd(obj, () => new());
+				writeRequests.Add(node);
+			}
 		}
+		//var rwLock = new ReaderWriterLockSlim();
+		//rwLock.h
 
-
+		//System.Threading.res
+		//DotNext.Threading.
 	}
-	//gc perf cleanup
-	//todo now:  add before/after node features
-	//test with example nodes
-	//fixup files/namespaces ("runtime" namespace)
-	//generic node exclusion (read/write) policy
+
+
+
 
 	public async Task ExecuteNodeGraph()
 	{
@@ -481,9 +506,10 @@ public partial class Frame ////node graph setup and execution
 		var maxThreads = Environment.ProcessorCount + 2;
 		var currentTasks = new List<Task>();
 		var activeNodes = new List<NodeFrameState>();
+		var waitingOnChildrenNodes = new List<NodeFrameState>();
 		var finishedNodes = new List<NodeFrameState>();
 
-		while (_allNodesToProcess.Count > 0 || currentTasks.Count>0)
+		while (_allNodesToProcess.Count > 0 || currentTasks.Count > 0)
 		{
 			var DEBUG_startedThisPass = 0;
 			var DEBUG_finishedNodeUpdate = 0;
@@ -495,8 +521,9 @@ public partial class Frame ////node graph setup and execution
 			{
 				var node = _allNodesToProcess[i];
 				var frameState = _frameStates[node];
-				if (frameState.CanUpdateNow())
+				if (frameState.CanUpdateNow() && AreResourcesAvailable(node))
 				{
+					LockResources(node);
 					__DEBUG.Assert(frameState._status == FrameStatus.SCHEDULED);
 					frameState._status = FrameStatus.PENDING;
 
@@ -531,7 +558,6 @@ public partial class Frame ////node graph setup and execution
 			{
 				//wait on at least one task			
 				await Task.WhenAny(currentTasks);
-
 			}
 
 			//remove done
@@ -546,16 +572,31 @@ public partial class Frame ////node graph setup and execution
 				}
 			}
 
-			//loop through all active nodes, and if FINISHED and all children are HIERARCHY_FINISHED then mark this as finished and remove from active
+			//loop through all active nodes, and if FINISHED unlock resources and move to waiting on children collection
 			for (var i = activeNodes.Count - 1; i >= 0; i--)
 			{
 				var nodeState = activeNodes[i];
-				__DEBUG.Assert(nodeState._status == FrameStatus.RUNNING || nodeState._status == FrameStatus.FINISHED_WAITING_FOR_CHILDREN);
+				__DEBUG.Assert(nodeState._status is FrameStatus.RUNNING or FrameStatus.FINISHED_WAITING_FOR_CHILDREN);
 
 				if (nodeState._status != FrameStatus.FINISHED_WAITING_FOR_CHILDREN)
 				{
 					continue;
 				}
+				//node is finished, free resource locks
+				UnlockResources(nodeState._node);
+
+				//move to waiting on Children group
+				waitingOnChildrenNodes.Add(nodeState);
+				activeNodes.RemoveAt(i);
+			}
+
+			//loop through all waitingOnChildrenNodes, and if all children are HIERARCHY_FINISHED then mark this as finished and remove from active
+
+			for (var i = waitingOnChildrenNodes.Count - 1; i >= 0; i--)
+			{
+				var nodeState = waitingOnChildrenNodes[i];
+				__DEBUG.Assert(nodeState._status is FrameStatus.FINISHED_WAITING_FOR_CHILDREN);
+
 				//node is finished, check children if can remove
 				var childrenFinished = true;
 				foreach (var child in nodeState._activeChildren)
@@ -570,13 +611,13 @@ public partial class Frame ////node graph setup and execution
 				{
 					DEBUG_finishedHierarchy++;
 					nodeState._status = FrameStatus.HIERARCHY_FINISHED;
-					activeNodes.RemoveAt(i);
+					waitingOnChildrenNodes.RemoveAt(i);
 					finishedNodes.Add(nodeState);
 				}
 			}
 
 
-			if(DEBUG_startedThisPass > 0 || DEBUG_finishedHierarchy > 0 || currentTasks.Count > 0 || DEBUG_finishedNodeUpdate > 0)
+			if (DEBUG_startedThisPass > 0 || DEBUG_finishedHierarchy > 0 || currentTasks.Count > 0 || DEBUG_finishedNodeUpdate > 0)
 			{
 				//ok
 			}
@@ -585,7 +626,7 @@ public partial class Frame ////node graph setup and execution
 				var errorStr = $"Node execution deadlocked for frame {_stats._frameId}.  " +
 					$"There are {_allNodesToProcess.Count} nodes that can not execute due to circular dependencies in UpdateBefore/After settings.  " +
 					$"These are their settings (set in code) and their runtimeUpdateAfter computed values for this frame.  Check any nodes mentioned:\n";
-				foreach(var node in _allNodesToProcess)
+				foreach (var node in _allNodesToProcess)
 				{
 					var nodeState = _frameStates[node];
 					errorStr += $"   {node.GetHierarchyString()} " +
@@ -606,6 +647,114 @@ public partial class Frame ////node graph setup and execution
 		}
 
 	}
+}
+public partial class Frame //resource locking
+{
+
+	Frame _priorFrame;
+	/// <summary>
+	/// track what reads are remaining for this frame.   used so next frame writes will not start until these are empty.
+	/// </summary>
+	public Dictionary<object, HashSet<SimNode>> _readRequestsRemaining = new();
+	/// <summary>
+	/// track what writes remain for this frame.  used so next frame R/W will not start until these are empty.
+	/// </summary>
+	public Dictionary<object, HashSet<SimNode>> _writeRequestsRemaining = new();
+
+	private bool AreResourcesAvailable(SimNode node)
+	{
+		//make sure that there are no pending resource usage in prior frames
+		if (_priorFrame != null)
+		{
+			//for a READ resource, make sure no WRITES remaining from last frame, otherwise can not proceed yet.
+			foreach (var obj in node._readResources)
+			{	
+				if(_priorFrame._writeRequestsRemaining.TryGetValue(obj,out var nodesRemaining) && nodesRemaining.Count>0)
+				{
+					return false;
+				}
+			}
+			//for a WRITE resource, make sure no READS or WRITES remaining from last frame, otherwise can not proceed yet.
+			foreach (var obj in node._writeResources)
+			{
+				{
+					if (_priorFrame._writeRequestsRemaining.TryGetValue(obj, out var nodesRemaining) && nodesRemaining.Count > 0)
+					{
+						return false;
+					}
+				}
+				{
+					if (_priorFrame._readRequestsRemaining.TryGetValue(obj, out var nodesRemaining) && nodesRemaining.Count > 0)
+					{
+						return false;
+					}
+				}
+			}
+
+		}
+		//reads
+		foreach (var obj in node._readResources)
+		{
+			var rwCounter = _manager._resourceLocks._GetOrAdd(obj, () => new());
+			if (rwCounter.IsWriteHeld)
+			{
+				return false;
+			}
+		}
+		//writes
+		foreach (var obj in node._writeResources)
+		{
+			var rwCounter = _manager._resourceLocks._GetOrAdd(obj, () => new());
+			if (rwCounter.IsAnyHeld)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/// <summary>
+	/// lock the resource and decrement our remaining locks needed for this frame.
+	/// </summary>
+	private bool LockResources(SimNode node)
+	{
+		//reads
+		foreach (var obj in node._readResources)
+		{
+			var rwCounter = _manager._resourceLocks._GetOrAdd(obj, () => new());
+			rwCounter.EnterRead();
+			var result = _readRequestsRemaining[obj].Remove(node);
+			__DEBUG.Assert(result);
+
+		}
+		//writes
+		foreach (var obj in node._writeResources)
+		{
+			var rwCounter = _manager._resourceLocks._GetOrAdd(obj, () => new());
+			rwCounter.EnterWrite();
+			var result = _writeRequestsRemaining[obj].Remove(node);
+			__DEBUG.Assert(result);
+		}
+		return true;
+	}
+	private bool UnlockResources(SimNode node)
+	{
+		//reads
+		foreach (var obj in node._readResources)
+		{
+			var rwLock = _manager._resourceLocks._GetOrAdd(obj, () => new());
+			rwLock.ExitRead();
+
+		}
+		//writes
+		foreach (var obj in node._writeResources)
+		{
+			var rwLock = _manager._resourceLocks._GetOrAdd(obj, () => new());
+			rwLock.ExitWrite();
+		}
+		return true;
+	}
+
 
 }
 
@@ -678,7 +827,7 @@ public class NodeFrameState
 		}
 
 		//ensure nodes we run after are completed
-		foreach(var otherNode in _updateAfter)
+		foreach (var otherNode in _updateAfter)
 		{
 			if (otherNode._status != FrameStatus.HIERARCHY_FINISHED)
 			{
@@ -761,3 +910,56 @@ public class NodeFrameState
 
 
 //}
+
+/// <summary>
+/// cheap non-blocking way to track resource availabiltiy
+/// <para>NOT thread safe.</para>
+/// </summary>
+[NotThreadSafe]
+public class ReadWriteCounter
+{
+	public int _writes;
+	public int _reads;
+	private int _version;
+
+
+	public bool IsReadHeld { get { return _reads > 0; } }
+	public bool IsWriteHeld { get { return _writes > 0; } }
+	public bool IsAnyHeld { get => IsReadHeld || IsWriteHeld; }
+
+	public void EnterWrite()
+	{
+		_version++;
+		var ver = _version;
+		__DEBUG.Throw(IsAnyHeld == false, "a lock already held");
+		_writes++;
+		__DEBUG.Throw(_writes == 1, "writes out of balance");
+		__DEBUG.Assert(ver == _version);
+	}
+	public void ExitWrite()
+	{
+		_version++;
+		var ver = _version;
+		_writes--;
+		__DEBUG.Throw(_writes == 0, "writes out of balance");
+		__DEBUG.Assert(ver == _version);
+	}
+	public void EnterRead()
+	{
+		_version++;
+		var ver = _version;
+		__DEBUG.Throw(IsWriteHeld == false, "write lock already held");
+		_reads++;
+		__DEBUG.Throw(_reads > 0, "reads out of balance");
+		__DEBUG.Assert(ver == _version);
+	}
+	public void ExitRead()
+	{
+		_version++;
+		var ver = _version;
+		_reads--;
+		__DEBUG.Throw(_reads >= 0, "reads out of balance");
+		__DEBUG.Assert(ver == _version);
+	}
+
+}

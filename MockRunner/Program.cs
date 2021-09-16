@@ -24,9 +24,12 @@ using System.Threading.Tasks;
 
 //await task;
 
+//Task.WaitAll(Task.Delay(100000));
+//Console.WriteLine("hi");
 
 
 var manager = new SimManager() { };
+
 
 
 
@@ -35,17 +38,17 @@ long lastElapsed = 0;
 
 
 manager.Register(new DebugPrint { ParentName = "root", Name = "DebugPrint", _updateBefore = { "A" } });
-manager.Register(new HierarchyTest { ParentName = "root", Name = "A" });
-manager.Register(new HierarchyTest { ParentName = "root", Name = "A2" });
+manager.Register(new DelayTest { ParentName = "root", Name = "A" });
+manager.Register(new DelayTest { ParentName = "root", Name = "A2" });
 
-manager.Register(new HierarchyTest { ParentName = "A", Name = "B", _updateBefore = { "A2" } });
-manager.Register(new HierarchyTest { ParentName = "A", Name = "B2" });
-manager.Register(new HierarchyTest { ParentName = "A", Name = "B3" }); 
-manager.Register(new DelayTest { ParentName = "A", Name = "B4!", _updateAfter = { "A2" } });
+manager.Register(new DelayTest { ParentName = "A", Name = "B", _updateBefore = { "A2" }, _writeResources = {"taco" } });
+manager.Register(new DelayTest { ParentName = "A", Name = "B2", _readResources = { "taco" } });
+manager.Register(new DelayTest { ParentName = "A", Name = "B3", _readResources = { "taco" } }); 
+manager.Register(new DelayTest { ParentName = "A", Name = "B4!", _updateAfter = { "A2" }, _readResources = { "taco" } });
 
-manager.Register(new HierarchyTest { ParentName = "B", Name = "C" });
-manager.Register(new HierarchyTest { ParentName = "B", Name = "C2" });
-manager.Register(new HierarchyTest { ParentName = "B", Name = "C3", _updateAfter = { "AA" } }); //bug
+manager.Register(new DelayTest { ParentName = "B", Name = "C" });
+manager.Register(new DelayTest { ParentName = "B", Name = "C2" });
+manager.Register(new DelayTest { ParentName = "B", Name = "C3", _updateAfter = { "C" } }); //bug
 
 //add some test nodes
 //execManager.Register(new A());
@@ -95,14 +98,17 @@ public class HierarchyTest : SimNode
 }
 public class DelayTest : SimNode
 {
+	private Random _rand = new();
 	public override async Task Update(Frame frame)
 	{
-		await Task.Delay(0);
 		////Console.WriteLine("WHUT");
 		if (frame._stats._frameId % 200 == 0)
 		{
 			var indent = GetHierarchyChain().Count * 3;
-			Console.WriteLine($"{Name.PadLeft(indent + Name.Length)}");
+
+			Console.WriteLine($"{Name.PadLeft(indent + Name.Length)}       START");
+			await Task.Delay(_rand.Next(10,100));
+			Console.WriteLine($"{Name.PadLeft(indent + Name.Length)}       END");
 		}
 	}
 }

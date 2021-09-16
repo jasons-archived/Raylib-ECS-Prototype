@@ -451,6 +451,17 @@ public static class zz_Extensions_Numeric
 
 public static class zz_Extensions_Dictionary
 {
+
+	public static TValue _GetOrAdd<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, Func<TValue> onAddNew)
+	{
+		if(!dict.TryGetValue(key, out var value))
+		{
+			value = onAddNew();
+			dict.Add(key,value);
+		}
+		return value;
+	}
+
 	/// <summary>
 	/// get by reference!   ref returns allow efficient storage of structs in dictionaries
 	/// These are UNSAFE in that further modifying (adding/removing) the dictionary while using the ref return will break things!
