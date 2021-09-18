@@ -30,9 +30,9 @@ Scheduling means:
 
 The ECS system will sit on top of this, and other things can too.
 
-Currently single threaded.  API for multithreading will stay the same
-
-
+### Multithreaded by default
+The execution engine is fully multithreaded.  Your nodes can be written in a single-threaded fashion as long as you specify what resource yo
+ur node has read/write access to.
 
 ## notes / scratch stuff below...
 
@@ -54,8 +54,21 @@ Logical object structure is
 - multithreaded.  take advantage of a 16 core system effectively.
 - code based game development
 - focus on modularity
-- documentation:  Class and namespace summaries at minimum.
+- documentation:  
+  - Class and namespace summaries at minimum.
+  - end-to-end example games
+  - samples via unit tests
+- open source via AGPL3, with commercial licensing
 
+
+### non-goals
+- mobile or consoles
+- computers that can not run Vulkan
+- visual editor
+- documentation
+  - long-form text
+  - stand-alone examples/samples
+  - tutorial
 
 
 ### feature notes
@@ -67,3 +80,36 @@ Logical object structure is
 - input and other platform libs: Silk.net
 - kitbash:  https://kenney.nl/tools/assetforge and https://kenney.itch.io/kenshape
 - 
+
+
+# design guidelines
+
+Generally following the [standard dotnet design guidelines](https://docs.microsoft.com/en-us/dotnet/standard/design-guidelines/) with the following differences:
+## Naming
+1. WIP is put in files prefixed with an underscore, such as `_utils.cs`.  These will be put into proper `Namespace/Class.cs` layouts when the feature is done/stable.
+   - this lets the working dev have more flexibility during design/implementation, and lets other devs know that this is a work-in-progress section.
+   - when code leaves this WIP file, it should be properly documented (all classes and members should have intellisense)
+1. member fields prefixed with `_` and first letter lowercase. 
+   - prefixing makes it easy to distinguish between local and member variables.   
+   - using a modern IDE you can ignore the "cost" when doing discovery (intelisense dropdown, autocomplete)
+1. Prefix important/commonly used globals with `__` such as `__DEBUG.Assert()`
+   - same reasoning as the member field `_` prefix shown above.
+1. Prefix extension methods with `_` and if there is anything unusual about them, add a suffix like `_Unsafe` to give a hint to the users.  
+   - prefixing allows easy identification as a custom extension method without impacting autocomplete/intelisense.
+   - if using a suffix, Add approriate intellisense docs so the user can understand the meaning of the suffix.
+1. Prefix extension method containing static classes with `zz_Extensions_` 
+   - so that it doesn't polute intellisense dropdowns, and is still descriptive.
+
+## Error/Test handling
+1. use `#CHECKED` for costly code/data/usage verifications.  use `#DEBUG` for helpful hints about mistakes being made.  use `#TEST` for inline testing code
+   - This allows turning on/off any combination to get desired runtime effect.
+   - be sure to not mix these in a way that leads to broken code when one or more is disabled.
+1. inline tests are okay, but should not block the main thread (run them via `Task.Run()`) and should not run every frame of execution.  
+   - Generally run them once on first use, and be sure the cost is optimized away if not using `#TEST` builds
+   - For an example pattern where you want to run the test periotically (checking for GC race conditions for example) see `StructArray100<T>`
+1. If the user does something bad that is going to mess up the execution or results in not doing what the user intends, throw an exception via `__ERROR.Throw()` 
+   - throwing a specific/custom Exception class is okay too, I guess?  
+   - If you don't have a specific/custom exception class, prefer `_ERROR.Throw()` over `throw new Exception()` because I think it provides better customization later.
+
+
+## Git Repository
