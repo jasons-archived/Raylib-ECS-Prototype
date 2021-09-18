@@ -457,7 +457,7 @@ public static class zz_Extensions_Task
 	/// <param name="task"></param>
 	/// <param name="callback"></param>
 	/// <returns></returns>
-	public static Task _ContinueWithSyncOrAsync(this Task task,Func<Task,Task> callback)
+	public static Task _ContinueWithSyncOrAsync(this Task task, Func<Task, Task> callback)
 	{
 		if (task.IsCompleted)
 		{
@@ -555,6 +555,28 @@ public static class zz_Extensions_Span
 		}
 	}
 
+	/// <summary>
+	/// returns true if both spans starting address in memory is the same.  Different length and/or type is ignored.
+	/// </summary>
+	public static unsafe bool _ReferenceEquals<T1, T2>(ref this Span<T1> target,ref Span<T2> other) where T1: unmanaged where T2: unmanaged
+	{
+		fixed (T1* pSpan1 = target)
+		{
+			fixed (T2* pSpan2 = other)
+			{
+				return pSpan1 == pSpan2;
+			}
+		}	
+
+	}
+	/// <summary>
+	/// cast this span as another.  Any extra bytes remaining are ignored (the number of bytes in the castTo may be smaller than the original)
+	/// </summary>
+	public static unsafe Span<TTo> _CastAs<TFrom, TTo>(ref this Span<TFrom> target) where TFrom : unmanaged where TTo : unmanaged
+	{
+		return MemoryMarshal.Cast<TFrom, TTo>(target);
+	}
+
 	[MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
 	public static ReadOnlySpan<T> _AsReadOnly<T>(this Span<T> span)
 	{
@@ -633,5 +655,26 @@ public static class zz_Extensions_Span
 			}
 		}
 		return toReturn;
+	}
+}
+
+
+public static class zz_Extensions_Timespan
+{
+	/// <summary>
+	/// given an interval, find the previous occurance of that interval's multiple. (prior to this timespan).  
+	/// <para>If This timespan is precisely a multiple of interval, itself will be returned.</para>
+	/// </summary>
+	public static TimeSpan _IntervalPrior(this TimeSpan target, TimeSpan interval)
+	{
+		var remainder = target.Ticks % interval.Ticks;
+		return TimeSpan.FromTicks(target.Ticks - remainder);
+	}
+	/// <summary>
+	/// given an interval, find the next occurance of that interval's multiple.
+	/// </summary>
+	public static TimeSpan _IntervalNext(this TimeSpan target, TimeSpan interval)
+	{
+		return target._IntervalPrior(interval) + interval;
 	}
 }
