@@ -1,6 +1,21 @@
 
 
 
+- [DumDum?](#dumdum)
+- [Current status](#current-status)
+- [Overview](#overview)
+  - [ECS](#ecs)
+  - [ExecManager](#execmanager)
+    - [Multithreaded by default](#multithreaded-by-default)
+  - [notes / scratch stuff below...](#notes--scratch-stuff-below)
+    - [goals](#goals)
+    - [non-goals](#non-goals)
+    - [feature notes](#feature-notes)
+- [design guidelines](#design-guidelines)
+  - [Naming](#naming)
+  - [Error/Test handling](#errortest-handling)
+  - [Git Repository](#git-repository)
+
 # DumDum?
 A codename?
 
