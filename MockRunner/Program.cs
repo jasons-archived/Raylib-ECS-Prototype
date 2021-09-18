@@ -4,6 +4,7 @@
 
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using DumDum.Bcl;
@@ -29,6 +30,10 @@ using DumDum.Engine.Ecs;
 
 
 var manager = new SimManager() { };
+
+
+var testClass = new MyClass<int>();
+testClass.GetStorage();
 
 
 
@@ -80,8 +85,16 @@ while (true)
 	//Console.WriteLine($"last Elapsed = {lastElapsed}");
 }
 
-
-
+//[DebuggerVisualizer(typeof(List<T>),)]
+public class MyClass<T>
+{
+	public List<T> GetStorage()
+	{
+		//return a list from somewhere...
+		return new List<T>();
+	}
+	private List<T> Storage { get => GetStorage(); }
+}
 
 public class DebugPrint : SimNode
 {

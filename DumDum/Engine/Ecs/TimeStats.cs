@@ -76,8 +76,8 @@ public struct NodeUpdateStats
 	private bool _isCtored = true;
 	public TimeStats _timeStats;
 
-	public DebugSampler800<TimeSpan> _updateDurations=new DebugSampler800<TimeSpan>();
-	public DebugSampler800<TimeSpan> _updateChildrenDurations = new DebugSampler800<TimeSpan>();
+	public PercentileSampler800<TimeSpan> _updateDurations=new PercentileSampler800<TimeSpan>();
+	public PercentileSampler800<TimeSpan> _updateChildrenDurations = new PercentileSampler800<TimeSpan>();
 
 	public TimeSpan _lastUpdateTime;
 	public TimeSpan _lastUpdateHierarchyTime;

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime;
 
 namespace DumDum.Bcl.Diagnostics
 {
@@ -150,5 +151,15 @@ namespace DumDum.Bcl.Diagnostics
 				Console.WriteLine(message);
 			}
 		}
+	}
+}
+
+public static class __GcHelper
+{
+	public static void ForceFullCollect()
+	{
+		GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+		GC.Collect();
+		GC.WaitForPendingFinalizers();
 	}
 }

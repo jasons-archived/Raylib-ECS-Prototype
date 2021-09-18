@@ -1,5 +1,6 @@
 ﻿using DumDum.Bcl.Diagnostics;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -10,8 +11,11 @@ using System.Threading.Tasks;
 
 namespace DumDum.Bcl;
 
-
-public unsafe struct DebugSampler800<T> where T : unmanaged, IComparable<T>
+/// <summary>
+/// sample unmanaged structs to provide statistics
+/// </summary>
+/// <typeparam name="T"></typeparam>
+public unsafe struct PercentileSampler800<T> where T : unmanaged, IComparable<T>
 {
 	public const int BUFFER_SIZE = 800;
 	public int MaxCapacity { get => BUFFER_SIZE / sizeof(T); }
@@ -20,6 +24,10 @@ public unsafe struct DebugSampler800<T> where T : unmanaged, IComparable<T>
 
 	private int _nextIndex;
 	private bool _isCtored = true;
+	/// <summary>
+	/// if we have not filled our sample count, don't generate percentiles based on the blanks
+	/// </summary>
+	private int _fill;
 
 	public int SampleCount
 	{
@@ -32,6 +40,13 @@ public unsafe struct DebugSampler800<T> where T : unmanaged, IComparable<T>
 	}
 	private int _sampleCount = BUFFER_SIZE / sizeof(T);
 
+	public void Clear()
+	{
+		_nextIndex = 0;
+		_fill = 0;
+		_samples.Clear();
+	}
+
 	public void RecordSample(T value)
 	{
 		__CHECKED.Throw(_isCtored, "you need to use a .ctor() otherwise fields are not init");
@@ -41,6 +56,10 @@ public unsafe struct DebugSampler800<T> where T : unmanaged, IComparable<T>
 			tBuffer[_nextIndex % SampleCount] = value;
 		}
 		_nextIndex = (_nextIndex + 1) % SampleCount;
+		if (_fill < MaxCapacity)
+		{
+			_fill++;
+		}
 	}
 	public T GetLastSample()
 	{
@@ -53,65 +72,198 @@ public unsafe struct DebugSampler800<T> where T : unmanaged, IComparable<T>
 		}
 	}
 
-	public Quartiles<T> GetQuartiles()
+	public Percentiles<T> GetPercentiles()
 	{
 		__CHECKED.Throw(_isCtored, "you need to use a .ctor() otherwise fields are not init");
-		return new(_samples.AsSpan().Slice(0, SampleCount));
+		
+		return new(_samples.AsSpan().Slice(0,Math.Min(SampleCount,_fill)));
 	}
 
 	public override string ToString()
 	{
 		__CHECKED.Throw(_isCtored, "you need to use a .ctor() otherwise fields are not init");
-		return GetQuartiles().ToString();
+		return GetPercentiles().ToString();
 	}
 	public string ToString<TOut>(Func<T, TOut> formater)
 	{
 		__CHECKED.Throw(_isCtored, "you need to use a .ctor() otherwise fields are not init");
-		return GetQuartiles().ToString(formater);
+		return GetPercentiles().ToString(formater);
 	}
 
 
 
 }
 
-public struct Quartiles<T> where T: unmanaged, IComparable<T>
+/// <summary>
+/// Provides a 7-number-summary of data.
+/// <para>see https://en.wikipedia.org/wiki/Seven-number_summary</para>
+/// <para>also includes quartiles, see: https://en.wikipedia.org/wiki/Quartile</para>
+/// </summary>
+/// <remarks>for a good explanation of "why", see: https://www.dynatrace.com/news/blog/why-averages-suck-and-percentiles-are-great/</remarks>
+/// <typeparam name="T"></typeparam>
+public struct Percentiles<T> where T: unmanaged, IComparable<T>
 {
+	/// <summary>
+	/// how many samples were present on the input data
+	/// </summary>
 	public int sampleCount;
-	public T q0;
-	public T q5;
-	public T q25;
-	public T q50;
-	public T q75;
-	public T q95;
-	public T q100;
+	/// <summary>
+	/// the minimum.  percentile 0
+	/// </summary>
+	public T p0;
+	/// <summary>
+	/// the 5th percentile.  useful as a minimum if you want to avoid outliers.
+	/// </summary>
+	public T p5;
+	/// <summary>
+	/// 1st quartile
+	/// </summary>
+	public T p25;
+	/// <summary>
+	/// 2nd quartile, aka median
+	/// </summary>
+	public T p50;
+	/// <summary>
+	/// 3rd quartile
+	/// </summary>
+	public T p75;
+	/// <summary>
+	/// the 95th percentile.  useful as a maximum if you want to avoid outliers.
+	/// </summary>
+	public T p95;
+	/// <summary>
+	/// the maximum
+	/// </summary>
+	public T p100;
 
-	public Quartiles(Span<T> samples)
+	public Percentiles(Span<T> samples)
 	{
+		if (samples.Length == 0)
+		{
+			this = default;
+			return;
+		}
 		var len = samples.Length;
 		sampleCount = len;
 		Span<T> sortedSamples = stackalloc T[len];
 		samples.CopyTo(sortedSamples);
 		sortedSamples.Sort();
-		q0 = sortedSamples[0];
-		q5 = sortedSamples[5 * len / 100];
-		q25 = sortedSamples[25 * len / 100];
-		q50 = sortedSamples[50 * len / 100];
-		q75 = sortedSamples[75 * len / 100];
-		q95 = sortedSamples[95 * len / 100];
-		q100 = sortedSamples[len-1];
+		p0 = sortedSamples[0];
+		p5 = sortedSamples[5 * len / 100];
+		p25 = sortedSamples[25 * len / 100];
+		p50 = sortedSamples[50 * len / 100];
+		p75 = sortedSamples[75 * len / 100];
+		p95 = sortedSamples[95 * len / 100];
+		p100 = sortedSamples[len-1];
 
 	}
 
 	public override string ToString()
 	{
-			return $"[{q0} {{{q5} ({q25} ={q50}= {q75}) {q95}}} {q100}] (samples={sampleCount})";	
+			return $"[{p0} {{{p5} ({p25} ={p50}= {p75}) {p95}}} {p100}](x{sampleCount})";	
 	}
+	/// <summary>
+	/// generate string while passing a custom format function to the percentile samples
+	/// </summary>
+	/// <typeparam name="TOut"></typeparam>
+	/// <param name="formater"></param>
+	/// <returns></returns>
 	public string ToString<TOut>(Func<T, TOut> formater)
 	{
-			return $"[{formater(q0)} {{{formater(q5)} ({formater(q25)} ={formater(q50)}= {formater(q75)}) {formater(q95)}}} {formater(q100)}] (samples={sampleCount})";		
+			return $"[{formater(p0)} {{{formater(p5)} ({formater(p25)} ={formater(p50)}= {formater(p75)}) {formater(p95)}}} {formater(p100)}](x{sampleCount})";		
 	}
 }
 
+public unsafe struct StructArray4096<T> where T : unmanaged
+{
+	public const int BUFFER_SIZE = 4096;
+	public fixed byte _buffer[BUFFER_SIZE];
+
+	public int Length { get => BUFFER_SIZE / sizeof(T); }
+
+	public Span<T>.Enumerator GetEnumerator()
+	{
+		return AsSpan().GetEnumerator();
+	}
+	public Span<T> AsSpan()
+	{
+		StructArray100<byte>.__TEST_Unit();
+
+		return MemoryMarshal.Cast<byte, T>(MemoryMarshal.CreateSpan(ref _buffer[0], BUFFER_SIZE));
+	}
+	public void Clear()
+	{
+		AsSpan().Clear();
+	}
+	public ref T this[int index]
+	{
+		get
+		{
+			var span = AsSpan();
+			return ref span[index];
+		}
+	}
+}
+public unsafe struct StructArray2048<T> where T : unmanaged
+{
+	public const int BUFFER_SIZE = 2048;
+	public fixed byte _buffer[BUFFER_SIZE];
+
+	public int Length { get => BUFFER_SIZE / sizeof(T); }
+
+	public Span<T>.Enumerator GetEnumerator()
+	{
+		return AsSpan().GetEnumerator();
+	}
+	public Span<T> AsSpan()
+	{
+		StructArray100<byte>.__TEST_Unit();
+
+		return MemoryMarshal.Cast<byte, T>(MemoryMarshal.CreateSpan(ref _buffer[0], BUFFER_SIZE));
+	}
+	public void Clear()
+	{
+		AsSpan().Clear();
+	}
+	public ref T this[int index]
+	{
+		get
+		{
+			var span = AsSpan();
+			return ref span[index];
+		}
+	}
+}
+public unsafe struct StructArray1024<T> where T : unmanaged
+{
+	public const int BUFFER_SIZE = 1024;
+	public fixed byte _buffer[BUFFER_SIZE];
+
+	public int Length { get => BUFFER_SIZE / sizeof(T); }
+
+	public Span<T>.Enumerator GetEnumerator()
+	{
+		return AsSpan().GetEnumerator();
+	}
+	public Span<T> AsSpan()
+	{
+		StructArray100<byte>.__TEST_Unit();
+
+		return MemoryMarshal.Cast<byte, T>(MemoryMarshal.CreateSpan(ref _buffer[0], BUFFER_SIZE));
+	}
+	public void Clear()
+	{
+		AsSpan().Clear();
+	}
+	public ref T this[int index]
+	{
+		get
+		{
+			var span = AsSpan();
+			return ref span[index];
+		}
+	}
+}
 public unsafe struct StructArray800<T> where T : unmanaged
 {
 	public const int BUFFER_SIZE = 800;
@@ -119,11 +271,27 @@ public unsafe struct StructArray800<T> where T : unmanaged
 
 	public int Length { get => BUFFER_SIZE / sizeof(T); }
 
+	public Span<T>.Enumerator GetEnumerator()
+	{
+		return AsSpan().GetEnumerator();
+	}
 	public Span<T> AsSpan()
 	{
 		StructArray100<byte>.__TEST_Unit();
 
 		return MemoryMarshal.Cast<byte, T>(MemoryMarshal.CreateSpan(ref _buffer[0], BUFFER_SIZE));
+	}
+	public void Clear()
+	{
+		AsSpan().Clear();
+	}
+	public ref T this[int index]
+	{
+		get
+		{
+			var span = AsSpan();
+			return ref span[index];
+		}
 	}
 }
 public unsafe struct StructArray400<T> where T : unmanaged
@@ -133,13 +301,40 @@ public unsafe struct StructArray400<T> where T : unmanaged
 
 	public int Length { get => BUFFER_SIZE / sizeof(T); }
 
+	public Span<T>.Enumerator GetEnumerator()
+	{
+		return AsSpan().GetEnumerator();
+	}
 	public Span<T> AsSpan()
 	{
 		StructArray100<byte>.__TEST_Unit();
 
 		return MemoryMarshal.Cast<byte, T>(MemoryMarshal.CreateSpan(ref _buffer[0], BUFFER_SIZE));
 	}
+	public void Clear()
+	{
+		AsSpan().Clear();
+	}
+
+
+	public ref T this[int index]
+	{
+		get
+		{
+			var span = AsSpan();
+			return ref span[index];
+		}
+	}
 }
+
+
+
+/// <summary>
+/// A struct based array, with a size of 100bytes.
+/// <para>as a `long` is 8 bytes, a StructArray100{long} could hold 100/8= 12 longs</para>
+/// <para>This is useful for reducing object allocations in either high-frequency or long-lived objects</para>
+/// <para>If you need a throwaway temporary array, consider using stackalloc spans instead.  example:<code>Span{Timespan} samples = stackalloc Timespan[100];</code>.  But this StructArray also works for stackalloc purposes. </para>
+/// </summary>
 public unsafe struct StructArray100<T> where T : unmanaged
 {
 	private const int BUFFER_SIZE = 100;
@@ -147,7 +342,10 @@ public unsafe struct StructArray100<T> where T : unmanaged
 
 	public int Length { get => BUFFER_SIZE / sizeof(T); }
 
-	
+	public Span<T>.Enumerator GetEnumerator()
+	{
+		return AsSpan().GetEnumerator();
+	}
 	public Span<T> AsSpan()
 	{
 		//NOTE: This trick works because the CLR/GC treats Span special.  it won't move the underlying _buffer as long as the Span is in scope.
@@ -159,6 +357,20 @@ public unsafe struct StructArray100<T> where T : unmanaged
 		//	return new Span<T>(ptr, Length);
 		//}		
 		return MemoryMarshal.Cast<byte, T>(MemoryMarshal.CreateSpan(ref _buffer[0], BUFFER_SIZE));
+	}
+	public void Clear()
+	{
+		AsSpan().Clear();
+	}
+
+
+	public ref T this[int index]
+	{
+		get
+		{
+			var span = AsSpan();
+			return ref span[index];
+		}
 	}
 
 
@@ -174,22 +386,53 @@ public unsafe struct StructArray100<T> where T : unmanaged
 		{
 			var test = () =>
 			{
-				var testArray = new StructArray100<Vector3>();
-
-				var span = testArray.AsSpan();
-
-				for (var i = 0; i < span.Length; i++)
+				//test this[] access
 				{
-					span[i] = new() { X = i, Y = i + 1, Z = i + 2 };
+					var testArray = new StructArray100<Vector3>();
+
+
+
+					for (var i = 0; i < testArray.Length; i++)
+					{
+						if (i % 2 == 0)
+						{
+							testArray[i] = new() { X = i, Y = i + 1, Z = i + 2 };
+						}
+						else
+						{
+							ref var vec = ref testArray[i];
+							__GcHelper.ForceFullCollect();
+							vec = new() { X = i, Y = i + 1, Z = i + 2 };
+						}
+					}
+					for (var i = 0; i < testArray.Length; i++)
+					{
+						var testVec = new Vector3() { X = i, Y = i + 1, Z = i + 2 };
+						__CHECKED.Throw(testArray[i] == testVec);
+					}
 				}
-				GC.Collect();
-				var span2 = testArray.AsSpan();
-				for (var i = 0; i < span.Length; i++)
+
+				//test span access
 				{
-					var testVec = new Vector3() { X = i, Y = i + 1, Z = i + 2 };
-					__CHECKED.Throw(span2[i] == testVec);
+					var testArray = new StructArray100<Vector3>();
+
+					var span = testArray.AsSpan();
+
+					for (var i = 0; i < span.Length; i++)
+					{
+						span[i] = new() { X = i, Y = i + 1, Z = i + 2 };
+					}
+					__GcHelper.ForceFullCollect();
+					var span2 = testArray.AsSpan();
+					for (var i = 0; i < span.Length; i++)
+					{
+						var testVec = new Vector3() { X = i, Y = i + 1, Z = i + 2 };
+						__CHECKED.Throw(span2[i] == testVec);
+					}
+					__CHECKED.Throw(span._ReferenceEquals(ref span2));
 				}
-				__CHECKED.Throw(span._ReferenceEquals(ref span2));
+
+
 
 			};
 			if (forceRunSync)
@@ -203,6 +446,8 @@ public unsafe struct StructArray100<T> where T : unmanaged
 		}
 
 	}
+
+
 }
 
 

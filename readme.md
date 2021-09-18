@@ -68,6 +68,8 @@ Logical object structure is
 - engine that runs on modern desktop platforms
 - multithreaded.  take advantage of a 16 core system effectively.
 - code based game development
+- dynamic, procedural worlds
+- game coordinates 1000 x 1000 km
 - focus on modularity
 - documentation:  
   - Class and namespace summaries at minimum.
@@ -78,7 +80,10 @@ Logical object structure is
 
 ### non-goals
 - mobile or consoles
-- computers that can not run Vulkan
+- computers incompatable with the tech choises made
+- 2d games
+- photorealism
+- physical realism
 - visual editor
 - documentation
   - long-form text
@@ -107,12 +112,16 @@ Generally following the [standard dotnet design guidelines](https://docs.microso
 1. member fields prefixed with `_` and first letter lowercase. 
    - prefixing makes it easy to distinguish between local and member variables.   
    - using a modern IDE you can ignore the "cost" when doing discovery (intelisense dropdown, autocomplete)
-1. Prefix important/commonly used globals with `__` such as `__DEBUG.Assert()`
+1. prefix Class Properties/Methods meant for "internal use only" with `_`
+   - even `protected internal` members are visible to derived classes.  prefixing with an underscore signals to the user that these are not meant for common workflow scenarios.
+2. Prefix important/commonly used globals with `__` such as `__DEBUG.Assert()`
    - same reasoning as the member field `_` prefix shown above.
-1. Prefix extension methods with `_` and if there is anything unusual about them, add a suffix like `_Unsafe` to give a hint to the users.  
+3. Prefix ***very*** special classes/members with ``__WHAT_`, where `WHAT` is the special thing.
+   - for example, conditional unit test entrypoints might be named `__TEST_Unit()` or maybe `__UNITTEST_GcVerification()` or `__UNITTEST_RunAll()`
+4. Prefix extension methods with `_` and if there is anything unusual about them, add a suffix like `_Unsafe` to give a hint to the users.  
    - prefixing allows easy identification as a custom extension method without impacting autocomplete/intelisense.
-   - if using a suffix, Add approriate intellisense docs so the user can understand the meaning of the suffix.
-1. Prefix extension method containing static classes with `zz_Extensions_` 
+   - if using a suffix, Add approriate intellisense docs (to the containing static class at minimum) so the user can understand the meaning of the suffix.
+5. Prefix extension method containing static classes with `zz_Extensions_` 
    - so that it doesn't polute intellisense dropdowns, and is still descriptive.
 
 ## Error/Test handling

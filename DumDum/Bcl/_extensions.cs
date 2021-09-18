@@ -535,7 +535,9 @@ public static class zz_Extensions_Dictionary
 	//	}
 }
 
-
+/// <summary>
+/// `_Generic` utilizes experimental CLR behavior to allow generic numerical operations. Might work great, might have hidden perf costs?
+/// </summary>
 public static class zz_Extensions_Span
 {
 	[ThreadStatic]
@@ -593,6 +595,7 @@ public static class zz_Extensions_Span
 	//}
 
 
+	
 	public static T _Sum_Generic<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
 	{
 		return values._AsReadOnly()._Sum_Generic();
