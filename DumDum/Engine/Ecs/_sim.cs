@@ -31,7 +31,7 @@ public partial class SimManager //tree management
 		{
 			__ERROR.Throw(_nodeRegistry.TryAdd(node.Name, node), $"A node with the same name of '{node.Name}' is already registered");
 			var result = _nodeRegistry.TryGetValue(node.ParentName, out parent);
-			__ERROR.Throw(result);
+			__ERROR.Throw(result,$"Node registration failed.  Node '{node.Name}' parent of '{node.ParentName}' is not registered.");
 		}
 
 		parent.OnChildRegister(node);
@@ -67,15 +67,39 @@ public partial class SimManager //thread execution
 	private TimeStats _stats;
 	private Task _priorFrameTask;
 	private Frame _frame;
-	public async Task Update(TimeSpan elapsed)
+
+	//private TimeSpan _realElapsedBuffer;
+	//private const int _targetFramerate = 240;
+	//private TimeSpan _targetFrameElapsed = TimeSpan.FromTicks(TimeSpan.TicksPerSecond/ _targetFramerate);
+	public async Task Update(TimeSpan _targetFrameElapsed)
 	{
-		_stats.Update(elapsed);
-		_frame = Frame.FromPool(_stats, _frame, this);
+		//_realElapsedBuffer += realElapsed;
+		//if (_realElapsedBuffer >= _targetFrameElapsed)
+		//{
+		//	var isRunningSlowly = false;
+		//	_realElapsedBuffer -= _targetFrameElapsed;
+		//	if (_realElapsedBuffer > _targetFrameElapsed)
+		//	{
+		//		//sim is running slowly (it takes more than _targetFrameElapsed time to do an update)
+		//		isRunningSlowly = true;
+		//		if (_realElapsedBuffer > _targetFrameElapsed*2)
+		//		{
+		//			//more than 2 frames behind.  start dropping
+		//			_realElapsedBuffer *= 0.9f;
+		//		}
+
+		//	}
+			_stats.Update(_targetFrameElapsed);
+			_frame = Frame.FromPool(_stats, _frame, this);
 
 
-		await _frame.InitializeNodeGraph(_root);
+			await _frame.InitializeNodeGraph(_root);
 
-		await _frame.ExecuteNodeGraph();
+			await _frame.ExecuteNodeGraph();
+		// }
+
+
+		
 
 
 	}
@@ -94,7 +118,7 @@ public interface IIgnoreUpdate { }
 /// </summary>
 public class RootNode : SimNode, IIgnoreUpdate
 {
-	public override Task Update(Frame frame, NodeFrameState frameState)
+	protected override Task Update(Frame frame, NodeFrameState nodeState)
 	{
 		throw new Exception("This exception will never be thrown because this implements IIgnoreUpdate");
 	}
@@ -194,18 +218,104 @@ public abstract partial class SimNode  //tree logic
 
 
 
+public interface ITargetFramerate
+{
+	public int TargetFps { get; set; }
+}
 
+public abstract class FixedTimestepNode : SimNode
+{
+	/// <summary>
+	/// the target framerate you want to execute at.
+	/// Note that nested groups will already be constrained by the parent group TargetFrameRate,
+	/// but this property can still be set for the child group. In that case the child group will update at the slowest of the two TargetFrameRates.
+	/// <para>default is int.MaxValue (update as fast as possible (every tick))</para>
+	/// </summary>
+	public int TargetFps;
+	//{
+	//	get => (int)(TimeSpan.TicksPerSecond / _targetUpdateInterval.Ticks);
+	//	set => _targetUpdateInterval = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / value);
+	//}
+	private TimeSpan _targetUpdateInterval { get => TimeSpan.FromTicks(TimeSpan.TicksPerSecond / TargetFps); }
+
+	/// <summary>
+	/// If set to true, attempts to ensure we update at precisely the rate specified.  if we execute slightly later than the TargetFrameRate, 
+	/// the extra delay is not ignored and is taken into consideration on future updates.  
+	/// </summary>
+	public bool FixedStep = false;
+
+	/// <summary>
+	/// if our update is more than this many frames out of date, we ignore others.
+	/// <para> only matters if FixedStep==true</para>
+	/// </summary>
+	public int CatchUpMaxFrames = 1;
+
+
+	private TimeSpan _nextRunTime;
+
+	/// <summary>
+	/// by default, all FixedTimestepNodes of the same interval update on the same frame. 
+	/// If you don't want this node to update at the same time as others, set this to however many frames you want it's update to be offset by;
+	/// </summary>
+	public int FrameOffset;
+	//	get => (int)(_nextRunOffset * TargetFps / _targetUpdateInterval);
+	//	set => _nextRunOffset = _targetUpdateInterval / TargetFps * value; 
+	//}
+	private TimeSpan _nextRunOffset { get => _targetUpdateInterval / TargetFps * FrameOffset; }
+
+	private TimeSpan _intervalOffset=TimeSpan.Zero;
+
+	internal override void OnFrameStarting(Frame frame, ICollection<SimNode> allNodesToUpdateInFrame)
+	{
+		if (TargetFps == 0)
+		{
+			//register this node and it's children for participation in this frame.
+			base.OnFrameStarting(frame, allNodesToUpdateInFrame);
+			//skip this logic
+			return;
+		}
+		//run our node at a fixed interval, based on the target frame rate.  
+		if(frame._stats._wallTime >= _nextRunTime)
+		{
+			var offset = _nextRunOffset;
+			_nextRunTime = offset + _nextRunTime._IntervalNext(_targetUpdateInterval) ;
+			if (frame._stats._wallTime >= _nextRunTime)
+			{
+				//we are running behind our target framerate.
+
+				frame._slowRunningNodes.Add(this);
+				var nextCatchupRunTime =offset+ frame._stats._wallTime._IntervalNext(_targetUpdateInterval) - (_targetUpdateInterval*CatchUpMaxFrames);
+				if(nextCatchupRunTime > _nextRunTime)
+				{
+					//further behind than our CatchUpMaxFrames so ignore missing updates beyond that.
+					_nextRunTime = nextCatchupRunTime;
+				}
+			}
+			//register this node and it's children for participation in this frame.
+			base.OnFrameStarting(frame, allNodesToUpdateInFrame);
+		}
+		else
+		{
+			//not time to run this node or it's children!
+			//do nothing.
+		}
+	}
+}
 
 
 
 public abstract partial class SimNode //update logic
 {
+	/// <summary>
+	/// stats about the time at which the update() last completed successfully
+	/// </summary>
+	public NodeUpdateStats _lastUpdate = new();
 
 	/// <summary> triggered for root node and propigating down.  allows node to decide if it, or it+children should participate in this frame. </summary>
-	internal void OnFrameStarting(Frame frame, ICollection<SimNode> allNodesToUpdateInFrame)
+	internal virtual void OnFrameStarting(Frame frame, ICollection<SimNode> allNodesToUpdateInFrame)
 	{
 		//TODO:  store last updateTime metric, use this+children to estimate node priority (costly things run first!)  add out TimeSpan hiearchyLastElapsed
-		//TODO:  when doing that, maybe take the average of executions.   store in frameState
+		//TODO:  when doing that, maybe take the average of executions.   store in nodeState
 
 		//add this node to be executed this frame
 		allNodesToUpdateInFrame.Add(this);  //TODO: node filtering logic here based on FPS limiting, etc
@@ -222,7 +332,19 @@ public abstract partial class SimNode //update logic
 	/// </summary>
 	/// <param name="frame"></param>
 	/// <returns></returns>
-	public abstract Task Update(Frame frame, NodeFrameState frameState);
+	internal Task DoUpdate(Frame frame, NodeFrameState nodeState)
+	{
+		try
+		{
+			return Update(frame, nodeState);
+		}
+		finally
+		{
+			
+		}
+	}
+
+	protected abstract Task Update(Frame frame, NodeFrameState nodeState);
 
 
 
@@ -231,6 +353,8 @@ public abstract partial class SimNode //update logic
 	{
 		//_frameStates.Remove(frame);
 	}
+
+
 }
 
 
@@ -289,6 +413,9 @@ public partial class Frame //general setup
 	{
 		return _stats.ToString();
 	}
+
+	public bool IsRunningSlowly { get => _slowRunningNodes.Count > 0; }
+	public List<FixedTimestepNode> _slowRunningNodes = new();
 
 }
 
@@ -354,7 +481,7 @@ public partial class Frame ////node graph setup and execution
 		//now that our tree of NodeFrameStates is setup properly, reloop calculating execution order dependencies
 		foreach (var node in _allNodesInFrame)
 		{
-			var frameState = _frameStates[node];
+			var nodeState = _frameStates[node];
 
 
 			//TODO: calculate and store all runBefore/ runAfter dependencies
@@ -363,6 +490,7 @@ public partial class Frame ////node graph setup and execution
 			//updateAfter
 			foreach (var afterName in node._updateAfter)
 			{
+				
 				if (!node.FindNode(afterName, out var afterNode))
 				{
 					__DEBUG.AssertOnce(false, $"'{afterName}' node is listed as an updateAfter dependency in '{node.GetHierarchyName()}' node.  target node not registered");
@@ -373,7 +501,9 @@ public partial class Frame ////node graph setup and execution
 					__DEBUG.Assert(false, "missing?  maybe ok.  node not participating in this frame");
 					continue;
 				}
-				frameState._updateAfter.Add(afterNodeState);
+				__ERROR.Throw(node.GetHierarchy().Contains(afterNodeState._node) == false, $"updateBefore('{afterName}') is invalid.  Node '{node.Name}' is a (grand)child of '{afterName}'.  You can not mark a parent as updateBefore/After." +
+					$"{node.Name} will always update during it's it's parent's update (parent updates first, but is not marked as complete until all it's children finish).");
+				nodeState._updateAfter.Add(afterNodeState);
 			}
 
 			//updateBefore
@@ -389,7 +519,9 @@ public partial class Frame ////node graph setup and execution
 					__DEBUG.Assert(false, "missing?  maybe ok.  node not participating in this frame");
 					continue;
 				}
-				beforeNodeState._updateAfter.Add(frameState);
+				__ERROR.Throw(node.GetHierarchy().Contains(beforeNodeState._node) == false, $"updateBefore('{beforeName}') is invalid.  Node '{node.Name}' is a (grand)child of '{beforeName}'.  You can not mark a parent as updateBefore/After." +
+					$"{node.Name} will always update during it's it's parent's update (parent updates first, but is not marked as complete until all it's children finish).");
+				beforeNodeState._updateAfter.Add(nodeState);
 			}
 
 			var lockTest = new DotNext.Threading.AsyncReaderWriterLock();
@@ -446,30 +578,30 @@ public partial class Frame ////node graph setup and execution
 			for (var i = _allNodesToProcess.Count - 1; i >= 0; i--)
 			{
 				var node = _allNodesToProcess[i];
-				var frameState = _frameStates[node];
-				if (frameState.CanUpdateNow() && AreResourcesAvailable(node))
+				var nodeState = _frameStates[node];
+				if (nodeState.CanUpdateNow() && AreResourcesAvailable(node))
 				{
 					//execute the node's .Update() method
-					__DEBUG.Assert(frameState._status == FrameStatus.SCHEDULED);
-					frameState._status = FrameStatus.PENDING;
+					__DEBUG.Assert(nodeState._status == FrameStatus.SCHEDULED);
+					nodeState._status = FrameStatus.PENDING;
 					LockResources(node);
 
 					_allNodesToProcess.RemoveAt(i);
 
-					var updateTimer = Stopwatch.StartNew();
+					nodeState._updateStopwatch = Stopwatch.StartNew();
 
-					__DEBUG.Assert(frameState._status == FrameStatus.PENDING);
-					frameState._status = FrameStatus.RUNNING;
-					activeNodes.Add(frameState);
+					__DEBUG.Assert(nodeState._status == FrameStatus.PENDING);
+					nodeState._status = FrameStatus.RUNNING;
+					activeNodes.Add(nodeState);
 
 
-					//helper to update our frameState when the update method is done running
+					//helper to update our nodeState when the update method is done running
 					var doneUpdateTask = (Task updateTask) =>
 					{
-						__DEBUG.Assert(frameState._status == FrameStatus.RUNNING);
-						frameState._status = FrameStatus.FINISHED_WAITING_FOR_CHILDREN;
-						frameState._updateTime = updateTimer.Elapsed;
-						frameState._updateTcs.SetFromTask(updateTask);
+						__DEBUG.Assert(nodeState._status == FrameStatus.RUNNING);
+						nodeState._status = FrameStatus.FINISHED_WAITING_FOR_CHILDREN;
+						nodeState._updateTime = nodeState._updateStopwatch.Elapsed;
+						nodeState._updateTcs.SetFromTask(updateTask);
 					};
 
 					if (node is IIgnoreUpdate)
@@ -481,7 +613,7 @@ public partial class Frame ////node graph setup and execution
 					else
 					{
 						//node update() may be async, so need to monitor it to track when it completes.
-						var updateTask = Task.Run(() => node.Update(this, frameState)).ContinueWith(doneUpdateTask);
+						var updateTask = Task.Run(() => node.DoUpdate(this, nodeState)).ContinueWith(doneUpdateTask);
 						currentTasks.Add(updateTask);
 						DEBUG_startedThisPass++;
 
@@ -563,10 +695,14 @@ public partial class Frame ////node graph setup and execution
 				}
 				if (childrenFinished)
 				{
+					//this node and it's children are all done for this frame!
 					DEBUG_finishedHierarchy++;
 					nodeState._status = FrameStatus.HIERARCHY_FINISHED;
+					nodeState._updateHierarchyTime = nodeState._updateStopwatch.Elapsed;
 					waitingOnChildrenNodes.RemoveAt(i);
 					finishedNodes.Add(nodeState);
+					//record stats about this frame for easy access in the node
+					nodeState._node._lastUpdate.Update(this, nodeState);
 				}
 			}
 
@@ -584,7 +720,7 @@ public partial class Frame ////node graph setup and execution
 				{
 					var nodeState = _frameStates[node];
 					errorStr += $"   {node.GetHierarchyName()} " +
-						$"updateBefore=[{String.Join(',', node._updateBefore)}] updateAfter=[{String.Join(',', node._updateAfter)}]  runtimeUpdateAfter=[{String.Join(',', nodeState._updateAfter)}]\n";
+						$"updateBefore=[{String.Join(',', node._updateBefore)}] updateAfter=[{String.Join(',', node._updateAfter)}]  calculatedUpdateAfter=[{String.Join(',', nodeState._updateAfter)}]\n";
 				}
 				__ERROR.Throw(false, errorStr);
 			}
@@ -753,6 +889,8 @@ public class NodeFrameState
 	/// nodes that this node must run after
 	/// </summary>
 	public List<NodeFrameState> _updateAfter = new();
+	internal Stopwatch _updateStopwatch;
+	internal TimeSpan _updateHierarchyTime;
 
 	public override string ToString()
 	{
@@ -810,28 +948,7 @@ public class NodeFrameState
 
 
 
-//	/// <summary>
-//	/// the target framerate you want to execute at.
-//	/// Note that nested groups will already be constrained by the parent group TargetFrameRate,
-//	/// but this property can still be set for the child group. In that case the child group will update at the slowest of the two TargetFrameRates.
-//	/// <para>default is int.MaxValue (update as fast as possible (every tick))</para>
-//	/// </summary>
-//	public double TargetFrameRate
-//	{
-//		get => 1 / _targetUpdateInterval.TotalSeconds;
-//		set => _targetUpdateInterval = TimeSpan.FromSeconds(1 / value);
-//	}
-//	private TimeSpan _targetUpdateInterval = TimeSpan.Zero;
-//	/// <summary>
-//	/// If set to true, attempts to ensure we update at precisely the rate specified.  if we execute slightly later than the TargetFrameRate, the extra delay is not ignored and is taken into consideration on future updates.  
-//	/// </summary>
-//	public bool FixedStep = false;
 
-//	/// <summary>
-//	/// if our update is more than this many frames out of date, we ignore others.
-//	/// <para> only matters if FixedStep==true</para>
-//	/// </summary>
-//	public int CatchUpMaxFrames = 1;
 
 
 //}

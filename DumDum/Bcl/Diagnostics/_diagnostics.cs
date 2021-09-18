@@ -140,7 +140,7 @@ namespace DumDum.Bcl.Diagnostics
 					return;
 				}
 
-				Assert(false, message);
+				//Assert(false, message);
 				throw new(message);
 			}
 

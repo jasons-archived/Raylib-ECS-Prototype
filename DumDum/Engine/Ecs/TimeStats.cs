@@ -1,7 +1,11 @@
 ﻿using DumDum.Bcl;
+using DumDum.Bcl.Diagnostics;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -13,7 +17,7 @@ namespace DumDum.Engine.Ecs;
 public unsafe struct TimeStats
 {
 	public TimeSpan _frameElapsed;
-	public TimeSpan _totalElapsed;
+	public TimeSpan _wallTime;
 	public int _frameId = 0;
 
 	private const int SAMPLE_COUNT = 100;
@@ -28,10 +32,10 @@ public unsafe struct TimeStats
 		//simple fps metrics calculated
 
 		_frameElapsed = frameElapsed;
-		_totalElapsed = _totalElapsed.Add(frameElapsed);
+		_wallTime = _wallTime.Add(frameElapsed);
 		_frameId++;
 		//var instantFps = (float)(1f / frameElapsed.TotalSeconds);
-		var elapsedMs =(float) frameElapsed.TotalMilliseconds._Round_Generic(2);
+		var elapsedMs = (float)frameElapsed.TotalMilliseconds._Round_Generic(2);
 
 		//TODO: instead of doing calculations on last 100 frames, store avg/min/max for last 10 seconds.
 
@@ -45,20 +49,72 @@ public unsafe struct TimeStats
 			_minMs = samples._Min_Generic();
 		}
 		var lst = new List<float>();
-		
-		
+
+
 
 	}
 	public override string ToString()
 	{
 		var gcTime = GC.GetGCMemoryInfo().PauseDurations._Sum_Generic();
-		var frameInfo = $"frame= {_frameId} @ {_totalElapsed.TotalSeconds._Round_Generic(0)}sec ";
+		var frameInfo = $"frame= {_frameId} @ {_wallTime.TotalSeconds._Round_Generic(0)}sec ";
 		var historyInfo = $" history = {_frameElapsed.TotalMilliseconds._Round_Generic(2)}cur {_maxMs._Round_Generic(1)}max {_avgMs._Round_Generic(1)}avg {_minMs._Round_Generic(1)}min  ";
 		var gcInfo = $" GC={GC.CollectionCount(0)} ({gcTime.TotalMilliseconds._Round_Generic(1)} ms)";
 
 		return frameInfo + historyInfo + gcInfo;
 	}
 	//TODO: add stopwatch showing current frame execution time
+}
+
+
+
+
+/// <summary>
+/// details about the update of the node
+/// </summary>
+public struct NodeUpdateStats
+{
+	private bool _isCtored = true;
+	public TimeStats _timeStats;
+
+	public DebugSampler800<TimeSpan> _updateDurations=new DebugSampler800<TimeSpan>();
+	public DebugSampler800<TimeSpan> _updateChildrenDurations = new DebugSampler800<TimeSpan>();
+
+	public TimeSpan _lastUpdateTime;
+	public TimeSpan _lastUpdateHierarchyTime;
+	public TimeSpan _avgUpdateTime;
+	public TimeSpan _avgUpdateHierarchyTime;
+
+	//public Tim
+	//TODO: record time since last run of update()
+	public TimeSpan _timeSinceLastUpdate;
+	public Stopwatch _timeSinceLastUpdateStopwatch = Stopwatch.StartNew();
+
+	public void Update(Frame frame, NodeFrameState nodeState)
+	{
+		__CHECKED.Throw(_isCtored, "you need to use a .ctor() otherwise fields are not init");
+		__CHECKED.Assert(nodeState._status == FrameStatus.HIERARCHY_FINISHED);
+		_timeSinceLastUpdate = frame._stats._wallTime - _timeStats._wallTime;
+		_timeStats = frame._stats;
+		_avgUpdateTime = (_avgUpdateTime + _lastUpdateTime + nodeState._updateTime) / 3;
+		_avgUpdateHierarchyTime = (_avgUpdateHierarchyTime + _lastUpdateHierarchyTime + nodeState._updateHierarchyTime) / 3;
+		_lastUpdateTime = nodeState._updateTime;
+		_lastUpdateHierarchyTime = nodeState._updateHierarchyTime;
+		_updateDurations.RecordSample(nodeState._updateTime);
+		_updateChildrenDurations.RecordSample(nodeState._updateHierarchyTime-nodeState._updateTime);
+
+		
+		
+	}
+
+	public override string ToString()
+	{
+		__CHECKED.Throw(_isCtored, "you need to use a .ctor() otherwise fields are not init");
+		return $"self={_lastUpdateTime.TotalMilliseconds._Round_Generic(1)}ms, children={(_lastUpdateHierarchyTime - _lastUpdateTime).TotalMilliseconds._Round_Generic(1)}ms, " +
+			$"selfAvg={+_avgUpdateTime.TotalMilliseconds._Round_Generic(1)}ms, childrenAvg={(_avgUpdateHierarchyTime - _avgUpdateTime).TotalMilliseconds._Round_Generic(1)}ms  " +
+			$"updateDur={_updateDurations.ToString((ts)=>ts.TotalMilliseconds._Round_Generic(2))}  " +
+			$"updateChildrenDur={_updateChildrenDurations.ToString((ts) => ts.TotalMilliseconds._Round_Generic(2))}  " +
+			$"timeSinceLastUpdate={_timeSinceLastUpdate.TotalMilliseconds._Round_Generic(1)}ms";
+	}
 }
 
 
