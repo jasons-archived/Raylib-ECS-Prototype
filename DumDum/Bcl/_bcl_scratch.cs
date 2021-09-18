@@ -121,7 +121,7 @@ public unsafe struct StructArray800<T> where T : unmanaged
 
 	public Span<T> AsSpan()
 	{
-		StructArray100<byte>.__CHECKED_UNIT_TEST();
+		StructArray100<byte>.__TEST_Unit();
 
 		return MemoryMarshal.Cast<byte, T>(MemoryMarshal.CreateSpan(ref _buffer[0], BUFFER_SIZE));
 	}
@@ -135,7 +135,7 @@ public unsafe struct StructArray400<T> where T : unmanaged
 
 	public Span<T> AsSpan()
 	{
-		StructArray100<byte>.__CHECKED_UNIT_TEST();
+		StructArray100<byte>.__TEST_Unit();
 
 		return MemoryMarshal.Cast<byte, T>(MemoryMarshal.CreateSpan(ref _buffer[0], BUFFER_SIZE));
 	}
@@ -147,28 +147,30 @@ public unsafe struct StructArray100<T> where T : unmanaged
 
 	public int Length { get => BUFFER_SIZE / sizeof(T); }
 
+	
 	public Span<T> AsSpan()
 	{
+		//NOTE: This trick works because the CLR/GC treats Span special.  it won't move the underlying _buffer as long as the Span is in scope.
 
-		__CHECKED_UNIT_TEST();
+		__TEST_Unit();
 
 		//fixed (byte* ptr = _buffer)
 		//{
 		//	return new Span<T>(ptr, Length);
-		//}
+		//}		
 		return MemoryMarshal.Cast<byte, T>(MemoryMarshal.CreateSpan(ref _buffer[0], BUFFER_SIZE));
 	}
 
 
-	private static int _testCounter;
+	private static int __TEST_counter;
 	/// <summary>
-	/// basic unit test
+	/// basic unit test checking for GC race conditions
 	/// </summary>
-	[Conditional("CHECKED")]
-	public unsafe static void __CHECKED_UNIT_TEST(bool forceRunSync = false)
+	[Conditional("TEST")]
+	public unsafe static void __TEST_Unit(bool forceRunSync = false)
 	{
-		_testCounter++;
-		if (_testCounter % 1000 == 1 || forceRunSync == true)
+		__TEST_counter++;
+		if (__TEST_counter % 1000 == 1 || forceRunSync == true)
 		{
 			var test = () =>
 			{
@@ -207,75 +209,3 @@ public unsafe struct StructArray100<T> where T : unmanaged
 
 
 
-
-
-
-//public static unsafe class Alloc
-//{
-//	public static Span<T> StackallocSpan<T>(int length) where T : unmanaged
-//	{
-
-//		Span<TimeSpan> test = stackalloc TimeSpan[100];
-
-
-
-//		var byteLength = sizeof(T) * length;
-//		var pByte = stackalloc byte[byteLength];
-
-//		return new Span<T>(pByte, length);
-//		//var pT = (T*)pByte;
-//		//return MemoryMarshal.CreateSpan<T>(ref *pT, length);
-//		//return MemoryMarshal.Cast<byte, T>(MemoryMarshal.CreateSpan(ref _buffer[0], BUFFER_SIZE));
-//		//var toReturn = MemoryMarshal.Cast<byte, T>(MemoryMarshal.CreateSpan(ref pByte[0], byteLength));
-//		//return toReturn;
-//	}
-//	public static Span<T> StackallocSpan2<T>(int length) where T : unmanaged
-//	{
-//		var byteLength = sizeof(T) * length;
-//		var x = stackalloc byte[sizeof(T) * length];
-//		var toReturn = MemoryMarshal.Cast<byte, T>(MemoryMarshal.CreateSpan(ref x[0], byteLength));
-//		return toReturn;
-//	}
-
-//	private static int _testCounter;
-//	/// <summary>
-//	/// basic unit test
-//	/// </summary>
-//	[Conditional("CHECKED")]
-//	public unsafe static void __CHECKED_UNIT_TEST(bool forceRunSync = false)
-//	{
-//		_testCounter++;
-//		if (_testCounter % 1000 == 1 || forceRunSync == true)
-//		{
-//			var test = () =>
-//			{
-
-
-//				var span = Alloc.StackallocSpan<Vector3>(100);
-
-//				for (var i = 0; i < span.Length; i++)
-//				{
-//					span[i] = new() { X = i, Y = i + 1, Z = i + 2 };
-//				}
-//				GC.Collect();
-//				var span2 = span;
-//				for (var i = 0; i < span.Length; i++)
-//				{
-//					var testVec = new Vector3() { X = i, Y = i + 1, Z = i + 2 };
-//					__CHECKED.Throw(span2[i] == testVec);
-//				}
-//				__CHECKED.Throw(span._ReferenceEquals(ref span2));
-
-//			};
-//			if (forceRunSync)
-//			{
-//				test();
-//			}
-//			else
-//			{
-//				Task.Run(test);
-//			}
-//		}
-
-//	}
-//}
