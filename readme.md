@@ -15,6 +15,8 @@
   - [Naming](#naming)
   - [Error/Test handling](#errortest-handling)
   - [Git Repository](#git-repository)
+- [testing and verificaiton](#testing-and-verificaiton)
+  - [unsafe code verification](#unsafe-code-verification)
 
 # DumDum?
 A codename?
@@ -137,3 +139,12 @@ Generally following the [standard dotnet design guidelines](https://docs.microso
 
 
 ## Git Repository
+`main` is the stable work branch.  individual features to be put in their own branches, as are bugfixes, being merged back into main when done.  releases will be in the `release` branch with appropriate tagging for version.
+
+
+# testing and verificaiton
+
+## unsafe code verification
+any work done to unsafe code should be verified by using GC Hole stress, as defined here:  https://github.com/dotnet/runtime/blob/main/docs/design/coreclr/jit/investigate-stress.md#gc-hole-stress
+
+- Specifically, add the `DOTNET_GCStress=0xF` to launchsettings.json  (can be created via the startup project properties window)

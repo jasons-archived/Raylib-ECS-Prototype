@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "MockRunner": {
+      "commandName": "Project",
+      "environmentVariables": {
+        //"DOTNET_GCStress": "0xF" //GC Hole Stress Test:  https://github.com/dotnet/runtime/blob/main/docs/design/coreclr/jit/investigate-stress.md#gc-hole-stress
+      }
+    }
+  }
+}
