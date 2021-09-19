@@ -39,6 +39,19 @@ public static class zz__Extensions_List
 		target.RemoveAt(index);
 		return true;
 	}
+	public static bool _TryTakeLast<T>(this IList<T> target, out T value)
+	{
+		if (target.Count == 0)
+		{
+			value = default;
+			return false;
+		}
+
+		var index = target.Count-1;
+		value = target[index];
+		target.RemoveAt(index);
+		return true;
+	}
 
 	public static void _Randomize<T>(this IList<T> target)
 	{
@@ -390,9 +403,12 @@ public static class zz_Extensions_TaskCompletionSource
 	}
 }
 
+/// <summary>
+/// The included numeric extension methods utilize experimental CLR behavior to allow generic numerical operations. Might work great, might have hidden perf costs?
+/// </summary>
 public static class zz_Extensions_Numeric
 {
-	public static T _Round_Generic<T>(this T value, int digits, MidpointRounding mode = MidpointRounding.AwayFromZero) where T : IFloatingPoint<T>
+	public static T _Round<T>(this T value, int digits, MidpointRounding mode = MidpointRounding.AwayFromZero) where T : IFloatingPoint<T>
 	{
 		return T.Round(value, digits, mode);
 	}
@@ -401,7 +417,7 @@ public static class zz_Extensions_Numeric
 
 //public static class zz_Extensions_IEnumerable
 //{
-//	public static T _Sum_Generic<T>(this IEnumerable<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
+//	public static T _Sum<T>(this IEnumerable<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
 //	{
 //		var toReturn = T.AdditiveIdentity;
 //		foreach (var val in values)
@@ -410,7 +426,7 @@ public static class zz_Extensions_Numeric
 //		}
 //		return toReturn;
 //	}
-//	public static T _Avg_Generic<T>(this IEnumerable<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>, IDivisionOperators<T, float, T>
+//	public static T _Avg<T>(this IEnumerable<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>, IDivisionOperators<T, float, T>
 //	{
 //		var count = 0;
 //		var toReturn = T.AdditiveIdentity;
@@ -421,7 +437,7 @@ public static class zz_Extensions_Numeric
 //		}
 //		return toReturn / count;
 //	}
-//	public static T _Min_Generic<T>(this IEnumerable<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+//	public static T _Min<T>(this IEnumerable<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
 //	{
 //		var toReturn = T.MaxValue;
 
@@ -434,7 +450,7 @@ public static class zz_Extensions_Numeric
 //		}
 //		return toReturn;
 //	}
-//	public static T _Max_Generic<T>(this IEnumerable<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+//	public static T _Max<T>(this IEnumerable<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
 //	{
 //		var toReturn = T.MinValue;
 
@@ -536,7 +552,7 @@ public static class zz_Extensions_Dictionary
 }
 
 /// <summary>
-/// `_Generic` utilizes experimental CLR behavior to allow generic numerical operations. Might work great, might have hidden perf costs?
+/// The included numeric extension methods utilize experimental CLR behavior to allow generic numerical operations. Might work great, might have hidden perf costs?
 /// </summary>
 public static class zz_Extensions_Span
 {
@@ -596,11 +612,11 @@ public static class zz_Extensions_Span
 
 
 	
-	public static T _Sum_Generic<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
+	public static T _Sum<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
 	{
-		return values._AsReadOnly()._Sum_Generic();
+		return values._AsReadOnly()._Sum();
 	}
-	public static T _Sum_Generic<T>(this ReadOnlySpan<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
+	public static T _Sum<T>(this ReadOnlySpan<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
 	{
 		var toReturn = T.AdditiveIdentity;
 		foreach (var val in values)
@@ -610,11 +626,11 @@ public static class zz_Extensions_Span
 		return toReturn;
 	}
 
-	public static T _Avg_Generic<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>, IDivisionOperators<T, float, T>
+	public static T _Avg<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>, IDivisionOperators<T, float, T>
 	{
-		return values._AsReadOnly()._Avg_Generic();
+		return values._AsReadOnly()._Avg();
 	}
-	public static T _Avg_Generic<T>(this ReadOnlySpan<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>, IDivisionOperators<T, float, T>
+	public static T _Avg<T>(this ReadOnlySpan<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>, IDivisionOperators<T, float, T>
 	{
 		var count = 0;
 		var toReturn = T.AdditiveIdentity;
@@ -625,11 +641,11 @@ public static class zz_Extensions_Span
 		}
 		return toReturn / count;
 	}
-	public static T _Min_Generic<T>(this Span<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	public static T _Min<T>(this Span<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
 	{
-		return values._AsReadOnly()._Min_Generic();
+		return values._AsReadOnly()._Min();
 	}
-	public static T _Min_Generic<T>(this ReadOnlySpan<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	public static T _Min<T>(this ReadOnlySpan<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
 	{
 		var toReturn = T.MaxValue;
 
@@ -642,11 +658,11 @@ public static class zz_Extensions_Span
 		}
 		return toReturn;
 	}
-	public static T _Max_Generic<T>(this Span<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	public static T _Max<T>(this Span<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
 	{
-		return values._AsReadOnly()._Max_Generic();
+		return values._AsReadOnly()._Max();
 	}
-	public static T _Max_Generic<T>(this ReadOnlySpan<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	public static T _Max<T>(this ReadOnlySpan<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
 	{
 		var toReturn = T.MinValue;
 

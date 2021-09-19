@@ -7,8 +7,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using DumDum.Bcl;
 using DumDum.Bcl.Diagnostics;
+using DumDum.Engine.Ecs;
 
-namespace DumDum.Engine.Ecs;
+namespace DumDum.Engine.Sim;
 
 /// <summary>
 /// Manages execution of <see cref="SimNode"/> in parallel based on order-of-execution requirements (see <see cref="SimNode._updateBefore"/>) and resource requirements (see <see cref="SimNode._readResources"/> and <see cref="SimNode._writeResources"/>)

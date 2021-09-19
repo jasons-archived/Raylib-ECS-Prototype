@@ -5,7 +5,7 @@ namespace DumDum.Bcl.Collections._unused
 {
 	/// <summary>
 	/// An array backed storage where you can free up individual slots for reuse.    When it runs out of capacity, the backing array will be resized.
-	/// <para>thread safe writes and non-blocking reads</para>
+	/// <para>thread safe writes and non-blocking reads if not using `ref return` accessors</para>
 	/// </summary>
 	/// <typeparam name="T"></typeparam>
 	public class SlotStore<T>
@@ -47,20 +47,28 @@ namespace DumDum.Bcl.Collections._unused
 			}
 		}
 
-		public T this[int slot]
+		//public T this[int slot]
+		//{
+		//	get
+		//	{
+		//		__CHECKED.Throw(this._CHECKED_allocationTracker.ContainsKey(slot), "slot is not allocated and you are using it");
+		//		return _storage[slot];
+		//	}
+		//	set
+		//	{
+		//		lock (this._lock)
+		//		{
+		//			__CHECKED.Throw(this._CHECKED_allocationTracker.ContainsKey(slot), "slot is not allocated and you are using it");
+		//			_storage[slot] = value;
+		//		}
+		//	}
+		//}
+		public ref T this[int slot]
 		{
 			get
 			{
 				__CHECKED.Throw(this._CHECKED_allocationTracker.ContainsKey(slot), "slot is not allocated and you are using it");
-				return _storage[slot];
-			}
-			set
-			{
-				lock (this._lock)
-				{
-					__CHECKED.Throw(this._CHECKED_allocationTracker.ContainsKey(slot), "slot is not allocated and you are using it");
-					_storage[slot] = value;
-				}
+				return ref _storage[slot];
 			}
 		}
 
@@ -68,6 +76,22 @@ namespace DumDum.Bcl.Collections._unused
 
 
 		public int Alloc(T data)
+		{
+			var slot = Alloc();
+			this._storage[slot] = data;
+			return slot;
+
+
+		}
+
+		public int Alloc(ref T data)
+		{
+			var slot = Alloc();
+			this._storage[slot] = data;
+			return slot;
+		}
+
+		public int Alloc()
 		{
 			lock (this._lock)
 			{
@@ -84,8 +108,6 @@ namespace DumDum.Bcl.Collections._unused
 					//need to allocate a new slot
 					slot = _storage.Grow(1);
 				}
-
-				this._storage[slot] = data;
 				return slot;
 			}
 

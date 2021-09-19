@@ -30,19 +30,19 @@ namespace DumDum.Bcl.Collections._unused
 			_check.Exit();
 		}
 
-		public TItem this[int index]
+		public ref TItem this[int index]
 		{
 			get
 			{
 				//_check.Poke();
 				__CHECKED.Throw(index < Length, "out of bounds.  the index you are using is not allocated");
-				return _storage[index];
+				return ref _storage[index];
 			}
-			set
-			{
-				__CHECKED.Throw(index < Length, "out of bounds.  the index you are using is not allocated");
-				_storage[index] = value;
-			}
+			//set
+			//{
+			//	__CHECKED.Throw(index < Length, "out of bounds.  the index you are using is not allocated");
+			//	_storage[index] = value;
+			//}
 		}
 
 		public TItem GetOrSet(int index, Func<TItem> newCtor)

@@ -11,6 +11,9 @@
     - [goals](#goals)
     - [non-goals](#non-goals)
     - [feature notes](#feature-notes)
+- [required knowledge](#required-knowledge)
+  - [c](#c)
+  - [architecture](#architecture)
 - [design guidelines](#design-guidelines)
   - [Naming](#naming)
   - [Error/Test handling](#errortest-handling)
@@ -81,6 +84,7 @@ Logical object structure is
 
 
 ### non-goals
+- easy for novice developers
 - mobile or consoles
 - computers incompatable with the tech choises made
 - 2d games
@@ -96,13 +100,32 @@ Logical object structure is
 ### feature notes
 - networking using either Steamworks or Epic Services
 - messaging system: try out https://github.com/Cysharp/MessagePipe
-- utils:  DotNext?
+- utils:  
+  - DotNext?
+  - Windows Community Toolkit, High Performance package: https://docs.microsoft.com/en-us/windows/communitytoolkit/high-performance/introduction
+    - https://github.com/CommunityToolkit/WindowsCommunityToolkit
+    - https://docs.microsoft.com/en-us/windows/communitytoolkit/nuget-packages
 - physics: https://github.com/bepu/bepuphysics2
 - math helper libs: Silk.net
 - input and other platform libs: Silk.net
 - kitbash:  https://kenney.nl/tools/assetforge and https://kenney.itch.io/kenshape
 - 
 
+# required knowledge
+
+## c#
+- understanding of `return ref` and passing structs by reference.  Prerequisie is good understanding of value types vs reference types.
+- understanding of `Span<T>` and how it is a pointer to memory somewhere else
+- `async`/`await` and `Task` patterns.  
+  
+## architecture
+- general knowledge of Entity Component Systems.  If you read/watch some intro on Unity ECS that is a good start.
+  - The concept of components as resources having read/write locks, allowing coordination between multiple threads.
+  - The concept that each System you create is effectively it's own thread.
+  - Entity creation/deletion occurs at the start of each frame, between entity/component access by systems.
+  - A great strategy is to spin off your own `async Task` in a System to do long-running work that is independent of other components/systems, with a sync point in a future `.Update()` method call.
+
+- 
 
 # design guidelines
 
@@ -123,6 +146,8 @@ Generally following the [standard dotnet design guidelines](https://docs.microso
 4. Prefix extension methods with `_` and if there is anything unusual about them, add a suffix like `_Unsafe` to give a hint to the users.  
    - prefixing allows easy identification as a custom extension method without impacting autocomplete/intelisense.
    - if using a suffix, Add approriate intellisense docs (to the containing static class at minimum) so the user can understand the meaning of the suffix.
+     - `_Unsafe` is used for code that has some tricky usage pattern, usuall because of using pointers (unsafe code) that will go out of scope once the underlying object changes.  Generally speaking, use these method results immediately and do not make changes (add/removes for collections) until afterwards.
+     - `_Exp` is used for experimental code that seems to work fine, but might have some hidden performance "gotcha" or relies on some experimental feature that might change/break/be-deleted in the future.
 5. Prefix extension method containing static classes with `zz_Extensions_` 
    - so that it doesn't polute intellisense dropdowns, and is still descriptive.
 
