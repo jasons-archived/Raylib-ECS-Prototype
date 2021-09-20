@@ -2,12 +2,14 @@
 using DumDum.Bcl.Collections._unused;
 using DumDum.Bcl.Diagnostics;
 using DumDum.Engine.Sim;
+using Microsoft.Toolkit.HighPerformance.Buffers;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DumDum.Engine.Ecs;
@@ -23,12 +25,12 @@ public abstract class SystemBase : Sim.FixedTimestepNode
 	protected override Task Update(Frame frame, NodeFrameState nodeState)
 	{
 		return Update();
-		
+
 	}
 
 	protected abstract Task Update();
 
-	
+
 
 }
 
@@ -84,7 +86,7 @@ public partial class EntityManager : SystemBase //archetype management
 	/// </summary>
 	public bool TryAddArchetype(Archetype archetype)
 	{
-		if(TryGetArchetype(archetype._componentTypes.ToList()._AsSpan_Unsafe(),out var found))
+		if (TryGetArchetype(archetype._componentTypes.ToList()._AsSpan_Unsafe(), out var found))
 		{
 			return false;
 		}
@@ -137,7 +139,23 @@ public partial class EntityManager //entity creation
 
 	private void DoCreateEntities_Sync(int count, Archetype archetype, Action_RoSpan<EntityHandle> doneCallback)
 	{
+
+
+
+
+
+
+
+
+
+
+
 		throw new NotImplementedException();
+
+
+
+
+
 	}
 
 	private void TryRepackEntities_Sync()
@@ -158,16 +176,6 @@ public partial class EntityManager //entity creation
 	}
 }
 
-
-
-
-public record struct ArchetypeSlotInfo
-{
-	public int _archtypeId;
-	public int _chunkId;
-	public int _slotId;
-	//public int _version;
-}
 
 
 
@@ -225,64 +233,229 @@ public partial class Archetype //ctor
 
 
 
-public partial class Archetype  //entity allocations
+/// <summary>
+/// a handle to the entity's archetype data slot, valid until the archetype moves things around.
+/// </summary>
+public record struct ArchetypeEntityHandle
 {
+	public int _archetypeId;
+	public ChunkSlot _chunkSlot;
+	/// <summary>
+	/// maybe not needed?  use entityHandle version instead?
+	/// </summary>
+	public int _version;
+}
 
-	/** 
-	 * Each DataColumn is split into chunks of 1000 slots each.
-	 * we need to allocate a chunkId+slotId for a given input entityHandle.
+public record struct ChunkSlot : IComparable<int>, IComparable<ChunkSlot>, IEquatable<int>, IEquatable<ChunkSlot>
+{
+	public int _id;
 
 
-	*/
-
-
-	public SlotStore<EntityHandle> _storage = new();
-
-	public void Allocate(ref EntityHandle entityHandle)
+	public ChunkSlot(int id)
 	{
-		__ERROR.Throw(entityHandle._archetypeSlot == default(ArchetypeSlotInfo), "entityHandle already has arechetype allocated");
+		_id = id;
+	}
+	public ChunkSlot(int chunkId, int slotId)
+	{
+		_id = (chunkId * DataChunk.CHUNK_SIZE) + slotId;
+	}
+	public int Chunk { get => _id / DataChunk.CHUNK_SIZE; }
+	public int Slot { get => _id % DataChunk.CHUNK_SIZE; }
 
-		var storageId = _storage.Alloc();
-		var chunkId = storageId / DataChunk.CHUNK_SIZE;
-		var slotId = storageId % DataChunk.CHUNK_SIZE;
+	//public static bool operator <(ChunkSlot left, ChunkSlot right)
+	//{
+	//	return left.CompareTo(right) < 0;
+	//}
 
-		entityHandle._archetypeSlot = new()
-		{
-			_archtypeId = _archetypeId,
-			_chunkId = chunkId,
-			_slotId = slotId
-		};
-		_storage[storageId] = entityHandle;
+	//public static bool operator <=(ChunkSlot left, ChunkSlot right)
+	//{
+	//	return left.CompareTo(right) <= 0;
+	//}
 
-		foreach (var dataColumn in _componentColumns)
-		{
-			dataColumn.Alloc(chunkId, slotId, ref entityHandle, this);
-		}
+	//public static bool operator >(ChunkSlot left, ChunkSlot right)
+	//{
+	//	return left.CompareTo(right) > 0;
+	//}
+
+	//public static bool operator >=(ChunkSlot left, ChunkSlot right)
+	//{
+	//	return left.CompareTo(right) >= 0;
+	//}
+
+	public bool Equals(int other)
+	{
+		return _id == other;
 	}
 
-	public void Free(ref EntityHandle entityHandle)
+	public int CompareTo(ChunkSlot other)
 	{
-		__ERROR.Throw(entityHandle._archetypeSlot._archtypeId == _archetypeId, "entityHandle not assigned to this archetype");
-		var chunkId = entityHandle._archetypeSlot._chunkId;
-		var slotId = entityHandle._archetypeSlot._slotId;
-		var storageId = (chunkId * DataChunk.CHUNK_SIZE) + slotId;
-		foreach (var dataColumn in _componentColumns)
-		{
-			dataColumn.Free(chunkId, slotId, ref entityHandle, this);
-		}
-		_storage.Free(storageId);
+		return _id.CompareTo(other._id);
 	}
-
-	
-
-
-
-
+	public int CompareTo(int other)
+	{
+		return _id.CompareTo(other);
+	}
 }
 
 
+public partial class Archetype  //entity allocations
+{
+
+	public Dictionary<EntityHandle, ArchetypeEntityHandle> _lookup = new();
+
+	/// <summary>
+	/// free slots, where int = chunk * ChunkSize + slotId
+	/// </summary>
+	public List<ChunkSlot> _free = new();
+	private bool _isFreeSorted = false;
+
+	private int _version;
 
 
+
+	/**
+	 * each entity needs to be stored in a registry, so that it can be found based on it's entityHandle
+	 * 
+	 * 
+	 * 
+	 * entity registry needs:
+	 * - free slot tracking.  when free at end, decrement end.  thus FREE SLOTS MUST BE AN ORDERED COLLECTION
+	 * - when add, add to first free slot (try to be contiguous)
+	 * - track what chunks are in use
+	 * 
+	 * 
+	 * 
+	 * archetype needs to be in charge of it's own allocations/packing.
+	 * allow outsiders to investigate via an archeHandle
+	 * 
+	 * 
+	 */
+
+
+
+
+	/// <summary>
+	/// registry of chunkSlots in use AND free slots.
+	/// </summary>
+	public SlotStore<ArchetypeEntityHandle> _storage = new();
+
+	private object writeLock = new();
+
+	public MemoryOwner<EntityToken> Allocate(ReadOnlySpan<EntityHandle> entityHandles)
+	{
+		lock (writeLock)
+		{
+			var tokens = MemoryOwner<EntityToken>.Allocate(entityHandles.Length);
+			var tokensSpan = tokens.Span;
+			if (_isFreeSorted == false)
+			{
+				//sort in reverse order  (lowest id at end)
+				_free.Sort((first, second) => second.CompareTo(first));
+				_isFreeSorted = true;
+			}
+
+
+			for (var i = 0; i < entityHandles.Length; i++)
+			{
+				ref var token = ref tokensSpan[i];
+				var entityHandle = entityHandles[i];
+
+				token._entityHandle = entityHandle;
+
+
+
+				if (_free._TryTakeLast(out var chunkSlot) == false)
+				{
+					var id = _storage.Alloc();
+					chunkSlot = new ChunkSlot(id);
+				}
+				token._archHandle = new()
+				{
+					_archetypeId = _archetypeId,
+					_chunkSlot = chunkSlot,
+					_version = _version++,
+				};
+
+
+				//__ERROR.Throw(entityHandle._archetypeSlot == default(ArchetypeSlotInfo), "entityHandle already has arechetype allocated");
+				__ERROR.Throw(_lookup.ContainsKey(entityHandle) == false, "entity already has a slot in this archetype allocated");
+				_lookup.Add(entityHandle, token._archHandle);
+			}
+
+			//inform the DataChunks to allocate
+			foreach (var dataColumn in this._componentColumns)
+			{
+				dataColumn.Alloc(tokens);
+			}
+
+			return tokens;
+		}
+	}
+
+	public void Free(ReadOnlySpan<EntityHandle> entityHandles)
+	{
+		lock (writeLock)
+		{
+			_isFreeSorted = false;
+			Span<EntityToken> tokensSpan = stackalloc EntityToken[entityHandles.Length];
+
+			for (var i = 0; i < entityHandles.Length; i++)
+			{
+				ref var token = ref tokensSpan[i];
+				var entityHandle = entityHandles[i];
+
+				token._entityHandle = entityHandle;
+
+
+				var result = _lookup.TryGetValue(entityHandle, out var archHandle);
+				__ERROR.Throw(result, "trying to free entity not registered on this archetype");
+				_lookup.Remove(entityHandle);
+				_free.Add(archHandle._chunkSlot);
+				token._archHandle = archHandle;
+			}
+			foreach (var dataColumn in this._componentColumns)
+			{
+				dataColumn.Free(tokensSpan);
+			}
+
+		}
+	}
+}
+
+//public void Free(ref EntityHandle entityHandle)
+//{
+//	__ERROR.Throw(entityHandle._archetypeSlot._archtypeId == _archetypeId, "entityHandle not assigned to this archetype");
+//	var chunkId = entityHandle._archetypeSlot._chunkId;
+//	var slotId = entityHandle._archetypeSlot._slotId;
+//	var storageId = (chunkId * DataChunk.CHUNK_SIZE) + slotId;
+//	foreach (var dataColumn in _componentColumns)
+//	{
+//		dataColumn.Free(chunkId, slotId, ref entityHandle, this);
+//	}
+//	_storage.Free(storageId);
+//}
+
+
+
+
+
+
+
+
+
+
+/// <summary>
+/// token only gurenteed to be valid for a single frame.  after that the entity's archetype details might be invalid so may need to be reaquired.
+/// </summary>
+public record struct EntityToken
+{
+	public EntityHandle _entityHandle;
+	public ArchetypeEntityHandle _archHandle;
+}
+
+/// <summary>
+/// a persistant handle to an entity, valid for it's lifetime
+/// </summary>
 public record struct EntityHandle
 {
 
@@ -290,10 +463,10 @@ public record struct EntityHandle
 	public int _id;
 	public int _version;
 
-	/// <summary>
-	/// store archetype so can default to looking up directly here, not the global entityStore
-	/// </summary>
-	public ArchetypeSlotInfo _archetypeSlot;
+	///// <summary>
+	///// store archetype so can default to looking up directly here, not the global entityStore
+	///// </summary>
+	//public ArchetypeSlotInfo _archetypeSlot;
 
 
 
@@ -326,6 +499,8 @@ public record struct EntityHandle
 	}
 
 }
+
+
 
 
 public class EntityHandleAllocator
@@ -451,7 +626,18 @@ public abstract class DataColumn
 	}
 
 	internal abstract void Alloc(int chunkId, int slotId, ref EntityHandle entityHandle, Archetype archetype);
+
+	internal void Alloc(MemoryOwner<EntityToken> tokens)
+	{
+		throw new NotImplementedException();
+	}
+
 	internal abstract void Free(int chunkId, int slotId, ref EntityHandle entityHandle, Archetype archetype);
+
+	internal void Free(Span<EntityToken> tokensSpan)
+	{
+		throw new NotImplementedException();
+	}
 }
 
 

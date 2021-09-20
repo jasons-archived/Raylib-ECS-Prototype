@@ -9,6 +9,8 @@
 
 using System.Diagnostics;
 
+Console.WriteLine(System.Environment.SystemPageSize);
+
 
 var frame = 0;
 float avgMs = 0;
