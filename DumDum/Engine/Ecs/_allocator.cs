@@ -25,6 +25,7 @@ public interface IComponent
 /// </summary>
 public record struct AllocToken
 {
+	public bool isInit;
 	public long externalId;
 
 
@@ -93,6 +94,21 @@ public record struct AllocToken
 		__CHECKED.Throw(GetContainingChunk<AllocMetadata>() == chunk,"chunk lookup between both techniques does not match");
 		__CHECKED.Throw(this == chunk.Span[allocSlot.chunkRowIndex].allocToken);
 	}
+
+	
+
+
+	//public override string ToString()
+	//{
+	//	if (isInit)
+	//	{
+	//		return base.ToString();
+	//	}
+	//	else
+	//	{
+	//		return "AllocToken [NOT INITIALIZED]";
+	//	}
+	//}
 }
 
 
@@ -138,6 +154,39 @@ public record struct AllocSlot : IComparable<AllocSlot>
 	public int CompareTo(AllocSlot other)
 	{
 		return _packedValue.CompareTo(other._packedValue);
+	}
+}
+
+public partial class Allocator //unit test
+{
+
+
+	[Conditional("TEST")]
+	public static unsafe void __TEST_Unit_ParallelAllocators()
+	{
+		for(var i = 0; i < 10; i++)
+		{
+			Task.Run(() => __TEST_Unit_SingleAllocator());
+		}
+	}
+
+	[Conditional("TEST")]
+	public static unsafe void __TEST_Unit_SingleAllocator()
+	{
+		var allocator = new Allocator()
+		{
+			AutoPack=__.Rand._NextBoolean(),
+			ChunkSize=3,
+			ComponentTypes = new() {typeof(int),typeof(string) },
+			
+			
+		};
+		allocator.Initialize();
+
+		Span<long> externalIds = stackalloc long[] { 2,4,8,7 ,-2};
+		Span<AllocToken> tokens = stackalloc AllocToken[5];
+		allocator.Alloc(externalIds, tokens);
+
 	}
 }
 
@@ -331,6 +380,7 @@ public partial class Allocator  //alloc/free logic
 			ref var allocToken = ref output[i];
 			allocToken = new()
 			{
+				isInit= true,
 				allocatorId = _allocatorId,
 				allocSlot = slot,
 				externalId = externalId,
@@ -373,13 +423,9 @@ public partial class Allocator  //alloc/free logic
 		}
 
 
-
-
-
-
-		throw new NotImplementedException();
 	}
 
+	//lkajsdflkasjdf  //Do FREE next
 	public void Free(Span<long> externalIds)
 	{
 
@@ -439,14 +485,14 @@ public struct AllocPositionTracker
 	}
 	public void FreeLast(out bool freeChunk)
 	{
-		)
+		
 		nextAvailable.chunkRowIndex--;
 		if (nextAvailable.chunkRowIndex < 0)
 		{
 			nextAvailable.chunkRowIndex = chunkSize - 1;
 			nextAvailable.columnChunkIndex--;
 			freeChunk = true;
-			__DEBUG.Throw(nextAvailable.columnChunkIndex >= 0);
+			__DEBUG.Throw(nextAvailable.columnChunkIndex >= 0,"less than zero allocations");
 		}
 		else
 		{

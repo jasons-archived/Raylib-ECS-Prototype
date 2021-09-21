@@ -7,9 +7,24 @@ using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DumDum.Bcl;
+
+
+/// <summary>
+/// lolo: a static utils helper
+/// </summary>
+public unsafe static class __
+{	
+	private static ThreadLocal<Random> _rand = new(() => new());
+	/// <summary>
+	/// get a thread-local Random
+	/// </summary>
+	public static Random Rand { get => _rand.Value; }
+}
+
 
 /// <summary>
 /// sample unmanaged structs to provide statistics

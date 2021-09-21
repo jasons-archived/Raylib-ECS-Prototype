@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using DumDum.Bcl;
 using DumDum.Bcl.Diagnostics;
+using DumDum.Engine.Allocation;
 using DumDum.Engine.Ecs;
 using DumDum.Engine.Sim;
 
@@ -29,6 +30,7 @@ using DumDum.Engine.Sim;
 //Task.WaitAll(Task.Delay(100000));
 //Console.WriteLine("hi");
 
+Allocator.__TEST_Unit_SingleAllocator();
 
 var manager = new SimManager() { };
 

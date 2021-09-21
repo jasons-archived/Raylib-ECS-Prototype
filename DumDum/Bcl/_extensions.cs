@@ -16,11 +16,6 @@ using System.Threading.Tasks;
 namespace DumDum.Bcl;
 
 
-public static class zz__Extensions_Object
-{
-	//public static bool _IsAny
-}
-
 
 public static class zz__Extensions_List
 {
@@ -986,7 +981,7 @@ public static class zz__Extensions_Boolean
 
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1050:DeclareTypesInNamespaces")]
-public static class zz__Extensions_Object
+public  static partial class zz__Extensions_Object
 {
 
 

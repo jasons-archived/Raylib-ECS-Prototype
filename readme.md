@@ -63,7 +63,12 @@ The execution engine is fully multithreaded.  Your nodes can be written in a sin
     1. Download Repository (may include Git LFS setup)
     2. Open RpgSample.sln
     3. Hit F5
-    4. Do stuff: Set Breakpoint / modify code+hotReload
+    4. ... *wait a bit* ...
+    5. Do stuff: Set Breakpoint / modify code+hotReload
+- SLA (service level agreement)
+   - 48hr rsponse time for issues.  Triage by 72hr mark.
+   - 72hr response on PR requests edits.  (follow up, merge, reject)
+   - monthly roadmap and changelist updates
 - engine that runs on modern desktop platforms
 - multithreaded.  take advantage of a 16 core system effectively.
 - code based game development
