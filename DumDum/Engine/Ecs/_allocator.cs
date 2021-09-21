@@ -3,7 +3,9 @@ using DumDum.Bcl.Diagnostics;
 using Microsoft.Toolkit.HighPerformance.Buffers;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -25,6 +27,7 @@ public record struct AllocToken
 {
 	public long externalId;
 
+
 	/// <summary>
 	/// the id of the allocator that created/tracks this allocSlot.  //TODO: make the archetype also use this ID as it's own (on create allocator, use it's ID)
 	/// If needed, the allocator can be accessed via `Allocator._GLOBAL_LOOKUP(allocatorId)`
@@ -42,7 +45,53 @@ public record struct AllocToken
 	{
 		//create a long from two ints
 		//long correct = (long)left << 32 | (long)(uint)right;  //from: https://stackoverflow.com/a/33325313/1115220
-		return (long)allocatorId << 32 |(uint)allocSlot.columnChunkIndex;
+		return (long)allocatorId << 32 | (uint)allocSlot.columnChunkIndex;
+	}
+
+	public ref T GetComponentWriteRef<T>()
+	{
+		_CHECKED_VerifyInstance<T>();
+		var chunk = GetContainingChunk<T>();
+		return ref chunk.GetWriteRef(this);
+
+	}
+	public ref readonly T GetComponentReadRef<T>()
+	{
+		_CHECKED_VerifyInstance<T>();
+		var chunk = GetContainingChunk<T>();
+		return ref chunk.GetReadRef(this);
+	}
+	public Chunk<T> GetContainingChunk<T>()
+	{
+		_CHECKED_VerifyInstance<T>();
+		var chunkLookupId = GetChunkLookupId();
+
+		if (!Chunk<T>._GLOBAL_LOOKUP.TryGetValue(chunkLookupId, out var chunk))
+		{
+			__ERROR.Throw(GetAllocator().HasComponent<T>(), $"the archetype this element is attached to does not have a component of type {typeof(T).FullName}. Be aware that base classes do not match.");
+			//need to refresh token
+			__ERROR.Throw(false, "the chunk this allocToken points to does not exist.  either entity was deleted or it was packed.  Do not use AllocTokens beyond the frame aquired unless archetype.allocator.AutoPack==false");
+		}
+		return chunk;
+	}
+	public Allocator GetAllocator()
+	{
+		return Allocator._GLOBAL_LOOKUP[allocatorId];
+	}
+	[Conditional("CHECKED")]
+	private void _CHECKED_VerifyInstance<T>()
+	{
+		if (typeof(T) == typeof(AllocMetadata))
+		{
+			//otherwise can cause infinite recursion
+			return;
+		}
+		ref readonly var allocMetadata = ref GetComponentReadRef<AllocMetadata>();
+		__CHECKED.Throw(allocMetadata.allocToken == this, "mismatch");
+		//get chunk via the allocator, where the default way is direct through the Chunk<T>._GLOBAL_LOOKUP
+		var chunk = GetAllocator()._componentColumns[typeof(AllocMetadata)][allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
+		__CHECKED.Throw(GetContainingChunk<AllocMetadata>() == chunk,"chunk lookup between both techniques does not match");
+		__CHECKED.Throw(this == chunk.Span[allocSlot.chunkRowIndex].allocToken);
 	}
 }
 
@@ -95,13 +144,14 @@ public record struct AllocSlot : IComparable<AllocSlot>
 
 
 /// <summary>
-/// allocator for archetypes
+/// allocator for archetypes 
 /// </summary>
-public partial class Allocator //init logic
+public partial class Allocator : IDisposable //init logic
 {
 
-	public static short _allocatorId_GlobalCounter;
-	public short _allocatorId = _allocatorId_GlobalCounter++;
+	public static int _allocatorId_GlobalCounter;
+	public static Dictionary<int, Allocator> _GLOBAL_LOOKUP = new();
+	public int _allocatorId = _allocatorId_GlobalCounter._InterlockedIncrement();
 
 	/// <summary>
 	/// if you want to add additional custom components to each entity, list them here.  These are not used to compute the <see cref="_componentsHashId"/>
@@ -117,6 +167,11 @@ public partial class Allocator //init logic
 	public int _componentsHashId;
 
 	public Dictionary<Type, List<Chunk>> _componentColumns = new();
+
+	public bool HasComponent<T>()
+	{
+		return _componentColumns.ContainsKey(typeof(T));
+	}
 
 	public void Initialize()
 	{
@@ -152,9 +207,48 @@ public partial class Allocator //init logic
 		//create the first (blank) chunk for each column
 		_AllocNextChunk();
 
-
+		lock (_GLOBAL_LOOKUP)
+		{
+			_GLOBAL_LOOKUP.Add(_allocatorId, this);
+		}
 	}
-
+	public bool IsDisposed { get; private set; } = false;
+	public void Dispose()
+	{
+		if (IsDisposed)
+		{
+			return;
+		}
+		IsDisposed = true;
+		lock (_GLOBAL_LOOKUP)
+		{
+			_GLOBAL_LOOKUP.Remove(_allocatorId);
+		}
+		foreach (var (type, columnList) in _componentColumns)
+		{
+			foreach (var chunk in columnList)
+			{
+				chunk.Dispose();
+			}
+			columnList.Clear();
+		}
+		_componentColumns.Clear();
+		_componentColumns = null;
+		_free.Clear();
+		_free = null;
+		_lookup.Clear();
+		_lookup = null;
+	}
+#if DEBUG
+	~Allocator()
+	{
+		if (IsDisposed == false)
+		{
+			__DEBUG.AssertOnce(false, "need to have parent archetype dispose allocator for proper cleanup");
+			Dispose();
+		}
+	}
+#endif
 }
 
 public partial class Allocator //chunk management logic
@@ -193,7 +287,7 @@ public partial class Allocator  //alloc/free logic
 	/// <summary>
 	/// given an externalId, find current token.  this allows decoupling our internal storage location from external callers, allowing packing.
 	/// </summary>
-	public Dictionary<long, AllocToken> _loopup = new();
+	public Dictionary<long, AllocToken> _lookup = new();
 
 
 	/// <summary>
@@ -203,7 +297,7 @@ public partial class Allocator  //alloc/free logic
 
 
 	public int ChunkSize { get; init; } = 1000;
-	public int Count { get => _loopup.Count; }
+	public int Count { get => _lookup.Count; }
 	/// <summary>
 	/// the next slot we will allocate from, and logic informing us when to add/remove chunks
 	/// </summary>
@@ -216,9 +310,9 @@ public partial class Allocator  //alloc/free logic
 	/// </summary>
 	public bool AutoPack { get; init; } = true;
 
-	
 
-	public void Alloc(Span<long> externalIds, Span<AllocToken> output)  
+
+	public void Alloc(Span<long> externalIds, Span<AllocToken> output)
 	{
 		__DEBUG.Assert(output.Length == externalIds.Length);
 		for (var i = 0; i < externalIds.Length; i++)
@@ -234,32 +328,48 @@ public partial class Allocator  //alloc/free logic
 					_AllocNextChunk();
 				}
 			}
-			
-			output[i] = new()
+			ref var allocToken = ref output[i];
+			allocToken = new()
 			{
 				allocatorId = _allocatorId,
-				allocSlot= slot,
-				externalId= externalId,
-				packVersion=_packVersion,
+				allocSlot = slot,
+				externalId = externalId,
+				packVersion = _packVersion,
 			};
 
-			alksjdflkasjdflkjasdflkj //TOMORROW START: setup accessor methods on AllocToken and test them below
-				//set the AllocMetadata for the entity to a new
-	
+
 
 #if CHECKED
-			//verify accessor systems work.
+			//verify chunk accessor workflows are correct
+			var manualGetChunk = _componentColumns[typeof(AllocMetadata)][allocToken.allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
+			var autoGetChunk = allocToken.GetContainingChunk<AllocMetadata>();
+			__CHECKED.Throw(manualGetChunk == autoGetChunk, "should match");
+
 
 			//make sure proper chunk is referenced, and field
-			foreach(var (type,columnList) in _componentColumns)
+			foreach (var (type, columnList) in _componentColumns)
 			{
+				var columnChunk = columnList[allocToken.allocSlot.columnChunkIndex];
+
+				__CHECKED.Throw(columnChunk._chunkLookupId == allocToken.GetChunkLookupId(), "lookup id mismatch");
 
 			}
 #endif
-			__CHECKED.Assert()
 
-			//record this allocation in itself
-			output[i].
+
+
+			//set the allocMetadata builtin componenent
+			ref var allocMetadata = ref allocToken.GetContainingChunk<AllocMetadata>().Span[allocToken.allocSlot.chunkRowIndex];
+			__CHECKED.Throw(allocMetadata == default(AllocMetadata), "expect this to be cleared out, why not?");
+			allocMetadata = new AllocMetadata()
+			{
+				allocToken = allocToken,
+				componentCount = _componentColumns.Count,
+			};
+			__CHECKED.Throw(allocMetadata == allocToken.GetComponentReadRef<AllocMetadata>(), "component reference verification failed.  why?");
+
+
+
 		}
 
 
@@ -296,6 +406,10 @@ public record struct AllocMetadata : IComponent
 {
 	public AllocToken allocToken;
 	public int componentCount;
+	/// <summary>
+	/// hint informing that a writeRef was aquired for one of the components.
+	/// <para>Important Note: writing to this fieldWrites is done internally, and does not increment the Chunk[AllocMetadata]._writeVersion.  This is so _writeVersion can be used to detect entity alloc/free </para>
+	/// </summary>
 	public int fieldWrites;
 }
 
@@ -349,7 +463,7 @@ public abstract class Chunk : IDisposable
 	public int _count;
 	public int _length = -1;
 	/// <summary>
-	/// incremented every time a system writes to any of its slots
+	/// incremented every time a system writes to any of its slots.  
 	/// </summary>
 	public int _writeVersion;
 
@@ -370,7 +484,11 @@ public class Chunk<TComponent> : Chunk
 {
 	public static Dictionary<long, Chunk<TComponent>> _GLOBAL_LOOKUP = new();
 
-	public MemoryOwner<TComponent> _storage;
+	private MemoryOwner<TComponent> _storage;
+	public Memory<TComponent> Memory { get => _storage.Memory; }
+	public Span<TComponent> Span { get => _storage.Span; }
+
+	private TComponent[] _refStorage;
 	public bool IsDisposed { get; private set; } = false;
 	public override void Dispose()
 	{
@@ -380,6 +498,7 @@ public class Chunk<TComponent> : Chunk
 			_GLOBAL_LOOKUP.Remove(_chunkLookupId);
 		}
 		__ERROR.Throw(_count == 0);
+		_refStorage = null;
 		_storage.Dispose();
 		_storage = null;
 	}
@@ -396,6 +515,45 @@ public class Chunk<TComponent> : Chunk
 		}
 
 		_storage = MemoryOwner<TComponent>.Allocate(_length, AllocationMode.Clear); //TODO: maybe no need to clear?
+		_refStorage = _storage.DangerousGetArray().Array;
+	}
+
+	public unsafe ref TComponent GetWriteRef(AllocToken allocToken)
+	{
+		return ref GetWriteRef(ref *&allocToken); //cast to ptr using *& to circumvent return ref safety check
+	}
+	public ref TComponent GetWriteRef(ref AllocToken allocToken)
+	{
+		_CHECKED_VerifyIntegrity(ref allocToken);
+		var rowIndex = allocToken.allocSlot.chunkRowIndex;
+		//inform metadata that a write is occuring.  //TODO: is this needed?  If not, remove it to reduce random memory access
+		ref var allocMetadata = ref Chunk<AllocMetadata>._GLOBAL_LOOKUP[_chunkLookupId]._refStorage[rowIndex];
+		allocMetadata.fieldWrites++;
+		_writeVersion++;
+		return ref _refStorage[rowIndex];
+	}
+	public unsafe ref readonly TComponent GetReadRef(AllocToken allocToken)
+	{
+		return ref GetReadRef(ref *&allocToken); //cast to ptr using *& to circumvent return ref safety check
+	}
+	public ref readonly TComponent GetReadRef(ref AllocToken allocToken)
+	{
+		_CHECKED_VerifyIntegrity(ref allocToken);
+		var rowIndex = allocToken.allocSlot.chunkRowIndex;
+		return ref _refStorage[rowIndex];
+
+	}
+
+	[Conditional("CHECKED")]
+	private void _CHECKED_VerifyIntegrity(ref AllocToken allocToken)
+	{
+		__DEBUG.Throw(allocToken.GetChunkLookupId() == _chunkLookupId, "allocToken does not belong to this chunk");
+		__CHECKED.Throw(Chunk<TComponent>._GLOBAL_LOOKUP[_chunkLookupId] == this, "alloc system internal integrity failure");
+		__CHECKED.Throw(!IsDisposed, "use after dispose");
+		var rowIndex = allocToken.allocSlot.chunkRowIndex;
+		ref var allocMetadata = ref Chunk<AllocMetadata>._GLOBAL_LOOKUP[_chunkLookupId]._refStorage[rowIndex];
+		__DEBUG.Throw(allocMetadata.allocToken == allocToken, "invalid alloc token.   why?");
+
 	}
 }
 

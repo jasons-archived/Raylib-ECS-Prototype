@@ -7,11 +7,13 @@
   - [ECS](#ecs)
   - [ExecManager](#execmanager)
     - [Multithreaded by default](#multithreaded-by-default)
-    - [goals](#goals)
-    - [non-goals](#non-goals)
+  - [goals](#goals)
+  - [non-goals](#non-goals)
 - [required knowledge](#required-knowledge)
   - [c](#c)
   - [architecture](#architecture)
+- [patterns](#patterns)
+- [antipaterns](#antipaterns)
 - [design guidelines](#design-guidelines)
   - [Naming](#naming)
   - [Error/Test handling](#errortest-handling)
@@ -52,17 +54,23 @@ Scheduling means:
 The ECS system will sit on top of this, and other things can too.
 
 ### Multithreaded by default
-The execution engine is fully multithreaded.  Your nodes can be written in a single-threaded fashion as long as you specify what resource yo
-ur node has read/write access to.
+The execution engine is fully multithreaded.  Your nodes can be written in a single-threaded fashion as long as you specify what resource your node has read/write access to.
 
 
-### goals
+## goals
+- Best FTDE (First-Time-Developer-Experience)
+  - Steps needed to debug a sample project and full engine soure should be only:
+    1. Download Repository (may include Git LFS setup)
+    2. Open RpgSample.sln
+    3. Hit F5
+    4. Do stuff: Set Breakpoint / modify code+hotReload
 - engine that runs on modern desktop platforms
 - multithreaded.  take advantage of a 16 core system effectively.
 - code based game development
-- dynamic, procedural worlds
-- game coordinates 1000 x 1000 km
-- focus on modularity
+- procedural workflows come first: dynamic objects, procedural scenes
+- support world coordinates 1000 x 1000 km
+- networking built in
+- modular systems
 - documentation:  
   - Class and namespace summaries at minimum.
   - end-to-end example games
@@ -70,8 +78,8 @@ ur node has read/write access to.
 - open source via AGPL3, with commercial licensing
 
 
-### non-goals
-- easy for novice developers
+## non-goals
+- easy for beginner c# developers
 - mobile or consoles
 - computers incompatable with the tech choises made
 - 2d games
@@ -99,7 +107,26 @@ ur node has read/write access to.
   - Entity creation/deletion occurs at the start of each frame, between entity/component access by systems.
   - A great strategy is to spin off your own `async Task` in a System to do long-running work that is independent of other components/systems, with a sync point in a future `.Update()` method call.
 
-- 
+# patterns
+These are development pattern "tricks" needed to be used in this codebase.  It is likely that users of this engine need to use similar patterns.
+
+- cast input `ref` struct to ptr to circumvent `return ref` type checks.   Only use this when you ***KNOW*** the function is safe, but here's how:
+```cs
+	public unsafe ref readonly TComponent GetReadRef(AllocToken allocToken)
+	{
+		return ref GetReadRef(ref *&allocToken); //cast to ptr using *& to circumvent return ref safety check
+	}
+```
+- for multithreading, use `async/await`.  do not use thread blocking such as `Thread.Sleep()`.  The two ways of thread synchronization are not compatable.
+   -  this goes with synchronization objects too.   Do not use `lock`, use `SemephoreSlim`.  Do not use `ReaderWriterLockSlim`, use `AsyncReaderWriterLockSlim` from `DotNext.Threading`.
+   -  
+
+# antipaterns
+These are patterns that have known problems.  Do not use them, ever.
+- Do not use `Task.Wait(timeout)` for any timeout greater than zero.  It relies on a OS timer that on windows has a resolution of `15ms`, meaning that your block will always be at least `15ms`.
+- `lock` or `Thread.Sleep()`.  See the above pattern on using `async/await` instead.
+
+
 
 # design guidelines
 

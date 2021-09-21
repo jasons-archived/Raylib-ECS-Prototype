@@ -697,3 +697,25 @@ public static class zz_Extensions_Timespan
 		return target._IntervalPrior(interval) + interval;
 	}
 }
+
+
+public static class zz_Extensions_IntLong
+{
+	public static int _InterlockedIncrement(ref this int value)
+	{
+		return Interlocked.Increment(ref value);
+	}
+
+	public static long _InterlockedIncrement(ref this long value)
+	{
+		return Interlocked.Increment(ref value);
+	}
+	public static uint _InterlockedIncrement(ref this uint value)
+	{
+		return Interlocked.Increment(ref value);
+	}
+	public static ulong _InterlockedIncrement(ref this ulong value)
+	{		
+		return Interlocked.Increment(ref value);
+	}
+}
