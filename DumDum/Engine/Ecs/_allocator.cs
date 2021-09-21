@@ -24,8 +24,10 @@ public interface IComponent
 public record struct AllocToken
 {
 	public long externalId;
+
 	/// <summary>
-	/// one allocator per archetype
+	/// the id of the allocator that created/tracks this allocSlot.  //TODO: make the archetype also use this ID as it's own (on create allocator, use it's ID)
+	/// If needed, the allocator can be accessed via `Allocator._GLOBAL_LOOKUP(allocatorId)`
 	/// </summary>
 	public int allocatorId;
 	public AllocSlot allocSlot;
@@ -33,6 +35,15 @@ public record struct AllocToken
 	/// needs to match Allocator._packVersion, otherwise a pack took place and the token needs to be refreshed.
 	/// </summary>
 	public int packVersion;
+	/// <summary>
+	/// can be used to directly find a chunk from `Chunk[TComponent]._GLOBAL_LOOKUP(chunkId)`
+	/// </summary>
+	public long GetChunkLookupId()
+	{
+		//create a long from two ints
+		//long correct = (long)left << 32 | (long)(uint)right;  //from: https://stackoverflow.com/a/33325313/1115220
+		return (long)allocatorId << 32 |(uint)allocSlot.columnChunkIndex;
+	}
 }
 
 
@@ -41,36 +52,38 @@ public record struct AllocSlot : IComparable<AllocSlot>
 {
 
 	[FieldOffset(0)]
-	public long _packedValue;
+	private long _packedValue;
 
 	/// <summary>
 	/// can be used to directly find a chunk from `Chunk[TComponent]._GLOBAL_LOOKUP(chunkId)`
 	/// </summary>
-	[FieldOffset(0)]
-	public int chunkId;
-	/// <summary>
-	/// the id of the allocator that created/tracks this allocSlot.  //TODO: make the archetype also use this ID as it's own (on create allocator, use it's ID)
-	/// If needed, the allocator can be accessed via `Allocator._GLOBAL_LOOKUP(allocatorId)`
-	/// </summary>
+	//[FieldOffset(0)]
+	//public int chunkId;
 
-	[FieldOffset(0)]
-	public short allocatorId;
+	//[FieldOffset(0)]
+	//public short allocatorId;
 	/// <summary>
 	/// index to the chunk from `allocator._componentColumns(type)[columnIndex]`
 	/// </summary>
-	[FieldOffset(2)]
-	public short columnIndex;
+	[FieldOffset(0)]
+	public int columnChunkIndex;
 
 
 	[FieldOffset(4)]
-	public int slotId;
+	public int chunkRowIndex;
 
-	public AllocSlot(short allocatorId, short columnIndex, int slotId)
+	public AllocSlot(//short allocatorId, 
+		int columnIndex, int chunkRowIndex)
 	{
 		this = default;
-		this.allocatorId = allocatorId;
-		this.columnIndex = columnIndex;
-		this.slotId = slotId;
+		//this.allocatorId = allocatorId;
+		this.columnChunkIndex = columnIndex;
+		this.chunkRowIndex = chunkRowIndex;
+	}
+
+	public long GetChunkLookupId(int allocatorId)
+	{
+		return (long)allocatorId << 32 | (uint)columnChunkIndex;
 	}
 
 	public int CompareTo(AllocSlot other)
@@ -121,19 +134,19 @@ public partial class Allocator //init logic
 			_componentColumns.Add(type, new());
 		}
 		//add our special metadata component column
-		__DEBUG.Throw(CustomMetaComponents.Contains(typeof(AllocMetadata)),"we must have allocMetadata to store info on each entity added");
+		__DEBUG.Throw(CustomMetaComponents.Contains(typeof(AllocMetadata)), "we must have allocMetadata to store info on each entity added");
 		foreach (var type in CustomMetaComponents)
 		{
 			_componentColumns.Add(type, new());
 		}
-		
+
 
 
 		//create our next slot alloc tracker
 		_nextSlotTracker = new()
 		{
 			chunkSize = ChunkSize,
-			nextAvailable = new(_allocatorId, 0, 0),
+			nextAvailable = new(0, 0),
 		};
 
 		//create the first (blank) chunk for each column
@@ -142,14 +155,19 @@ public partial class Allocator //init logic
 
 	}
 
-	private void _AllocNextChunk()
+}
+
+public partial class Allocator //chunk management logic
+{
+
+	private void _AllocNextChunk() //TODO: preallocate extra chunks ahead of their need (always keep 1x extra chunk around)
 	{
 		foreach (var (type, columnList) in _componentColumns)
 		{
 			var chunkType = typeof(Chunk<>).MakeGenericType(type);
 			var chunk = Activator.CreateInstance(chunkType) as Chunk;
-			chunk.Initialize(_nextSlotTracker.chunkSize,_nextSlotTracker.nextAvailable.chunkId);
-			__DEBUG.Assert(columnList.Count == _nextSlotTracker.nextAvailable.columnIndex, "somehow our column allocations is out of step with our next free tracking.");
+			chunk.Initialize(_nextSlotTracker.chunkSize, _nextSlotTracker.nextAvailable.GetChunkLookupId(_allocatorId));
+			__DEBUG.Assert(columnList.Count == _nextSlotTracker.nextAvailable.columnChunkIndex, "somehow our column allocations is out of step with our next free tracking.");
 			columnList.Add(chunk);
 		}
 	}
@@ -161,13 +179,16 @@ public partial class Allocator //init logic
 			var result = columnList._TryTakeLast(out var chunk);
 			__DEBUG.Throw(result && chunk._count == 0);
 			chunk.Dispose();
-			__DEBUG.Assert(columnList.Count == _nextSlotTracker.nextAvailable.columnIndex, "somehow our column allocations is out of step with our next free tracking.");
+			__DEBUG.Assert(columnList.Count == _nextSlotTracker.nextAvailable.columnChunkIndex, "somehow our column allocations is out of step with our next free tracking.");
 		}
 	}
 }
 
 public partial class Allocator  //alloc/free logic
 {
+	/// <summary>
+	/// when we pack, we move entities around.  This is used to determine if a AllocToken is out of date.
+	/// </summary>
 	public int _packVersion = 0;
 	/// <summary>
 	/// given an externalId, find current token.  this allows decoupling our internal storage location from external callers, allowing packing.
@@ -175,6 +196,9 @@ public partial class Allocator  //alloc/free logic
 	public Dictionary<long, AllocToken> _loopup = new();
 
 
+	/// <summary>
+	/// temp listing of free entities, we will pack and/or deallocate at a specific time each frame
+	/// </summary>
 	public List<AllocSlot> _free = new();
 
 
@@ -192,15 +216,65 @@ public partial class Allocator  //alloc/free logic
 	/// </summary>
 	public bool AutoPack { get; init; } = true;
 
+	
 
-
-	public void Alloc(Span<long> externalIds, Span<AllocToken> output)
+	public void Alloc(Span<long> externalIds, Span<AllocToken> output)  
 	{
+		__DEBUG.Assert(output.Length == externalIds.Length);
+		for (var i = 0; i < externalIds.Length; i++)
+		{
+			var externalId = externalIds[i];
+			//get next free.
+			if (!_free._TryTakeLast(out var slot))
+			{
+				//  if we need to allocate a chunk do so here also.  //TODO: multithread
+				slot = _nextSlotTracker.AllocNext(out var newChunk);
+				if (newChunk)
+				{
+					_AllocNextChunk();
+				}
+			}
+			
+			output[i] = new()
+			{
+				allocatorId = _allocatorId,
+				allocSlot= slot,
+				externalId= externalId,
+				packVersion=_packVersion,
+			};
+
+			alksjdflkasjdflkjasdflkj //TOMORROW START: setup accessor methods on AllocToken and test them below
+				//set the AllocMetadata for the entity to a new
+	
+
+#if CHECKED
+			//verify accessor systems work.
+
+			//make sure proper chunk is referenced, and field
+			foreach(var (type,columnList) in _componentColumns)
+			{
+
+			}
+#endif
+			__CHECKED.Assert()
+
+			//record this allocation in itself
+			output[i].
+		}
+
+
+
+
+
+
 		throw new NotImplementedException();
 	}
 
 	public void Free(Span<long> externalIds)
 	{
+
+		//be sure to handle AutoPack if set, and update allocMetadata
+		//clear the component cells to default upon free if we are not packing to take it's place.
 		throw new NotImplementedException();
 	}
 
@@ -211,6 +285,9 @@ public partial class Allocator  //alloc/free logic
 		throw new NotImplementedException();
 
 	}
+
+
+
 }
 /// <summary>
 /// data for a default chunk always applied to all allocators.
@@ -218,6 +295,8 @@ public partial class Allocator  //alloc/free logic
 public record struct AllocMetadata : IComponent
 {
 	public AllocToken allocToken;
+	public int componentCount;
+	public int fieldWrites;
 }
 
 /// <summary>
@@ -230,11 +309,11 @@ public struct AllocPositionTracker
 	public AllocSlot AllocNext(out bool newChunk)
 	{
 		var toReturn = nextAvailable;
-		nextAvailable.slotId++;
-		if (nextAvailable.slotId >= chunkSize)
+		nextAvailable.chunkRowIndex++;
+		if (nextAvailable.chunkRowIndex >= chunkSize)
 		{
-			nextAvailable.slotId = 0;
-			nextAvailable.chunkId++;
+			nextAvailable.chunkRowIndex = 0;
+			nextAvailable.columnChunkIndex++;
 			newChunk = true;
 		}
 		else
@@ -247,13 +326,13 @@ public struct AllocPositionTracker
 	public void FreeLast(out bool freeChunk)
 	{
 		)
-		nextAvailable.slotId--;
-		if(nextAvailable.slotId < 0)
+		nextAvailable.chunkRowIndex--;
+		if (nextAvailable.chunkRowIndex < 0)
 		{
-			nextAvailable.slotId = chunkSize - 1;
-			nextAvailable.chunkId--;
+			nextAvailable.chunkRowIndex = chunkSize - 1;
+			nextAvailable.columnChunkIndex--;
 			freeChunk = true;
-			__DEBUG.Throw(nextAvailable.chunkId >= 0);
+			__DEBUG.Throw(nextAvailable.columnChunkIndex >= 0);
 		}
 		else
 		{
@@ -266,7 +345,7 @@ public struct AllocPositionTracker
 
 public abstract class Chunk : IDisposable
 {
-	public int _chunkId = -1;
+	public long _chunkLookupId = -1;
 	public int _count;
 	public int _length = -1;
 	/// <summary>
@@ -284,12 +363,12 @@ public abstract class Chunk : IDisposable
 	/// <summary>
 	/// using the given _chunkId, allocate self a slot on the global chunk store for Chunk[T]
 	/// </summary>
-	public abstract void Initialize(int length, int chunkId);
+	public abstract void Initialize(int length, long chunkLookupId);
 }
 
 public class Chunk<TComponent> : Chunk
 {
-	public static Dictionary<int, Chunk<TComponent>> _GLOBAL_LOOKUP = new();
+	public static Dictionary<long, Chunk<TComponent>> _GLOBAL_LOOKUP = new();
 
 	public MemoryOwner<TComponent> _storage;
 	public bool IsDisposed { get; private set; } = false;
@@ -298,22 +377,22 @@ public class Chunk<TComponent> : Chunk
 		IsDisposed = true;
 		lock (_GLOBAL_LOOKUP)
 		{
-			_GLOBAL_LOOKUP.Remove(_chunkId);
+			_GLOBAL_LOOKUP.Remove(_chunkLookupId);
 		}
 		__ERROR.Throw(_count == 0);
 		_storage.Dispose();
 		_storage = null;
 	}
 
-	public override void Initialize(int length, int chunkId)
+	public override void Initialize(int length, long chunkLookupId)
 	{
-		_chunkId = chunkId;
+		_chunkLookupId = chunkLookupId;
 		_length = length;
 
-		__DEBUG.Throw(_chunkId != -1 && _length != -1, "need to set before init");
+		__DEBUG.Throw(_chunkLookupId != -1 && _length != -1, "need to set before init");
 		lock (_GLOBAL_LOOKUP)
 		{
-			_GLOBAL_LOOKUP.Add(_chunkId, this);
+			_GLOBAL_LOOKUP.Add(_chunkLookupId, this);
 		}
 
 		_storage = MemoryOwner<TComponent>.Allocate(_length, AllocationMode.Clear); //TODO: maybe no need to clear?
