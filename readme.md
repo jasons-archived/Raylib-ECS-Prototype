@@ -7,10 +7,8 @@
   - [ECS](#ecs)
   - [ExecManager](#execmanager)
     - [Multithreaded by default](#multithreaded-by-default)
-  - [notes / scratch stuff below...](#notes--scratch-stuff-below)
     - [goals](#goals)
     - [non-goals](#non-goals)
-    - [feature notes](#feature-notes)
 - [required knowledge](#required-knowledge)
   - [c](#c)
   - [architecture](#architecture)
@@ -20,6 +18,9 @@
   - [Git Repository](#git-repository)
 - [testing and verificaiton](#testing-and-verificaiton)
   - [unsafe code verification](#unsafe-code-verification)
+- [notes / scratch stuff below...](#notes--scratch-stuff-below)
+    - [feature notes](#feature-notes)
+    - [c# tricks/notes/perf](#c-tricksnotesperf)
 
 # DumDum?
 A codename?
@@ -54,20 +55,6 @@ The ECS system will sit on top of this, and other things can too.
 The execution engine is fully multithreaded.  Your nodes can be written in a single-threaded fashion as long as you specify what resource yo
 ur node has read/write access to.
 
-## notes / scratch stuff below...
-
-
-
-
-Logical object structure is
-
-- SomeExternalTickPump
-  - ExecManager
-    - World
-      - Gameplay systems
-    - RenderingSystem
-    - 
-
 
 ### goals
 - engine that runs on modern desktop platforms
@@ -97,19 +84,6 @@ Logical object structure is
   - tutorial
 
 
-### feature notes
-- networking using either Steamworks or Epic Services
-- messaging system: try out https://github.com/Cysharp/MessagePipe
-- utils:  
-  - DotNext?
-  - Windows Community Toolkit, High Performance package: https://docs.microsoft.com/en-us/windows/communitytoolkit/high-performance/introduction
-    - https://github.com/CommunityToolkit/WindowsCommunityToolkit
-    - https://docs.microsoft.com/en-us/windows/communitytoolkit/nuget-packages
-- physics: https://github.com/bepu/bepuphysics2
-- math helper libs: Silk.net
-- input and other platform libs: Silk.net
-- kitbash:  https://kenney.nl/tools/assetforge and https://kenney.itch.io/kenshape
-- 
 
 # required knowledge
 
@@ -130,6 +104,7 @@ Logical object structure is
 # design guidelines
 
 Generally following the [standard dotnet design guidelines](https://docs.microsoft.com/en-us/dotnet/standard/design-guidelines/) with the following differences:
+
 ## Naming
 1. WIP is put in files prefixed with an underscore, such as `_utils.cs`.  These will be put into proper `Namespace/Class.cs` layouts when the feature is done/stable.
    - this lets the working dev have more flexibility during design/implementation, and lets other devs know that this is a work-in-progress section.
@@ -151,6 +126,7 @@ Generally following the [standard dotnet design guidelines](https://docs.microso
 5. Prefix extension method containing static classes with `zz_Extensions_` 
    - so that it doesn't polute intellisense dropdowns, and is still descriptive.
 
+it would be good to also follow these: https://github.com/dotnet/runtime/blob/main/docs/coding-guidelines/coding-style.md  which we also mostly follow.
 ## Error/Test handling
 1. use `#CHECKED` for costly code/data/usage verifications.  use `#DEBUG` for helpful hints about mistakes being made.  use `#TEST` for inline testing code
    - This allows turning on/off any combination to get desired runtime effect.
@@ -173,3 +149,46 @@ Generally following the [standard dotnet design guidelines](https://docs.microso
 any work done to unsafe code should be verified by using GC Hole stress, as defined here:  https://github.com/dotnet/runtime/blob/main/docs/design/coreclr/jit/investigate-stress.md#gc-hole-stress
 
 - Specifically, add the `DOTNET_GCStress=0xF` to launchsettings.json  (can be created via the startup project properties window)
+
+
+
+
+
+# notes / scratch stuff below...
+
+
+
+
+Logical object structure is
+
+- SomeExternalTickPump
+  - ExecManager
+    - World
+      - Gameplay systems
+    - RenderingSystem
+    - 
+### feature notes
+- networking using either Steamworks or Epic Services
+- messaging system: try out https://github.com/Cysharp/MessagePipe
+- utils:  
+  - DotNext?
+  - Windows Community Toolkit, High Performance package: https://docs.microsoft.com/en-us/windows/communitytoolkit/high-performance/introduction
+    - https://github.com/CommunityToolkit/WindowsCommunityToolkit
+    - https://docs.microsoft.com/en-us/windows/communitytoolkit/nuget-packages
+- physics: https://github.com/bepu/bepuphysics2
+- math helper libs: Silk.net
+- input and other platform libs: Silk.net
+- kitbash:  https://kenney.nl/tools/assetforge and https://kenney.itch.io/kenshape
+- benchmarking: https://benchmarkdotnet.org/
+- online codepen:
+  - https://sharplab.io/
+  - 
+### c# tricks/notes/perf
+- use record structs for comparison/lookups: https://nietras.com/2021/06/14/csharp-10-record-struct/
+- use `MemoryOwner<T>` for shared pool objects
+- `ReadOnlySpan<T>` and `Span<T>` are treated special by the CLR, it tracks their lifetimes and ensures references are valid
+   - also these enjoy other special things like casting from pointers or `stackalloc`
+- the Stack is only about  `1mb` so only use `stackalloc` for small temp allocations.   anything bigger use `MemoryOwner<T>`
+- on a `x64` win10 machine, a memorypage is `4096` bytes.  
+- for making instances of generic types:    `var listType = typeof(List<>).MakeGenericType(yourType)` and `Activator.CreateInstance(listType)`
+

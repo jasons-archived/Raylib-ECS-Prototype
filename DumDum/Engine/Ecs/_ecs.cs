@@ -341,7 +341,25 @@ public partial class Archetype  //entity allocations
 
 	private object writeLock = new();
 
-	public MemoryOwner<EntityToken> Allocate(ReadOnlySpan<EntityHandle> entityHandles)
+
+
+	private void Allocate(ReadOnlySpan<EntityHandle> input,Span<EntityToken> output) {
+	
+		//make stuff based on input, fill the output span with tokens based on what was created
+
+	}
+
+	private void Test<T,V>(T entityHandles) where T : IEnumerable<V>
+	{
+		Span<int> test = stackalloc int[200];
+
+		TEst2(test);
+
+		Test<Span<int>,int>(test);
+
+	}
+
+	public MemoryOwner<EntityToken> Allocate<T>(T entityHandles) where T: IEnumerable<EntityHandle>
 	{
 		lock (writeLock)
 		{
@@ -419,6 +437,23 @@ public partial class Archetype  //entity allocations
 			}
 
 		}
+	}
+
+	public void Compact()
+	{
+		lock (writeLock)
+		{
+			if (_isFreeSorted == false)
+			{
+				//sort in reverse order  (lowest id at end)
+				_free.Sort((first, second) => second.CompareTo(first));
+				_isFreeSorted = true;
+			}
+
+			_storage.Free
+			//while(_free._TryTakeLast
+		}
+
 	}
 }
 
