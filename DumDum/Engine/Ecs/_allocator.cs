@@ -1,6 +1,7 @@
 ﻿using DumDum.Bcl;
 using DumDum.Bcl.Diagnostics;
 using Microsoft.Toolkit.HighPerformance.Buffers;
+using Microsoft.Toolkit.HighPerformance.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -23,7 +24,7 @@ public interface IComponent
 /// <summary>
 /// only good for the current frame, unless chunk packing is disabled.  in that case it's good for lifetime of entity in the archetype.
 /// </summary>
-public record struct AllocToken
+public record struct AllocToken : IComparable<AllocToken>
 {
 	public bool isInit;
 	public long externalId;
@@ -91,11 +92,16 @@ public record struct AllocToken
 		__CHECKED.Throw(allocMetadata.allocToken == this, "mismatch");
 		//get chunk via the allocator, where the default way is direct through the Chunk<T>._GLOBAL_LOOKUP
 		var chunk = GetAllocator()._componentColumns[typeof(AllocMetadata)][allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
-		__CHECKED.Throw(GetContainingChunk<AllocMetadata>() == chunk,"chunk lookup between both techniques does not match");
+		__CHECKED.Throw(GetContainingChunk<AllocMetadata>() == chunk, "chunk lookup between both techniques does not match");
 		__CHECKED.Throw(this == chunk.Span[allocSlot.chunkRowIndex].allocToken);
 	}
 
-	
+	public int CompareTo(AllocToken other)
+	{
+		return allocSlot.CompareTo(other.allocSlot);
+	}
+
+
 
 
 	//public override string ToString()
@@ -164,10 +170,13 @@ public partial class Allocator //unit test
 	[Conditional("TEST")]
 	public static unsafe void __TEST_Unit_ParallelAllocators()
 	{
-		for(var i = 0; i < 10; i++)
-		{
-			Task.Run(() => __TEST_Unit_SingleAllocator());
-		}
+		//for(var i = 0; i < 10; i++)
+		//{
+		//	Task.Run(() => __TEST_Unit_SingleAllocator());
+		//}
+
+		var result = Parallel.For(0, 10, (index) => __TEST_Unit_SingleAllocator());
+		__ERROR.Throw(result.IsCompleted);
 	}
 
 	[Conditional("TEST")]
@@ -175,18 +184,19 @@ public partial class Allocator //unit test
 	{
 		var allocator = new Allocator()
 		{
-			AutoPack=__.Rand._NextBoolean(),
-			ChunkSize=3,
-			ComponentTypes = new() {typeof(int),typeof(string) },
-			
-			
+			AutoPack = __.Rand._NextBoolean(),
+			ChunkSize = 3,
+			ComponentTypes = new() { typeof(int), typeof(string) },
+
+
 		};
 		allocator.Initialize();
 
-		Span<long> externalIds = stackalloc long[] { 2,4,8,7 ,-2};
+		Span<long> externalIds = stackalloc long[] { 2, 4, 8, 7, -2 };
 		Span<AllocToken> tokens = stackalloc AllocToken[5];
 		allocator.Alloc(externalIds, tokens);
 
+		allocator.Dispose();
 	}
 }
 
@@ -224,7 +234,7 @@ public partial class Allocator : IDisposable //init logic
 
 	public void Initialize()
 	{
-		__DEBUG.AssertOnce(_allocatorId < 10, "//TODO: change allocatorId to use a pool, not increment, otherwise risk of collisions with long-running programs");
+		//__DEBUG.AssertOnce(_allocatorId < 10, "//TODO: change allocatorId to use a pool, not increment, otherwise risk of collisions with long-running programs");
 		__DEBUG.Throw(ComponentTypes != null, "need to set properties before init");
 		//generate hash for fast matching of archetypes
 		foreach (var type in ComponentTypes)
@@ -380,7 +390,7 @@ public partial class Allocator  //alloc/free logic
 			ref var allocToken = ref output[i];
 			allocToken = new()
 			{
-				isInit= true,
+				isInit = true,
 				allocatorId = _allocatorId,
 				allocSlot = slot,
 				externalId = externalId,
@@ -389,22 +399,12 @@ public partial class Allocator  //alloc/free logic
 
 
 
-#if CHECKED
-			//verify chunk accessor workflows are correct
-			var manualGetChunk = _componentColumns[typeof(AllocMetadata)][allocToken.allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
-			var autoGetChunk = allocToken.GetContainingChunk<AllocMetadata>();
-			__CHECKED.Throw(manualGetChunk == autoGetChunk, "should match");
 
-
-			//make sure proper chunk is referenced, and field
+			//loop all components zeroing out data and informing chunk of added item
 			foreach (var (type, columnList) in _componentColumns)
 			{
-				var columnChunk = columnList[allocToken.allocSlot.columnChunkIndex];
-
-				__CHECKED.Throw(columnChunk._chunkLookupId == allocToken.GetChunkLookupId(), "lookup id mismatch");
-
+				columnList[slot.columnChunkIndex].OnAllocSlot(ref allocToken);
 			}
-#endif
 
 
 
@@ -420,19 +420,152 @@ public partial class Allocator  //alloc/free logic
 
 
 
+			__CHECKED_VerifyAllocToken(ref allocToken);
 		}
 
 
 	}
 
+	[Conditional("CHECKED")]
+	public void __CHECKED_VerifyAllocToken(ref AllocToken allocToken)
+	{
+		var storedToken = _lookup[allocToken.externalId];
+		__ERROR.Throw(storedToken == allocToken);
+
+
+		//make sure proper chunk is referenced, and field
+		foreach (var (type, columnList) in _componentColumns)
+		{
+			var columnChunk = columnList[allocToken.allocSlot.columnChunkIndex];
+
+			__CHECKED.Throw(columnChunk._chunkLookupId == allocToken.GetChunkLookupId(), "lookup id mismatch");
+
+		}
+
+
+		//verify chunk accessor workflows are correct
+		var manualGetChunk = _componentColumns[typeof(AllocMetadata)][allocToken.allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
+		var autoGetChunk = allocToken.GetContainingChunk<AllocMetadata>();
+		__CHECKED.Throw(manualGetChunk == autoGetChunk, "should match");
+
+		//verify allocMetadatas match
+		__ERROR.Throw(manualGetChunk.Span[allocToken.allocSlot.chunkRowIndex].allocToken == allocToken);
+
+	}
+
+
+	private unsafe struct _GetAllocTokensHelper : IAction
+	{
+		public AllocToken* p_allocTokens;
+		public long* p_externalIds;
+		//public int length;
+		public Allocator owner;
+
+		public void Invoke(int index)
+		{
+			p_allocTokens[index] = owner._lookup[p_externalIds[index]];
+		}
+	}
+
+
+	public unsafe void GetAllocTokens(Span<long> externalIds, Span<AllocToken> output)
+	{
+		fixed (long* p_externalIds = externalIds)
+		{
+			fixed (AllocToken* p_allocTokens = output)
+			{
+				var collector = new _GetAllocTokensHelper()
+				{
+					//length = externalIds.Length,
+					owner = this,
+					p_allocTokens = p_allocTokens,
+					p_externalIds = p_externalIds
+				};
+
+				ParallelHelper.For(0, externalIds.Length, collector);
+			}
+
+		}
+
+	}
+
+	
 	//lkajsdflkasjdf  //Do FREE next
-	public void Free(Span<long> externalIds)
+	public unsafe void Free(Span<long> externalIds)
 	{
 
-		//be sure to handle AutoPack if set, and update allocMetadata
-		//clear the component cells to default upon free if we are not packing to take it's place.
-		throw new NotImplementedException();
+		var allocTokensOwner = SpanOwner<AllocToken>.Allocate(externalIds.Length);
+		asdfasdflkjl TO START HERE
+			//todo:   sort the allocTokens, then parallel through all columnLists deleting.
+
+
+
+		//var collector = new AllocTokenCollector(externalIds);
+		//ParallelHelper.For(0, externalIds.Length, collector);
+
+
+		using var test = SpanOwner<int>.Allocate(100);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		//	var length = externalIds.Length;
+		//	fixed (void* p = externalIds) {
+		//		var pSpan = p;
+
+		//		//Parallel.
+
+
+		//		Parallel.ForEach(_componentColumns, (pair) => {
+		//			var (type, columnList) = pair;
+
+		//			Span<long> externalIdsCopy = new Span<long>(pSpan2, length);
+
+		//			foreach (var externalId in externalIdsCopy)
+		//			{
+
+		//			}
+
+
+		//		});
+		//	}
+
 	}
+	//	foreach (var externalId in externalIds)
+	//	{
+	//		//get our associated allocToken
+	//		ref var allocToken = ref _lookup._GetValueRef_Unsafe(externalId, out var exists);
+	//		__ERROR.Throw(exists, "already freed?");
+
+	//		__CHECKED_VerifyAllocToken(ref allocToken);
+
+	//		//free up all components
+	//		foreach (var (type, columnList) in _componentColumns)
+	//		{
+	//			var columnChunk = columnList[allocToken.allocSlot.columnChunkIndex];
+
+	//			__CHECKED.Throw(columnChunk._chunkLookupId == allocToken.GetChunkLookupId(), "lookup id mismatch");
+
+	//		}
+
+	//	}
+
+
+	//	//be sure to handle AutoPack if set, and update allocMetadata
+	//	//clear the component cells to default upon free if we are not packing to take it's place.
+	//	throw new NotImplementedException();
+	//}
 
 
 	public bool Pack(int maxCount)
@@ -485,14 +618,14 @@ public struct AllocPositionTracker
 	}
 	public void FreeLast(out bool freeChunk)
 	{
-		
+
 		nextAvailable.chunkRowIndex--;
 		if (nextAvailable.chunkRowIndex < 0)
 		{
 			nextAvailable.chunkRowIndex = chunkSize - 1;
 			nextAvailable.columnChunkIndex--;
 			freeChunk = true;
-			__DEBUG.Throw(nextAvailable.columnChunkIndex >= 0,"less than zero allocations");
+			__DEBUG.Throw(nextAvailable.columnChunkIndex >= 0, "less than zero allocations");
 		}
 		else
 		{
@@ -524,6 +657,8 @@ public abstract class Chunk : IDisposable
 	/// using the given _chunkId, allocate self a slot on the global chunk store for Chunk[T]
 	/// </summary>
 	public abstract void Initialize(int length, long chunkLookupId);
+	internal abstract void OnAllocSlot(ref AllocToken allocToken);
+	internal abstract void OnFreeSlot(ref AllocToken allocToken);
 }
 
 public class Chunk<TComponent> : Chunk
@@ -563,7 +698,16 @@ public class Chunk<TComponent> : Chunk
 		_storage = MemoryOwner<TComponent>.Allocate(_length, AllocationMode.Clear); //TODO: maybe no need to clear?
 		_refStorage = _storage.DangerousGetArray().Array;
 	}
-
+	internal override void OnAllocSlot(ref AllocToken allocToken)
+	{
+		_count++;
+		//_refStorage[chunkRowIndex]=default(TComponent);
+	}
+	internal override void OnFreeSlot(ref AllocToken allocToken)
+	{
+		_count--;
+		_refStorage[allocToken.allocSlot.chunkRowIndex] = default(TComponent);
+	}
 	public unsafe ref TComponent GetWriteRef(AllocToken allocToken)
 	{
 		return ref GetWriteRef(ref *&allocToken); //cast to ptr using *& to circumvent return ref safety check

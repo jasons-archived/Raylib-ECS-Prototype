@@ -600,6 +600,63 @@ public static class zz_Extensions_Span
 		return span;
 	}
 
+	/// <summary>
+	/// do work in parallel over the span.  each parallelAction will operate over a segment of the span
+	/// </summary>
+	public static unsafe void _ParallelFor<TData>(this Span<TData> inputSpan, int parallelCount, Action_Span<TData> parallelAction) where TData : unmanaged
+	{
+		var length = inputSpan.Length;
+		fixed (TData* p = inputSpan)
+		{
+			var pSpan = p; //need to stop compiler complaint
+
+			Parallel.For(0, parallelCount + 1, (index) => { //plus one to capture remainder
+
+				var count = length / parallelCount;
+				var startIndex = index * count;
+				var endIndex = startIndex + count;
+				if (endIndex > length)
+				{
+					endIndex = length;
+					count = endIndex - startIndex; //on last loop, only do remainder
+				}
+
+				var spanPart = new Span<TData>(&pSpan[startIndex], count);
+
+				parallelAction(spanPart);
+
+			});
+		}
+	}
+
+	/// <summary>
+	/// do work in parallel over the span.  each parallelAction will operate over a segment of the span
+	/// </summary>
+	public static unsafe void _ParallelFor<TData>(this ReadOnlySpan<TData> inputSpan, int parallelCount, Action_RoSpan<TData> parallelAction) where TData : unmanaged
+	{
+		var length = inputSpan.Length;
+		fixed (TData* p = inputSpan)
+		{
+			var pSpan = p;
+
+			Parallel.For(0, parallelCount + 1, (index) => { //plus one to capture remainder
+
+				var count = length / parallelCount;
+				var startIndex = index * count;
+				var endIndex = startIndex + count;
+				if (endIndex > length)
+				{
+					endIndex = length;
+					count = endIndex - startIndex; //on last loop, only do remainder
+				}
+
+				var spanPart = new ReadOnlySpan<TData>(&pSpan[startIndex], count);
+
+				parallelAction(spanPart);
+
+			});
+		}
+	}
 
 	///// <summary>
 	///// get ref to item at index 0
