@@ -13,7 +13,7 @@ namespace DumDum.Bcl.Diagnostics
 	{
 		[Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void Assert(bool condition, string? message = null)
+		public static void Assert(bool condition, string message = null)
 		{
 			_internal.DiagHelper.Assert(condition, message);
 		}
@@ -25,7 +25,7 @@ namespace DumDum.Bcl.Diagnostics
 		}
 		[Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void Throw(bool condition, string? message = null)
+		public static void Throw(bool condition, string message = null)
 		{
 			_internal.DiagHelper.Throw(condition, message);
 		}
@@ -41,7 +41,7 @@ namespace DumDum.Bcl.Diagnostics
 	{
 		[Conditional("DEBUG")]
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void Assert(bool condition, string? message=null)
+		public static void Assert(bool condition, string message=null)
 		{
 			_internal.DiagHelper.Assert(condition, message);
 		}
@@ -53,7 +53,7 @@ namespace DumDum.Bcl.Diagnostics
 		}
 		[Conditional("DEBUG")]
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void Throw(bool condition, string? message = null)
+		public static void Throw(bool condition, string message = null)
 		{
 			_internal.DiagHelper.Throw(condition, message);
 		}
@@ -68,7 +68,7 @@ namespace DumDum.Bcl.Diagnostics
 	public static class __ERROR
 	{
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void Assert(bool condition, string? message = null)
+		public static void Assert(bool condition, string message = null)
 		{
 			_internal.DiagHelper.Assert(condition, message);
 		}
@@ -79,8 +79,8 @@ namespace DumDum.Bcl.Diagnostics
 			_internal.DiagHelper.AssertOnce(condition, message);
 		}
 	
-		[DebuggerNonUserCode, DebuggerHidden]
-		public static void Throw(bool condition, string? message = null)
+		//[DebuggerNonUserCode, DebuggerHidden]
+		public static void Throw(bool condition, string message=null)
 		{
 			_internal.DiagHelper.Throw(condition, message);
 		}
@@ -101,8 +101,9 @@ namespace DumDum.Bcl.Diagnostics
 		public static class DiagHelper
 		{
 			[DebuggerNonUserCode, DebuggerHidden]
-			public static void Assert(bool condition, string message = "Assert condition failed")
+			public static void Assert(bool condition, string message)
 			{
+				message ??= "Assert condition failed";
 				Debug.Assert(condition, message);
 			}
 
@@ -118,6 +119,7 @@ namespace DumDum.Bcl.Diagnostics
 			[DebuggerNonUserCode, DebuggerHidden]
 			public static void AssertOnce(bool condition, string message)
 			{
+				message ??= "Assert condition failed";
 				if (condition)
 				{
 					return;
@@ -133,9 +135,10 @@ namespace DumDum.Bcl.Diagnostics
 
 				Debug.Assert(false,"ASSERT ONCE: " + message);
 			}
-			[DebuggerNonUserCode, DebuggerHidden]
-			public static void Throw(bool condition, string message = "Throw condition failed")
+			//[DebuggerNonUserCode, DebuggerHidden]
+			public static void Throw(bool condition, string message)
 			{
+				message ??= "Throw condition failed";
 				if (condition == true)
 				{
 					return;

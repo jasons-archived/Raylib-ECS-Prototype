@@ -370,7 +370,13 @@ public partial class Allocator  //alloc/free logic
 	public bool AutoPack { get; init; } = true;
 
 
-
+	/// <summary>
+	/// get a slot (recycling free if available)
+	/// make allocToken
+	/// add slot to columnList
+	/// set builtin allocMetadata component
+	/// verify
+	/// </summary>
 	public void Alloc(Span<long> externalIds, Span<AllocToken> output)
 	{
 		__DEBUG.Assert(output.Length == externalIds.Length);
@@ -454,118 +460,107 @@ public partial class Allocator  //alloc/free logic
 	}
 
 
-	private unsafe struct _GetAllocTokensHelper : IAction
-	{
-		public AllocToken* p_allocTokens;
-		public long* p_externalIds;
-		//public int length;
-		public Allocator owner;
+	//private unsafe struct _GetAllocTokensHelper : IAction
+	//{
+	//	public AllocToken* p_allocTokens;
+	//	public long* p_externalIds;
+	//	//public int length;
+	//	public Allocator owner;
 
-		public void Invoke(int index)
-		{
-			p_allocTokens[index] = owner._lookup[p_externalIds[index]];
-		}
-	}
-
-
-	public unsafe void GetAllocTokens(Span<long> externalIds, Span<AllocToken> output)
-	{
-		fixed (long* p_externalIds = externalIds)
-		{
-			fixed (AllocToken* p_allocTokens = output)
-			{
-				var collector = new _GetAllocTokensHelper()
-				{
-					//length = externalIds.Length,
-					owner = this,
-					p_allocTokens = p_allocTokens,
-					p_externalIds = p_externalIds
-				};
-
-				ParallelHelper.For(0, externalIds.Length, collector);
-			}
-
-		}
-
-	}
-
-	
-	//lkajsdflkasjdf  //Do FREE next
-	public unsafe void Free(Span<long> externalIds)
-	{
-
-		var allocTokensOwner = SpanOwner<AllocToken>.Allocate(externalIds.Length);
-		asdfasdflkjl TO START HERE
-			//todo:   sort the allocTokens, then parallel through all columnLists deleting.
-
-
-
-		//var collector = new AllocTokenCollector(externalIds);
-		//ParallelHelper.For(0, externalIds.Length, collector);
-
-
-		using var test = SpanOwner<int>.Allocate(100);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-		//	var length = externalIds.Length;
-		//	fixed (void* p = externalIds) {
-		//		var pSpan = p;
-
-		//		//Parallel.
-
-
-		//		Parallel.ForEach(_componentColumns, (pair) => {
-		//			var (type, columnList) = pair;
-
-		//			Span<long> externalIdsCopy = new Span<long>(pSpan2, length);
-
-		//			foreach (var externalId in externalIdsCopy)
-		//			{
-
-		//			}
-
-
-		//		});
-		//	}
-
-	}
-	//	foreach (var externalId in externalIds)
+	//	public void Invoke(int index)
 	//	{
-	//		//get our associated allocToken
-	//		ref var allocToken = ref _lookup._GetValueRef_Unsafe(externalId, out var exists);
-	//		__ERROR.Throw(exists, "already freed?");
+	//		p_allocTokens[index] = owner._lookup[p_externalIds[index]];
+	//	}
+	//}
 
-	//		__CHECKED_VerifyAllocToken(ref allocToken);
 
-	//		//free up all components
-	//		foreach (var (type, columnList) in _componentColumns)
+	//public unsafe void GetAllocTokens(Span<long> externalIds, Span<AllocToken> output)
+	//{
+	//	fixed (AllocToken* p_output = output)
+	//	{
+	//		var p_allocTokens = p_output;
+	//		externalIds._ParallelForEach((ref long externalId, ref int index) =>
 	//		{
-	//			var columnChunk = columnList[allocToken.allocSlot.columnChunkIndex];
+	//			p_allocTokens[index] = _lookup[externalId];
 
-	//			__CHECKED.Throw(columnChunk._chunkLookupId == allocToken.GetChunkLookupId(), "lookup id mismatch");
+	//		});
 
+	//	}
+	//	fixed (long* p_externalIds = externalIds)
+	//	{
+	//		fixed (AllocToken* p_allocTokens = output)
+	//		{
+	//			var collector = new _GetAllocTokensHelper()
+	//			{
+	//				//length = externalIds.Length,
+	//				owner = this,
+	//				p_allocTokens = p_allocTokens,
+	//				p_externalIds = p_externalIds
+	//			};
+
+	//			ParallelHelper.For(0, externalIds.Length, collector);
 	//		}
 
 	//	}
 
-
-	//	//be sure to handle AutoPack if set, and update allocMetadata
-	//	//clear the component cells to default upon free if we are not packing to take it's place.
-	//	throw new NotImplementedException();
 	//}
+
+
+	/// <summary>
+	/// get the allocTokens to delete
+	/// verify
+	/// delete from allocations lookup
+	/// free slot from columnList
+	/// add to free list
+	/// if AutoPack, do it now.
+	/// </summary>
+	public unsafe void Free(Span<long> externalIds)
+	{
+		using var so_AllocTokens = SpanOwner<AllocToken>.Allocate(externalIds.Length);
+		var allocTokens = so_AllocTokens.Span;
+		//get tokens for freeing
+		for(var i=0; i<externalIds.Length; i++)
+		{
+			allocTokens[i]= _lookup[externalIds[i]];
+			__CHECKED.Throw(allocTokens[i].externalId == externalIds[i]);
+			__CHECKED_VerifyAllocToken(ref allocTokens[i]);
+			//remove them now??  maybe will cause further issues with verification
+			_lookup.Remove(externalIds[i]);
+		}
+		//sort so that when we itterate through, they will have a higher chance of being in the same chunk
+		allocTokens.Sort();
+
+
+		//parallel through all columns, deleting
+		var allocTokensArraySegment = so_AllocTokens.DangerousGetArray();
+		var allocArray = allocTokensArraySegment.Array;
+		Parallel.ForEach(_componentColumns, (pair, loopState) => {
+			var (type, columnList) = pair;
+			for (var i = 0; i < allocTokensArraySegment.Count; i++)
+			{
+				ref var allocToken = ref allocArray[i];
+				columnList[allocToken.allocSlot.columnChunkIndex].OnFreeSlot(ref allocToken);
+			}
+		});
+
+
+
+		//add to free list
+		for(var i=0;i<allocTokens.Length; i++)
+		{
+			__CHECKED.Throw(_free.Contains(allocTokens[i].allocSlot) == false);
+			_free.Add(allocTokens[i].allocSlot);
+		}
+
+		if (AutoPack == true)
+		{
+			var priorPackVersion = _packVersion;
+			Pack(externalIds.Length);
+			__DEBUG.Assert(priorPackVersion != _packVersion && _free.Count==0,"autopack not working?");
+		}
+
+	}
+	
 
 
 	public bool Pack(int maxCount)
@@ -706,6 +701,7 @@ public class Chunk<TComponent> : Chunk
 	internal override void OnFreeSlot(ref AllocToken allocToken)
 	{
 		_count--;
+		//clear the slot
 		_refStorage[allocToken.allocSlot.chunkRowIndex] = default(TComponent);
 	}
 	public unsafe ref TComponent GetWriteRef(AllocToken allocToken)

@@ -1,4 +1,5 @@
 ﻿using DumDum.Bcl.Diagnostics;
+using Microsoft.Toolkit.HighPerformance.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -600,63 +601,168 @@ public static class zz_Extensions_Span
 		return span;
 	}
 
+
+
+
 	/// <summary>
-	/// do work in parallel over the span.  each parallelAction will operate over a segment of the span
+	/// important implementation notes, be sure to read https://docs.microsoft.com/en-us/windows/communitytoolkit/high-performance/parallelhelper
 	/// </summary>
-	public static unsafe void _ParallelFor<TData>(this Span<TData> inputSpan, int parallelCount, Action_Span<TData> parallelAction) where TData : unmanaged
+	/// <typeparam name="TData"></typeparam>
+	private unsafe readonly struct _ParallelForEach_ActionHelper<TData> : IAction where TData : unmanaged
 	{
-		var length = inputSpan.Length;
-		fixed (TData* p = inputSpan)
+		public readonly TData* pSpan;
+		public readonly Action_Ref<TData, int> parallelAction;
+
+		public _ParallelForEach_ActionHelper(TData* pSpan, Action_Ref<TData, int> parallelAction)
 		{
-			var pSpan = p; //need to stop compiler complaint
+			this.pSpan = pSpan;
+			this.parallelAction = parallelAction;
+		}
 
-			Parallel.For(0, parallelCount + 1, (index) => { //plus one to capture remainder
+		public void Invoke(int index)
+		{
+			//Using delegate pointer invoke, Because action is a readonly field,
+			//but Invoke is an interface method where the compiler can't see it's actually readonly in all implementing types,
+			//so it emits a defensive copies. This skips that 
+			Unsafe.AsRef(parallelAction).Invoke(ref pSpan[index], ref index);
+		}
+	}
+	private unsafe readonly struct _ParallelForEach_ActionHelper_OutputSpan<TData,TOutput> : IAction where TData : unmanaged where TOutput : unmanaged
+	{
+		public readonly TData* pSpan;
+		public readonly TOutput* pOutput;
+		public readonly Action_Ref<TData,TOutput, int> parallelAction;
 
-				var count = length / parallelCount;
-				var startIndex = index * count;
-				var endIndex = startIndex + count;
-				if (endIndex > length)
-				{
-					endIndex = length;
-					count = endIndex - startIndex; //on last loop, only do remainder
-				}
+		public _ParallelForEach_ActionHelper_OutputSpan(TData* pSpan,TOutput* pOutput, Action_Ref<TData,TOutput, int> parallelAction)
+		{
+			this.pSpan = pSpan;
+			this.pOutput = pOutput;
+			this.parallelAction = parallelAction;
+		}
 
-				var spanPart = new Span<TData>(&pSpan[startIndex], count);
+		public void Invoke(int index)
+		{
+			//Using delegate pointer invoke, Because action is a readonly field,
+			//but Invoke is an interface method where the compiler can't see it's actually readonly in all implementing types,
+			//so it emits a defensive copies. This skips that 
+			Unsafe.AsRef(parallelAction).Invoke(ref pSpan[index],ref pOutput[index], ref index);
+		}
+	}
+	private unsafe readonly struct _ParallelForEach_ActionHelper_FunctionPtr<TData> : IAction where TData : unmanaged
+	{
+		public readonly TData* pSpan;
+		public readonly delegate*<ref TData, ref int, void> parallelAction;
 
-				parallelAction(spanPart);
+		public _ParallelForEach_ActionHelper_FunctionPtr(TData* pSpan, delegate*<ref TData, ref int, void> parallelAction)
+		{
+			this.pSpan = pSpan;
+			this.parallelAction = parallelAction;
+		}
 
-			});
+		public void Invoke(int index)
+		{
+			//Using delegate pointer invoke, Because action is a readonly field,
+			//but Invoke is an interface method where the compiler can't see it's actually readonly in all implementing types,
+			//so it emits a defensive copies. This skips that 
+			//Unsafe.AsRef(parallelAction).Invoke(ref pSpan[index], ref index);
+			parallelAction(ref pSpan[index], ref index);
 		}
 	}
 
-	/// <summary>
-	/// do work in parallel over the span.  each parallelAction will operate over a segment of the span
-	/// </summary>
-	public static unsafe void _ParallelFor<TData>(this ReadOnlySpan<TData> inputSpan, int parallelCount, Action_RoSpan<TData> parallelAction) where TData : unmanaged
+	public static unsafe void _ParallelForEach<TData>(this Span<TData> inputSpan, Action_Ref<TData, int> parallelAction) where TData : unmanaged
 	{
-		var length = inputSpan.Length;
-		fixed (TData* p = inputSpan)
+		fixed (TData* pSpan = inputSpan)
 		{
-			var pSpan = p;
-
-			Parallel.For(0, parallelCount + 1, (index) => { //plus one to capture remainder
-
-				var count = length / parallelCount;
-				var startIndex = index * count;
-				var endIndex = startIndex + count;
-				if (endIndex > length)
-				{
-					endIndex = length;
-					count = endIndex - startIndex; //on last loop, only do remainder
-				}
-
-				var spanPart = new ReadOnlySpan<TData>(&pSpan[startIndex], count);
-
-				parallelAction(spanPart);
-
-			});
+			var actionStruct = new _ParallelForEach_ActionHelper<TData>(pSpan, parallelAction);
+			ParallelHelper.For(0, inputSpan.Length, in actionStruct);
 		}
 	}
+
+	public static unsafe void _ParallelForEach<TData>(this Span<TData> inputSpan, delegate*<ref TData,ref int,void> parallelAction) where TData : unmanaged
+	{
+		fixed (TData* pSpan = inputSpan)
+		{
+			var actionStruct = new _ParallelForEach_ActionHelper_FunctionPtr<TData>(pSpan, parallelAction);
+			ParallelHelper.For(0, inputSpan.Length, in actionStruct);
+		}
+	}
+
+	public static unsafe void _ParallelForEach<TData, TOutput>(this Span<TData> inputSpan, Span<TOutput> outputSpan, Action_Ref<TData,TOutput, int> parallelAction) where TData : unmanaged where TOutput : unmanaged
+	{
+		fixed (TData* pSpan = inputSpan)
+		{
+			fixed (TOutput* pOutput = outputSpan)
+			{
+				var actionStruct = new _ParallelForEach_ActionHelper_OutputSpan<TData,TOutput>(pSpan, pOutput ,parallelAction);
+				ParallelHelper.For(0, inputSpan.Length, in actionStruct);
+			}
+		}
+	}
+
+	///////// <summary>
+	///////// do work in parallel over the span.  each parallelAction will operate over a segment of the span
+	///////// </summary>
+	//////public static unsafe void _ParallelFor<TData>(this Span<TData> inputSpan, int parallelCount, Action_Span<TData> parallelAction) where TData : unmanaged
+	//////{
+	//////	var length = inputSpan.Length;
+	//////	fixed (TData* p = inputSpan)
+	//////	{
+	//////		var pSpan = p; //need to stop compiler complaint
+
+	//////		Parallel.For(0, parallelCount + 1, (index) => { //plus one to capture remainder
+
+	//////			var count = length / parallelCount;
+	//////			var startIndex = index * count;
+	//////			var endIndex = startIndex + count;
+	//////			if (endIndex > length)
+	//////			{
+	//////				endIndex = length;
+	//////				count = endIndex - startIndex; //on last loop, only do remainder
+	//////			}
+
+	//////			var spanPart = new Span<TData>(&pSpan[startIndex], count);
+
+	//////			parallelAction(spanPart);
+
+	//////		});
+	//////	}
+	//////}
+	///////// <summary>
+	///////// do work in parallel over the span.  each parallelAction will operate over a segment of the span
+	///////// </summary>
+	//////public static unsafe void _ParallelForRange<TData>(this ReadOnlySpan<TData> inputSpan, int parallelCount, Action_RoSpan<TData> parallelAction) where TData : unmanaged
+	//////{
+
+	//////	var partition = System.Collections.Concurrent.Partitioner.Create(0, inputSpan.Length);
+
+	//////	inputSpan.s
+
+
+
+	//////	__ERROR.Assert(false, "needs verification of algo.  probably doesn't partition properly");
+	//////	var length = inputSpan.Length;
+	//////	fixed (TData* p = inputSpan)
+	//////	{
+	//////		var pSpan = p;
+
+	//////		Parallel.For(0, parallelCount + 1, (index) => { //plus one to capture remainder
+
+	//////			var count = length / parallelCount;
+	//////			var startIndex = index * count;
+	//////			var endIndex = startIndex + count;
+	//////			if (endIndex > length)
+	//////			{
+	//////				endIndex = length;
+	//////				count = endIndex - startIndex; //on last loop, only do remainder
+	//////			}
+
+	//////			var spanPart = new ReadOnlySpan<TData>(&pSpan[startIndex], count);
+
+	//////			parallelAction(spanPart);
+
+	//////		});
+	//////	}
+	//////}
 
 	///// <summary>
 	///// get ref to item at index 0
@@ -816,13 +922,52 @@ public static class zz__Extensions_Random
 	/// <param name="random"></param>
 	/// <param name="onlyLowerAscii">true to return a printable ASCII character in the "lower" range (less than 127)</param>
 	/// <returns></returns>
-	public static char _NextChar(this Random random, bool onlyLowerAscii = false)
+	public static char _NextChar(this Random random, bool symbolsOrWhitespace = false, bool unicodeOkay = false)
 	{
-		if (onlyLowerAscii)
+		if (unicodeOkay)
 		{
-			return printableUnicode[random.Next(0, lowerAsciiLimitIndexExclusive)];
+			while (true)
+			{
+				var c = (char)random.Next(0,ushort.MaxValue);
+				if (symbolsOrWhitespace)
+				{
+					if (char.IsLetterOrDigit(c) || char.IsPunctuation(c) || char.IsSymbol(c) || char.IsWhiteSpace(c))
+					{
+						return c;
+					}
+				}
+				else
+				{
+					if (char.IsLetterOrDigit(c))
+					{
+						return c;
+					}
+				}
+			}
 		}
-		return printableUnicode[random.Next(0, printableUnicode.Length)];
+		else
+		{
+			//ascii only
+			while (true)
+			{
+				var c = (char)random.Next(0,127);
+				if (symbolsOrWhitespace)
+				{
+					if (char.IsLetterOrDigit(c) || char.IsPunctuation(c) || char.IsSymbol(c) || char.IsWhiteSpace(c))
+					{
+						return c;
+					}
+				}
+				else
+				{
+					if (char.IsLetterOrDigit(c))
+					{
+						return c;
+					}
+				}
+			}
+		}
+		
 	}
 
 	/// <summary>
@@ -832,49 +977,50 @@ public static class zz__Extensions_Random
 	/// <param name="random"></param>
 	/// <param name="onlyLowerAscii">true to return a printable ASCII character in the "lower" range (less than 127)</param>
 	/// <returns></returns>
-	public static string _NextString(this Random random, int length, bool onlyLowerAscii = false)
+	public static string _NextString(this Random random, int length, bool symbolsOrWhitespace = false, bool unicodeOkay = false)
 	{
 		StringBuilder sb = new StringBuilder(length);
 		for (int i = 0; i < length; i++)
 		{
-			sb.Append(random._NextChar(onlyLowerAscii));
+			sb.Append(random._NextChar(unicodeOkay, symbolsOrWhitespace));
 		}
 		return sb.ToString();
 	}
 
 
-	[System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1810:InitializeReferenceTypeStaticFieldsInline")]
-	static zz__Extensions_Random()
-	{
-		List<char> valid = new List<char>();
-		for (int i = 0; i < ushort.MaxValue; i++)
-		{
-			var c = Convert.ToChar(i);
-			if (char.IsLetterOrDigit(c) || char.IsPunctuation(c) || char.IsSymbol(c) || char.IsWhiteSpace(c))
-			{
-				valid.Add(c);
-				if (c < 127)
-				{
-					//__ERROR.Assert(c >= 0, "expect char to be unsigned");
-					lowerAsciiLimitIndexExclusive = valid.Count;
-				}
-			}
-		}
-		printableUnicode = valid.ToArray();
-	}
-	/// <summary>
-	/// the exclusive bound of the lower ascii set in our <see cref="printableUnicode"/> characters array
-	/// </summary>
-	static int lowerAsciiLimitIndexExclusive;
-	/// <summary>
-	/// a sorted array of all unicode characters that meet the following criteria:
-	/// <para>
-	/// (char.IsLetterOrDigit(c) || char.IsPunctuation(c) || char.IsSymbol(c) || char.IsWhiteSpace(c))
-	/// </para>
-	/// </summary>
-	static char[] printableUnicode;
+	//[System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1810:InitializeReferenceTypeStaticFieldsInline")]
+	//static zz__Extensions_Random()
+	//{
+	//	List<char> valid = new List<char>();
+	//	for (int i = 0; i < ushort.MaxValue; i++)
+	//	{
+	//		var c = Convert.ToChar(i);
+	//		if (char.IsLetterOrDigit(c) || char.IsPunctuation(c) || char.IsSymbol(c) || char.IsWhiteSpace(c))
+	//		{
+	//			valid.Add(c);
+	//			if (c < 127)
+	//			{
+	//				//__ERROR.Assert(c >= 0, "expect char to be unsigned");
+	//				lowerAsciiLimitIndexExclusive = valid.Count;
+	//			}
+	//		}
+	//	}
+	//	var span = new Span<char>(valid.ToArray());
+	//	printableUnicode = span.ToString();
 
-
+	//	//printableUnicode = valid.ToArray();
+	//}
+	///// <summary>
+	///// the exclusive bound of the lower ascii set in our <see cref="printableUnicode"/> characters array
+	///// </summary>
+	//static int lowerAsciiLimitIndexExclusive;
+	///// <summary>
+	///// a sorted array of all unicode characters that meet the following criteria:
+	///// <para>
+	///// (char.IsLetterOrDigit(c) || char.IsPunctuation(c) || char.IsSymbol(c) || char.IsWhiteSpace(c))
+	///// </para>
+	///// </summary>
+	//static string printableUnicode;
 
 	/// <summary>Roll</summary>
 	/// <param name="diceNotation">string to be evaluated</param>
