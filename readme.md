@@ -124,7 +124,7 @@ These are development pattern "tricks" needed to be used in this codebase.  It i
 ```
 - for multithreading, use `async/await`.  do not use thread blocking such as `Thread.Sleep()`.  The two ways of thread synchronization are not compatable.
    -  this goes with synchronization objects too.   Do not use `lock`, use `SemephoreSlim`.  Do not use `ReaderWriterLockSlim`, use `AsyncReaderWriterLockSlim` from `DotNext.Threading`.
-   -  
+- for `MemoryOwner<T>` and `SpanOwner<T>` be suer to use them with a `using` clause, or to `Dispose()` them when done.  This tells the system when you are done using them.  This is especially ***CRITICALLY important for `SpanOwner<T>` otherwise it will cause a memory leak***.
 
 # antipaterns
 These are patterns that have known problems.  Do not use them, ever.
