@@ -26,7 +26,7 @@ public interface IComponent
 /// </summary>
 public record struct AllocToken : IComparable<AllocToken>
 {
-	public bool isInit;
+	public bool isAlive;
 	public long externalId;
 
 
@@ -160,6 +160,26 @@ public record struct AllocSlot : IComparable<AllocSlot>
 	public int CompareTo(AllocSlot other)
 	{
 		return _packedValue.CompareTo(other._packedValue);
+	}
+
+	public static bool operator <(AllocSlot left, AllocSlot right)
+	{
+		return left.CompareTo(right) < 0;
+	}
+
+	public static bool operator <=(AllocSlot left, AllocSlot right)
+	{
+		return left.CompareTo(right) <= 0;
+	}
+
+	public static bool operator >(AllocSlot left, AllocSlot right)
+	{
+		return left.CompareTo(right) > 0;
+	}
+
+	public static bool operator >=(AllocSlot left, AllocSlot right)
+	{
+		return left.CompareTo(right) >= 0;
 	}
 }
 
@@ -337,7 +357,7 @@ public partial class Allocator //chunk management logic
 	}
 }
 
-public partial class Allocator  //alloc/free logic
+public partial class Allocator  //alloc/free/pack logic
 {
 	/// <summary>
 	/// when we pack, we move entities around.  This is used to determine if a AllocToken is out of date.
@@ -353,6 +373,7 @@ public partial class Allocator  //alloc/free logic
 	/// temp listing of free entities, we will pack and/or deallocate at a specific time each frame
 	/// </summary>
 	public List<AllocSlot> _free = new();
+	public bool _isFreeSorted = true;
 
 
 	public int ChunkSize { get; init; } = 1000;
@@ -379,6 +400,12 @@ public partial class Allocator  //alloc/free logic
 	/// </summary>
 	public void Alloc(Span<long> externalIds, Span<AllocToken> output)
 	{
+		if (_isFreeSorted != true)
+		{
+			_free.Sort();
+			_isFreeSorted = true;
+		}
+
 		__DEBUG.Assert(output.Length == externalIds.Length);
 		for (var i = 0; i < externalIds.Length; i++)
 		{
@@ -394,14 +421,15 @@ public partial class Allocator  //alloc/free logic
 				}
 			}
 			ref var allocToken = ref output[i];
-			allocToken = new()
-			{
-				isInit = true,
-				allocatorId = _allocatorId,
-				allocSlot = slot,
-				externalId = externalId,
-				packVersion = _packVersion,
-			};
+			allocToken = _GenerateLiveAllocToken(externalId, slot);
+			//new()  
+			//{
+			//	isInit = true,
+			//	allocatorId = _allocatorId,
+			//	allocSlot = slot,
+			//	externalId = externalId,
+			//	packVersion = _packVersion,
+			//};
 
 
 
@@ -431,6 +459,31 @@ public partial class Allocator  //alloc/free logic
 
 
 	}
+	private AllocToken _GenerateLiveAllocToken(long externalId, AllocSlot slot)
+	{
+		return new()
+		{
+			isAlive = true,
+			allocatorId = _allocatorId,
+			allocSlot = slot,
+			externalId = externalId,
+			packVersion = _packVersion,
+		};
+	}
+
+	private bool _TryQueryMetadata(AllocSlot slot, out AllocMetadata metadata)
+	{
+		var columnList = _componentColumns[typeof(AllocMetadata)];
+		if (columnList.Count < slot.columnChunkIndex)
+		{
+			metadata = default;
+			return false;
+		}
+		var chunk = columnList[slot.columnChunkIndex] as Chunk<AllocMetadata>;
+		metadata = chunk.Span[slot.chunkRowIndex];
+		return true;
+	}
+
 
 	[Conditional("CHECKED")]
 	public void __CHECKED_VerifyAllocToken(ref AllocToken allocToken)
@@ -519,9 +572,9 @@ public partial class Allocator  //alloc/free logic
 		using var so_AllocTokens = SpanOwner<AllocToken>.Allocate(externalIds.Length);
 		var allocTokens = so_AllocTokens.Span;
 		//get tokens for freeing
-		for(var i=0; i<externalIds.Length; i++)
+		for (var i = 0; i < externalIds.Length; i++)
 		{
-			allocTokens[i]= _lookup[externalIds[i]];
+			allocTokens[i] = _lookup[externalIds[i]];
 			__CHECKED.Throw(allocTokens[i].externalId == externalIds[i]);
 			__CHECKED_VerifyAllocToken(ref allocTokens[i]);
 			//remove them now??  maybe will cause further issues with verification
@@ -534,7 +587,8 @@ public partial class Allocator  //alloc/free logic
 		//parallel through all columns, deleting
 		var allocTokensArraySegment = so_AllocTokens.DangerousGetArray();
 		var allocArray = allocTokensArraySegment.Array;
-		Parallel.ForEach(_componentColumns, (pair, loopState) => {
+		Parallel.ForEach(_componentColumns, (pair, loopState) =>
+		{
 			var (type, columnList) = pair;
 			for (var i = 0; i < allocTokensArraySegment.Count; i++)
 			{
@@ -546,28 +600,135 @@ public partial class Allocator  //alloc/free logic
 
 
 		//add to free list
-		for(var i=0;i<allocTokens.Length; i++)
+		for (var i = 0; i < allocTokens.Length; i++)
 		{
 			__CHECKED.Throw(_free.Contains(allocTokens[i].allocSlot) == false);
 			_free.Add(allocTokens[i].allocSlot);
+
 		}
+		_isFreeSorted = false;
+
 
 		if (AutoPack == true)
 		{
 			var priorPackVersion = _packVersion;
+			__DEBUG.Assert(externalIds.Length == _free.Count);
 			Pack(externalIds.Length);
-			__DEBUG.Assert(priorPackVersion != _packVersion && _free.Count==0,"autopack not working?");
+			__DEBUG.Assert(priorPackVersion != _packVersion && _free.Count == 0, "autopack not working?");
 		}
 
 	}
-	
 
+
+	private void _PackHelper_MoveSlotToFree(AllocToken highestAlive, AllocSlot lowestFree)
+	{
+		//verify freeSlot is free, and allocToken is valid
+#if CHECKED
+		__CHECKED_VerifyAllocToken(ref highestAlive);
+		__CHECKED.Assert(highestAlive.allocSlot > lowestFree);
+		if (!_TryQueryMetadata(lowestFree, out var freeSlotMeta))
+		{
+			__CHECKED.Throw(false, "this should not happen.  returning false means no chunk exists.");
+		}
+		__CHECKED.Assert(freeSlotMeta.allocToken.isAlive == false, "should be default value");
+#endif
+		//generate our newPos allocToken
+		var newSlotAllocToken = _GenerateLiveAllocToken(highestAlive.externalId, lowestFree);
+
+		//do a single alloc for that freeSlot componentColumns
+		foreach (var (type, columnList) in _componentColumns)
+		{
+			//copy data from old while allocting the slot
+			columnList[lowestFree.columnChunkIndex].OnPackSlot(ref newSlotAllocToken, ref highestAlive);
+			//deallocate old slot componentColumns
+			columnList[highestAlive.allocSlot.columnChunkIndex].OnFreeSlot(ref highestAlive);
+		}
+		//update the metadata component
+		var metadataChunk = _componentColumns[typeof(AllocMetadata)][newSlotAllocToken.allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
+		ref var metadataComponent = ref metadataChunk.Span[newSlotAllocToken.allocSlot.chunkRowIndex];
+		metadataComponent.allocToken = newSlotAllocToken;
+
+		//update our _lookup
+		_lookup[newSlotAllocToken.externalId] = newSlotAllocToken;
+
+		//make sure our newly moved is all setup properly
+		__CHECKED_VerifyAllocToken(ref newSlotAllocToken);
+	}
 
 	public bool Pack(int maxCount)
 	{
-		_packVersion++;
-		throw new NotImplementedException();
+		//sor frees
+		//loop through all to free, lowest to highest
+		//if free is higher than highest active slot, done.
+		//take highest active allocSlot and swap it with the free
 
+		if(_free.Count == 0)
+		{
+			return false;
+		}
+
+
+		_packVersion++;
+
+
+
+		var count = Math.Min(maxCount, _free.Count);
+
+
+		if (_isFreeSorted != true)
+		{
+			_free.Sort();
+			_isFreeSorted = true;
+		}
+
+		for (var i = 0; i < count; i++)
+		{
+
+			var firstFreeSlotToFill = _free[i];
+
+			if (!_nextSlotTracker.TryGetHighestOccupiedSlot(out var highestFilled))
+			{
+				__ERROR.Assert(false, "investigate?  no slots are filled?  probably okay, just clear our slots?");
+				break;
+			}
+			if (firstFreeSlotToFill >= highestFilled)
+			{
+				__ERROR.Assert(false, "investigate?  our free are higher than our filled?  probably okay, just clear our slots?");
+				break;
+			}
+			if (!_TryQueryMetadata(highestFilled, out var highestAliveToken))
+			{
+				__ERROR.Throw(false);
+			}
+			//swap out free and highest
+			_PackHelper_MoveSlotToFree(highestAliveToken.allocToken, firstFreeSlotToFill);
+
+
+
+			//decrement our slotTracker position now that we have moved our top item			
+			_nextSlotTracker.FreeLast(out var shouldFreeChunk);
+#if CHECKED
+			//verify next free is actually free
+			var result = _TryQueryMetadata(_nextSlotTracker.nextAvailable, out var shouldBeFreeMetadata);
+			__ERROR.Throw(result && shouldBeFreeMetadata.allocToken.isAlive == false);
+#endif
+
+		}
+		//remove these free slots now that we are done filling them
+		_free.RemoveRange(0, count);
+
+#if CHECKED
+		//verify that our highest allocated is either free or init
+		if (_lookup.Count > 0)
+		{
+			var result = _nextSlotTracker.TryGetHighestOccupiedSlot(out var highestAllocated);
+			__ERROR.Throw(result);
+			result = _TryQueryMetadata(highestAllocated, out var highestMetadata);
+			__CHECKED.Throw(highestMetadata.IsAlive || _free.Contains(highestAllocated));
+		}
+#endif
+
+		return true;
 	}
 
 
@@ -585,6 +746,11 @@ public record struct AllocMetadata : IComponent
 	/// <para>Important Note: writing to this fieldWrites is done internally, and does not increment the Chunk[AllocMetadata]._writeVersion.  This is so _writeVersion can be used to detect entity alloc/free </para>
 	/// </summary>
 	public int fieldWrites;
+
+	/// <summary>
+	/// If this slot is in use by an entity
+	/// </summary>
+	public bool IsAlive { get => allocToken.isAlive; }
 }
 
 /// <summary>
@@ -613,6 +779,18 @@ public struct AllocPositionTracker
 	}
 	public void FreeLast(out bool freeChunk)
 	{
+		//if(TryGetPriorSlot(nextAvailable,out var prior))
+		//{
+		//	if (nextAvailable.columnChunkIndex != prior.columnChunkIndex)
+		//	{
+		//		freeChunk = true;
+		//	}
+		//	else
+		//	{
+		//		freeChunk = false;
+		//	}
+		//	nextAvailable = prior;
+		//}
 
 		nextAvailable.chunkRowIndex--;
 		if (nextAvailable.chunkRowIndex < 0)
@@ -626,6 +804,31 @@ public struct AllocPositionTracker
 		{
 			freeChunk = false;
 		}
+	}
+	private bool TryGetPriorSlot(AllocSlot current, out AllocSlot prior)
+	{
+		if (nextAvailable.columnChunkIndex == 0 && nextAvailable.chunkRowIndex == 0)
+		{
+			prior = default;
+			return false;
+		}
+		prior = current;
+		prior.chunkRowIndex--;
+		if (prior.chunkRowIndex < 0)
+		{
+			prior.chunkRowIndex = chunkSize - 1;
+			prior.columnChunkIndex--;
+		}
+		return true;
+	}
+	/// <summary>
+	/// false if no slots are allocated
+	/// </summary>
+	/// <param name="slot"></param>
+	/// <returns></returns>
+	internal bool TryGetHighestOccupiedSlot(out AllocSlot slot)
+	{
+		return TryGetPriorSlot(nextAvailable, out slot);
 	}
 }
 
@@ -653,6 +856,10 @@ public abstract class Chunk : IDisposable
 	/// </summary>
 	public abstract void Initialize(int length, long chunkLookupId);
 	internal abstract void OnAllocSlot(ref AllocToken allocToken);
+	/// <summary>
+	/// overload used internally for packing
+	/// </summary>
+	internal abstract void OnPackSlot(ref AllocToken allocToken, ref AllocToken moveComponentDataFrom);
 	internal abstract void OnFreeSlot(ref AllocToken allocToken);
 }
 
@@ -696,11 +903,34 @@ public class Chunk<TComponent> : Chunk
 	internal override void OnAllocSlot(ref AllocToken allocToken)
 	{
 		_count++;
-		//_refStorage[chunkRowIndex]=default(TComponent);
+#if DEBUG
+		//clear the slot
+		_refStorage[allocToken.allocSlot.chunkRowIndex] = default(TComponent);
+#endif
+	}
+	/// <summary>
+	/// overload used internally for packing
+	/// </summary>
+	internal override void OnPackSlot(ref AllocToken allocToken, ref AllocToken moveComponentDataFrom)
+	{
+		_count++;
+		_refStorage[allocToken.allocSlot.chunkRowIndex] = moveComponentDataFrom.GetComponentReadRef<TComponent>();
+#if DEBUG
+		//clear the old slot.  this isn't needed, but in case someone is still using the old ref, lets make them aware of it in DEBUG
+		_GLOBAL_LOOKUP[moveComponentDataFrom.GetChunkLookupId()]._refStorage[moveComponentDataFrom.allocSlot.chunkRowIndex] = default(TComponent);
+#endif
+
 	}
 	internal override void OnFreeSlot(ref AllocToken allocToken)
 	{
 		_count--;
+
+		//if (allocToken.GetAllocator().AutoPack)
+		//{
+		//	//no need to clear, as we will pack over this!
+		//	return;
+		//}
+
 		//clear the slot
 		_refStorage[allocToken.allocSlot.chunkRowIndex] = default(TComponent);
 	}

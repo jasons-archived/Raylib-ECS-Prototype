@@ -101,7 +101,7 @@ public class DelegatesBenchmark
 			externalId = i,
 			allocatorId = 0,
 			allocSlot = new AllocSlot(i / CHUNK_SIZE, i % CHUNK_SIZE),
-			isInit = true,
+			isAlive = true,
 			packVersion = 0,
 
 		};
@@ -115,7 +115,7 @@ public class DelegatesBenchmark
 			externalId = i,
 			allocatorId = 0,
 			allocSlot = new AllocSlot(i / CHUNK_SIZE, i % CHUNK_SIZE),
-			isInit = true,
+			isAlive = true,
 			packVersion = 0,
 
 		};
@@ -1195,8 +1195,11 @@ public class Program
 
 		//BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, new BenchmarkDotNet.Configs.DebugInProcessConfig());
 #if DEBUG
-		var toBenchmark = new DelegatesBenchmark();
-		toBenchmark.SpanParallel_MemoryOwner_Array();
+		//var toBenchmark = new DelegatesBenchmark();
+		
+		//toBenchmark.SpanParallel_MemoryOwner_Array();
+
+		//toBenchmark.SpanParallel_Default_MemoryOwner_Array();
 #endif
 
 
