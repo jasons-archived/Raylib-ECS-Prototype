@@ -79,7 +79,7 @@ namespace DumDum.Bcl.Diagnostics
 			_internal.DiagHelper.AssertOnce(condition, message);
 		}
 	
-		//[DebuggerNonUserCode, DebuggerHidden]
+		[DebuggerNonUserCode, DebuggerHidden]
 		public static void Throw(bool condition, string message=null)
 		{
 			_internal.DiagHelper.Throw(condition, message);
@@ -135,7 +135,7 @@ namespace DumDum.Bcl.Diagnostics
 
 				Debug.Assert(false,"ASSERT ONCE: " + message);
 			}
-			//[DebuggerNonUserCode, DebuggerHidden]
+			[DebuggerNonUserCode, DebuggerHidden]
 			public static void Throw(bool condition, string message)
 			{
 				message ??= "Throw condition failed";

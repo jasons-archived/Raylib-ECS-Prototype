@@ -53,6 +53,11 @@ public static class zz__Extensions_List
 		return true;
 	}
 
+	public static void _RemoveLast<T>(this IList<T> target)
+	{
+		target.RemoveAt(target.Count - 1);
+	}
+
 	public static void _Randomize<T>(this IList<T> target)
 	{
 		//lock (_rand)
@@ -488,7 +493,7 @@ public static class zz_Extensions_Task
 public static class zz_Extensions_Dictionary
 {
 
-	public static TValue _GetOrAdd<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, Func<TValue> onAddNew) where TKey : notnull
+	public static TValue _GetOrAdd<TKey, TValue>(this IDictionary<TKey, TValue> dict, TKey key, Func<TValue> onAddNew) where TKey : notnull
 	{
 		if (!dict.TryGetValue(key, out var value))
 		{
@@ -496,6 +501,15 @@ public static class zz_Extensions_Dictionary
 			dict.Add(key, value);
 		}
 		return value;
+	}
+	public static bool _TryRemove<TKey, TValue>(this IDictionary<TKey, TValue> dict, TKey key, out TValue value) where TKey : notnull
+	{
+		var toReturn = dict.TryGetValue(key, out value);
+		if (toReturn == true)
+		{
+			dict.Remove(key);
+		}
+		return toReturn;
 	}
 
 	/// <summary>

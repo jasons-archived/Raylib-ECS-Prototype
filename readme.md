@@ -158,7 +158,9 @@ Generally following the [standard dotnet design guidelines](https://docs.microso
 5. Prefix extension method containing static classes with `zz_Extensions_` 
    - so that it doesn't polute intellisense dropdowns, and is still descriptive.
 
-it would be good to also follow these: https://github.com/dotnet/runtime/blob/main/docs/coding-guidelines/coding-style.md  which we also mostly follow.
+it would be good to also follow these: 
+- https://github.com/dotnet/runtime/blob/main/docs/coding-guidelines/coding-style.md  which we also mostly follow.
+- https://github.com/davidfowl/AspNetCoreDiagnosticScenarios/blob/master/AsyncGuidance.md 
 ## Error/Test handling
 1. use `#CHECKED` for costly code/data/usage verifications.  use `#DEBUG` for helpful hints about mistakes being made.  use `#TEST` for inline testing code
    - This allows turning on/off any combination to get desired runtime effect.
@@ -214,7 +216,9 @@ Logical object structure is
 - benchmarking: https://benchmarkdotnet.org/
 - online codepen:
   - https://sharplab.io/
-  - 
+- linq: https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/linq/
+- plinq: https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/introduction-to-plinq
+- 
 ### c# tricks/notes/perf
 - use record structs for comparison/lookups: https://nietras.com/2021/06/14/csharp-10-record-struct/
 - use `MemoryOwner<T>` for shared pool objects
