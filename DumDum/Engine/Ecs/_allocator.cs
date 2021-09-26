@@ -10,6 +10,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DumDum.Engine.Allocation;
@@ -21,6 +22,75 @@ public interface IComponent
 {
 
 }
+
+
+
+
+
+public static class Atom
+{
+	/**
+	 * 
+	 * 
+Tanner Gooding — Today at 3:44 PM
+I'd recommend looking at an ATOM based system
+
+that is, your issue is you have a bunch of keys (the type) and using the hashcode in a dictionary is expensive for your scenario
+however, the number of types you need to support isn't likely most of them, its probably a small subset (like 1000-10k)
+
+so you can have a system that offsets most of the dictionary cost to be "1 time" by mapping it to an incremental key (sometimes called an atom)
+that key can then be used for constant time indexing into an array
+
+this is how a lot of Windows/Unix work internally for the xprocess windowing support
+almost every string is registered as a ushort ATOM, which is really just used as the index into a linear array
+and then everything else carries around the ATOM, not the string (or in your case the TYPE)
+its similar in concept to primary keys in a database, or similar
+
+or maybe its not primary keys, I'm bad with databases; but there is a "key" like concept in databases that corresponds to integers rather than actual values
+
+Zombie — Today at 3:48 PM
+In other words, you're basically turning a Type into an array index as early as you can, and you just pass that around
+So then your code doesn't need to query the dictionary nearly as much
+Tanner Gooding — Today at 3:49 PM
+right, which is similar to what GetHashCode does
+the difference being that GetHashCode is "random"
+while ATOM is explicitly incremental and "registered"
+
+Zombie — Today at 3:49 PM
+You'd have an API like Atom RegisterComponent<T>()
+And you'd pass around that Atom instead of T
+or in addition to T
+Tanner Gooding — Today at 3:50 PM
+so rather than needing to do buckets and stuff based on arbitrary integers (what dictionaries do)
+you can just do array[atom]
+
+yeah, no need for Atom to be an allocation
+its just a simple integer that is itself a dictionary lookup over the Type
+and a small registration lock if an entry doesn't exist to handle multi-threading
+
+so its a 1 time cost up front
+and a basically zero cost for anything that already has the atom, which should be most things
+	*/
+
+
+
+
+	private static int _counter;
+	private static class AtomHelper<T>
+	{
+		public static int _atomId = Interlocked.Increment(ref _counter);
+	}
+
+	public static int GetId<T>() {
+		return AtomHelper<T>._atomId;
+	}
+}
+
+
+
+
+
+
 
 /// <summary>
 /// only good for the current frame, unless chunk packing is disabled.  in that case it's good for lifetime of entity in the archetype.
@@ -45,7 +115,7 @@ public record struct AllocToken : IComparable<AllocToken>
 	/// can be used to directly find a chunk from `Chunk[TComponent]._GLOBAL_LOOKUP(chunkId)`
 	/// </summary>
 	public long GetChunkLookupId()
-	{
+	{		
 		//create a long from two ints
 		//long correct = (long)left << 32 | (long)(uint)right;  //from: https://stackoverflow.com/a/33325313/1115220
 #if CHECKED
@@ -82,13 +152,16 @@ public record struct AllocToken : IComparable<AllocToken>
 		_CHECKED_VerifyInstance<T>();
 		var chunkLookupId = GetChunkLookupId();
 
-		lock (Chunk<T>._GLOBAL_LOOKUP)
+		//lock (Chunk<T>._GLOBAL_LOOKUP)
 		{
 			if (!Chunk<T>._GLOBAL_LOOKUP.TryGetValue(chunkLookupId, out var chunk))
 			{
-				__ERROR.Throw(GetAllocator().HasComponent<T>(), $"the archetype this element is attached to does not have a component of type {typeof(T).FullName}. Be aware that base classes do not match.");
-				//need to refresh token
-				__ERROR.Throw(false, "the chunk this allocToken points to does not exist.  either entity was deleted or it was packed.  Do not use AllocTokens beyond the frame aquired unless archetype.allocator.AutoPack==false");
+				if (!Chunk<T>._GLOBAL_LOOKUP.TryGetValue(chunkLookupId, out chunk))
+				{
+					__ERROR.Throw(GetAllocator().HasComponent<T>(), $"the archetype this element is attached to does not have a component of type {typeof(T).FullName}. Be aware that base classes do not match.");
+					//need to refresh token
+					__ERROR.Throw(false, "the chunk this allocToken points to does not exist.  either entity was deleted or it was packed.  Do not use AllocTokens beyond the frame aquired unless archetype.allocator.AutoPack==false");
+				}
 			}
 			return chunk;
 		}
@@ -302,6 +375,8 @@ public partial class Allocator : IDisposable //init logic
 
 	public Dictionary<Type, List<Chunk>> _componentColumns = new();
 
+	//public List<List<Chunk>> _columns=new();
+
 	public bool HasComponent<T>()
 	{
 		return _componentColumns.ContainsKey(typeof(T));
@@ -351,6 +426,7 @@ public partial class Allocator : IDisposable //init logic
 	{
 		if (IsDisposed)
 		{
+			__DEBUG.Assert(false, "why dispose twice?");
 			return;
 		}
 		IsDisposed = true;
@@ -897,7 +973,11 @@ public class Chunk<TComponent> : Chunk
 
 	private MemoryOwner<TComponent> _storage;
 	public Memory<TComponent> Memory { get => _storage.Memory; }
-	public Span<TComponent> Span { get => _storage.Span; }
+	public Span<TComponent> Span
+	{
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		get => _storage.Span;
+	}
 
 	/// <summary>
 	/// this is an array obtained by a object pool (cache).  It is longer than actually needed.  Do not use the extra slots.  always get length from _storage or Span
@@ -939,7 +1019,7 @@ public class Chunk<TComponent> : Chunk
 		_count++;
 #if DEBUG
 		//clear the slot
-		_DANGEROUS_refStorage[allocToken.allocSlot.chunkRowIndex] = default(TComponent);
+		Span[allocToken.allocSlot.chunkRowIndex] = default(TComponent);
 #endif
 	}
 	/// <summary>
@@ -948,12 +1028,15 @@ public class Chunk<TComponent> : Chunk
 	internal override void OnPackSlot(ref AllocToken allocToken, ref AllocToken moveComponentDataFrom)
 	{
 		_count++;
-		_DANGEROUS_refStorage[allocToken.allocSlot.chunkRowIndex] = moveComponentDataFrom.GetComponentReadRef<TComponent>();
+		Span[allocToken.allocSlot.chunkRowIndex] = moveComponentDataFrom.GetComponentReadRef<TComponent>();
 #if DEBUG
 		lock (_GLOBAL_LOOKUP)
 		{
 			//clear the old slot.  this isn't needed, but in case someone is still using the old ref, lets make them aware of it in DEBUG
-			_GLOBAL_LOOKUP[moveComponentDataFrom.GetChunkLookupId()]._DANGEROUS_refStorage[moveComponentDataFrom.allocSlot.chunkRowIndex] = default(TComponent);
+			var chunkLookupId = moveComponentDataFrom.GetChunkLookupId();
+			var result = _GLOBAL_LOOKUP.TryGetValue(chunkLookupId, out var chunk);
+			__ERROR.Throw(result);
+			chunk.Span[moveComponentDataFrom.allocSlot.chunkRowIndex] = default(TComponent);
 		}
 #endif
 
@@ -969,7 +1052,7 @@ public class Chunk<TComponent> : Chunk
 		//}
 
 		//clear the slot
-		_DANGEROUS_refStorage[allocToken.allocSlot.chunkRowIndex] = default(TComponent);
+		Span[allocToken.allocSlot.chunkRowIndex] = default(TComponent);
 	}
 	public unsafe ref TComponent GetWriteRef(AllocToken allocToken)
 	{
@@ -982,10 +1065,12 @@ public class Chunk<TComponent> : Chunk
 			_CHECKED_VerifyIntegrity(ref allocToken);
 			var rowIndex = allocToken.allocSlot.chunkRowIndex;
 			//inform metadata that a write is occuring.  //TODO: is this needed?  If not, remove it to reduce random memory access
-			ref var allocMetadata = ref Chunk<AllocMetadata>._GLOBAL_LOOKUP[_chunkLookupId]._DANGEROUS_refStorage[rowIndex];
+			var result = Chunk<AllocMetadata>._GLOBAL_LOOKUP.TryGetValue(_chunkLookupId, out var chunk);
+			__ERROR.Throw(result);
+			ref var allocMetadata = ref chunk.Span[rowIndex];
 			allocMetadata.fieldWrites++;
 			_writeVersion++;
-			return ref _DANGEROUS_refStorage[rowIndex];
+			return ref Span[rowIndex];
 		}
 	}
 	public unsafe ref readonly TComponent GetReadRef(AllocToken allocToken)
@@ -996,7 +1081,7 @@ public class Chunk<TComponent> : Chunk
 	{
 		_CHECKED_VerifyIntegrity(ref allocToken);
 		var rowIndex = allocToken.allocSlot.chunkRowIndex;
-		return ref _DANGEROUS_refStorage[rowIndex];
+		return ref Span[rowIndex];
 
 	}
 
@@ -1006,17 +1091,21 @@ public class Chunk<TComponent> : Chunk
 		lock (_GLOBAL_LOOKUP)
 		{
 			__DEBUG.Throw(allocToken.GetChunkLookupId() == _chunkLookupId, "allocToken does not belong to this chunk");
-			__CHECKED.Throw(Chunk<TComponent>._GLOBAL_LOOKUP[_chunkLookupId] == this, "alloc system internal integrity failure");
+			var result = Chunk<TComponent>._GLOBAL_LOOKUP.TryGetValue(_chunkLookupId, out var chunk);
+			__ERROR.Throw(result);
+			__CHECKED.Throw(chunk == this, "alloc system internal integrity failure");
 			__CHECKED.Throw(!IsDisposed, "use after dispose");
 			var rowIndex = allocToken.allocSlot.chunkRowIndex;
-			ref var allocMetadata = ref Chunk<AllocMetadata>._GLOBAL_LOOKUP[_chunkLookupId]._DANGEROUS_refStorage[rowIndex];
+			result = Chunk<AllocMetadata>._GLOBAL_LOOKUP.TryGetValue(_chunkLookupId, out var allocMetadataChunk);
+			__ERROR.Throw(result);
+			ref var allocMetadata = ref allocMetadataChunk.Span[rowIndex];
 			__DEBUG.Throw(allocMetadata.allocToken == allocToken, "invalid alloc token.   why?");
 		}
 	}
 }
 
 
-public class AllocSlotList<T>
+public class AllocSlotList<T> : IDisposable
 {
 	private List<T> _storage = new();
 	public int _count;
@@ -1086,5 +1175,21 @@ public class AllocSlotList<T>
 				}
 			}
 		}
+	}
+
+	public bool IsDisposed { get; private set; }
+	public void Dispose()
+	{
+		if (IsDisposed)
+		{
+			__DEBUG.Assert(false, "why already disposed?");
+			return;
+		}
+		IsDisposed = true;
+		_storage.Clear();
+		_storage = null;
+		_freeSlots.Clear();
+		_freeSlots = null;
+		_count = -1;
 	}
 }
