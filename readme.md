@@ -23,6 +23,7 @@
 - [notes / scratch stuff below...](#notes--scratch-stuff-below)
     - [feature notes](#feature-notes)
     - [c# tricks/notes/perf](#c-tricksnotesperf)
+- [TODO:](#todo)
 
 # DumDum?
 A codename?
@@ -228,3 +229,10 @@ Logical object structure is
 - on a `x64` win10 machine, a memorypage is `4096` bytes.  
 - for making instances of generic types:    `var listType = typeof(List<>).MakeGenericType(yourType)` and `Activator.CreateInstance(listType)`
 
+
+# TODO:
+
+- replace `Allocator` direct List indexer calls with `Span`
+- Free Chunk should only happen when 2 full chunks are empty, to prevent thrashing
+  - put the free in a lazy slot.  preallocate async.
+  - `Parallel.ForEach(_columns, (columnList, loopState) ` line in Allocator.Free() should be changed to __.ForRange() workflow

@@ -27,65 +27,6 @@ public interface IComponent
 
 
 
-public static class Atom
-{
-	/**
-	 * 
-	 * 
-Tanner Gooding — Today at 3:44 PM
-I'd recommend looking at an ATOM based system
-
-that is, your issue is you have a bunch of keys (the type) and using the hashcode in a dictionary is expensive for your scenario
-however, the number of types you need to support isn't likely most of them, its probably a small subset (like 1000-10k)
-
-so you can have a system that offsets most of the dictionary cost to be "1 time" by mapping it to an incremental key (sometimes called an atom)
-that key can then be used for constant time indexing into an array
-
-this is how a lot of Windows/Unix work internally for the xprocess windowing support
-almost every string is registered as a ushort ATOM, which is really just used as the index into a linear array
-and then everything else carries around the ATOM, not the string (or in your case the TYPE)
-its similar in concept to primary keys in a database, or similar
-
-or maybe its not primary keys, I'm bad with databases; but there is a "key" like concept in databases that corresponds to integers rather than actual values
-
-Zombie — Today at 3:48 PM
-In other words, you're basically turning a Type into an array index as early as you can, and you just pass that around
-So then your code doesn't need to query the dictionary nearly as much
-Tanner Gooding — Today at 3:49 PM
-right, which is similar to what GetHashCode does
-the difference being that GetHashCode is "random"
-while ATOM is explicitly incremental and "registered"
-
-Zombie — Today at 3:49 PM
-You'd have an API like Atom RegisterComponent<T>()
-And you'd pass around that Atom instead of T
-or in addition to T
-Tanner Gooding — Today at 3:50 PM
-so rather than needing to do buckets and stuff based on arbitrary integers (what dictionaries do)
-you can just do array[atom]
-
-yeah, no need for Atom to be an allocation
-its just a simple integer that is itself a dictionary lookup over the Type
-and a small registration lock if an entry doesn't exist to handle multi-threading
-
-so its a 1 time cost up front
-and a basically zero cost for anything that already has the atom, which should be most things
-	*/
-
-
-
-
-	private static int _counter;
-	private static class AtomHelper<T>
-	{
-		public static int _atomId = Interlocked.Increment(ref _counter);
-	}
-
-	public static int GetId<T>() {
-		return AtomHelper<T>._atomId;
-	}
-}
-
 
 
 
@@ -115,7 +56,7 @@ public record struct AllocToken : IComparable<AllocToken>
 	/// can be used to directly find a chunk from `Chunk[TComponent]._GLOBAL_LOOKUP(chunkId)`
 	/// </summary>
 	public long GetChunkLookupId()
-	{		
+	{
 		//create a long from two ints
 		//long correct = (long)left << 32 | (long)(uint)right;  //from: https://stackoverflow.com/a/33325313/1115220
 #if CHECKED
@@ -158,7 +99,7 @@ public record struct AllocToken : IComparable<AllocToken>
 			{
 				if (!Chunk<T>._GLOBAL_LOOKUP.TryGetValue(chunkLookupId, out chunk))
 				{
-					__ERROR.Throw(GetAllocator().HasComponent<T>(), $"the archetype this element is attached to does not have a component of type {typeof(T).FullName}. Be aware that base classes do not match.");
+					__ERROR.Throw(GetAllocator().HasComponentType<T>(), $"the archetype this element is attached to does not have a component of type {typeof(T).FullName}. Be aware that base classes do not match.");
 					//need to refresh token
 					__ERROR.Throw(false, "the chunk this allocToken points to does not exist.  either entity was deleted or it was packed.  Do not use AllocTokens beyond the frame aquired unless archetype.allocator.AutoPack==false");
 				}
@@ -181,7 +122,10 @@ public record struct AllocToken : IComparable<AllocToken>
 		ref readonly var allocMetadata = ref GetComponentReadRef<AllocMetadata>();
 		__CHECKED.Throw(allocMetadata.allocToken == this, "mismatch");
 		//get chunk via the allocator, where the default way is direct through the Chunk<T>._GLOBAL_LOOKUP
-		var chunk = GetAllocator()._componentColumns[typeof(AllocMetadata)][allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
+		var atomId = Allocator.Atom.GetId<T>();
+
+		//var chunk = GetAllocator()._componentColumns[typeof(AllocMetadata)][allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
+		var chunk = GetAllocator()._columns[atomId][allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
 		__CHECKED.Throw(GetContainingChunk<AllocMetadata>() == chunk, "chunk lookup between both techniques does not match");
 		__CHECKED.Throw(this == chunk.Span[allocSlot.chunkRowIndex].allocToken);
 	}
@@ -348,7 +292,129 @@ public partial class Allocator //unit test
 	}
 }
 
+public partial class Allocator  //ATOM logic
+{
 
+	protected internal static class Atom
+	{
+		/**
+		 * 
+		 * Tanner Gooding — Today at 3:44 PM
+			I'd recommend looking at an ATOM based system
+
+			that is, your issue is you have a bunch of keys (the type) and using the hashcode in a dictionary is expensive for your scenario
+			however, the number of types you need to support isn't likely most of them, its probably a small subset (like 1000-10k)
+
+			so you can have a system that offsets most of the dictionary cost to be "1 time" by mapping it to an incremental key (sometimes called an atom)
+			that key can then be used for constant time indexing into an array
+
+			this is how a lot of Windows/Unix work internally for the xprocess windowing support
+			almost every string is registered as a ushort ATOM, which is really just used as the index into a linear array
+			and then everything else carries around the ATOM, not the string (or in your case the TYPE)
+			its similar in concept to primary keys in a database, or similar
+
+			or maybe its not primary keys, I'm bad with databases; but there is a "key" like concept in databases that corresponds to integers rather than actual values
+
+			Zombie — Today at 3:48 PM
+			In other words, you're basically turning a Type into an array index as early as you can, and you just pass that around
+			So then your code doesn't need to query the dictionary nearly as much
+			Tanner Gooding — Today at 3:49 PM
+			right, which is similar to what GetHashCode does
+			the difference being that GetHashCode is "random"
+			while ATOM is explicitly incremental and "registered"
+
+			Zombie — Today at 3:49 PM
+			You'd have an API like Atom RegisterComponent<T>()
+			And you'd pass around that Atom instead of T
+			or in addition to T
+			Tanner Gooding — Today at 3:50 PM
+			so rather than needing to do buckets and stuff based on arbitrary integers (what dictionaries do)
+			you can just do array[atom]
+
+			yeah, no need for Atom to be an allocation
+			its just a simple integer that is itself a dictionary lookup over the Type
+			and a small registration lock if an entry doesn't exist to handle multi-threading
+
+			so its a 1 time cost up front
+			and a basically zero cost for anything that already has the atom, which should be most things
+		 * 
+		*/
+
+
+
+
+
+		private abstract class AtomHelper
+		{
+			protected static int _counter;
+			public abstract int GetId();
+		}
+		private class AtomHelper<T> : AtomHelper
+		{
+			public static int _atomId;
+
+			static AtomHelper()
+			{
+				_atomId = Interlocked.Increment(ref _counter);
+				lock (_typeLookup)
+				{
+					_typeLookup.Add(typeof(T), _atomId);
+					_atomIdLookup.Add(_atomId, typeof(T));
+				}
+			}
+
+			public override int GetId()
+			{
+				return _atomId;
+			}
+		}
+
+		public static int GetId<T>()
+		{
+			return AtomHelper<T>._atomId;
+		}
+		public static Type GetType(int atomId)
+		{
+			lock (_typeLookup)
+			{
+				return _atomIdLookup[atomId];
+			}
+		}
+
+		private static Dictionary<Type, int> _typeLookup = new();
+
+		private static Dictionary<int, Type> _atomIdLookup = new();
+		public static int GetId(Type type)
+		{
+			lock (_typeLookup)
+			{
+				if (_typeLookup.TryGetValue(type, out var atomId))
+				{
+					return atomId;
+				}
+			}
+			{
+				//make atomId
+				var helperType = typeof(AtomHelper<>).MakeGenericType(type);
+				var helper = Activator.CreateInstance(helperType) as AtomHelper;
+				var newAtomId = helper.GetId();
+				lock (_typeLookup)
+				{
+					if (_typeLookup.TryGetValue(type, out var atomId))
+					{
+						__ERROR.Throw(newAtomId == atomId);
+						return atomId;
+					}
+					_typeLookup.Add(type, newAtomId);
+					_atomIdLookup.Add(atomId, type);
+					return newAtomId;
+
+				}
+			}
+		}
+	}
+
+}
 
 /// <summary>
 /// allocator for archetypes 
@@ -364,22 +430,50 @@ public partial class Allocator : IDisposable //init logic
 	/// if you want to add additional custom components to each entity, list them here.  These are not used to compute the <see cref="_componentsHashId"/>
 	/// <para>be sure not to remove the items already in the list.</para>
 	/// </summary>
-	public List<Type> CustomMetaComponents = new List<Type>() { typeof(AllocMetadata) };
+	public List<Type> CustomMetaComponentTypes = new List<Type>() { typeof(AllocMetadata) };
 
 
 	public List<Type> ComponentTypes { get; init; }
+
+
 	/// <summary>
 	/// used to quickly identify what collection of ComponentTypes this allocator is in charge of
 	/// </summary>
 	public int _componentsHashId;
 
-	public Dictionary<Type, List<Chunk>> _componentColumns = new();
 
-	//public List<List<Chunk>> _columns=new();
+	//public Dictionary<Type, List<Chunk>> _componentColumns = new();
+	/// <summary>
+	/// ATOM_ID --> chunkId --> rowId --> The_Component
+	/// </summary>
+	public List<List<Chunk>> _columns = new();
 
-	public bool HasComponent<T>()
+	/// <summary>
+	/// all the atomId's used in columns.  can use the atomId to get the offset to the proper column
+	/// </summary>
+	public List<int> _atomIdsUsed = new();
+
+	public List<Chunk> GetColumn<T>()
 	{
-		return _componentColumns.ContainsKey(typeof(T));
+		var atomId = Atom.GetId<T>();
+		return _columns[atomId];
+	}
+	public Chunk<T> GetChunk<T>(ref AllocToken allocToken)
+	{
+		var column = GetColumn<T>();
+		return column[allocToken.allocSlot.columnChunkIndex] as Chunk<T>;
+	}
+	public ref T GetComponentRef<T>(ref AllocToken allocToken)
+	{
+		var chunk = GetChunk<T>(ref allocToken);
+		return ref chunk.Span[allocToken.allocSlot.chunkRowIndex];
+	}
+
+	public bool HasComponentType<T>()
+	{
+		//return _componentColumns.ContainsKey(typeof(T));
+		var atomId = Atom.GetId<T>();
+		return _columns.Count > atomId && _columns[atomId] != null;
 	}
 
 	public void Initialize()
@@ -395,13 +489,28 @@ public partial class Allocator : IDisposable //init logic
 		//create columns
 		foreach (var type in ComponentTypes)
 		{
-			_componentColumns.Add(type, new());
+			//_componentColumns.Add(type, new());
+			var atomId = Atom.GetId(type);
+			_atomIdsUsed.Add(atomId);
+			while (_columns.Count <= atomId)
+			{
+				_columns.Add(null);
+			}
+			_columns[atomId] = new();
+
 		}
 		//add our special metadata component column
-		__DEBUG.Throw(CustomMetaComponents.Contains(typeof(AllocMetadata)), "we must have allocMetadata to store info on each entity added");
-		foreach (var type in CustomMetaComponents)
+		__DEBUG.Throw(CustomMetaComponentTypes.Contains(typeof(AllocMetadata)), "we must have allocMetadata to store info on each entity added");
+		foreach (var type in CustomMetaComponentTypes)
 		{
-			_componentColumns.Add(type, new());
+			//_componentColumns.Add(type, new());	
+			var atomId = Atom.GetId(type);
+			_atomIdsUsed.Add(atomId);
+			while (_columns.Count <= atomId)
+			{
+				_columns.Add(null);
+			}
+			_columns[atomId] = new();
 		}
 
 
@@ -434,16 +543,27 @@ public partial class Allocator : IDisposable //init logic
 		{
 			_GLOBAL_LOOKUP.Remove(_allocatorId);
 		}
-		foreach (var (type, columnList) in _componentColumns)
+		//foreach (var (type, columnList) in _componentColumns)
+		//foreach (var columnList in _columns)
+		foreach(var atomId in _atomIdsUsed)
 		{
+			var columnList = _columns[atomId];
 			foreach (var chunk in columnList)
 			{
 				chunk.Dispose();
 			}
 			columnList.Clear();
+			_columns[atomId] = null;
 		}
-		_componentColumns.Clear();
-		_componentColumns = null;
+#if CHECKED
+		foreach (var columnList in _columns)
+		{
+			__CHECKED.Throw(columnList == null);
+		}
+#endif
+
+			_columns.Clear();
+		_columns = null;
 		_free.Clear();
 		_free = null;
 		_lookup.Clear();
@@ -466,24 +586,46 @@ public partial class Allocator //chunk management logic
 
 	private void _AllocNextChunk() //TODO: preallocate extra chunks ahead of their need (always keep 1x extra chunk around)
 	{
-		foreach (var (type, columnList) in _componentColumns)
+		void _AllocChunkHelper(Type type)
 		{
+			var atomId = Atom.GetId(type);
 			var chunkType = typeof(Chunk<>).MakeGenericType(type);
 			var chunk = Activator.CreateInstance(chunkType) as Chunk;
 			chunk.Initialize(_nextSlotTracker.chunkSize, _nextSlotTracker.nextAvailable.GetChunkLookupId(_allocatorId));
-			__DEBUG.Assert(columnList.Count == _nextSlotTracker.nextAvailable.columnChunkIndex, "somehow our column allocations is out of step with our next free tracking.");
-			columnList.Add(chunk);
+			__DEBUG.Assert(_columns[atomId].Count == _nextSlotTracker.nextAvailable.columnChunkIndex, "somehow our column allocations is out of step with our next free tracking.");
+			_columns[atomId].Add(chunk);
+		}
+
+		foreach (var type in ComponentTypes)
+		{
+			_AllocChunkHelper(type);
+		}
+
+
+		foreach (var type in CustomMetaComponentTypes)
+		{
+			_AllocChunkHelper(type);
 		}
 	}
 
 	private void _FreeLastChunk()
 	{
-		foreach (var (type, columnList) in _componentColumns)
+		void _FreeChunkHelper(Type type)
 		{
-			var result = columnList._TryTakeLast(out var chunk);
+			var atomId = Atom.GetId(type);
+			var result = _columns[atomId]._TryTakeLast(out var chunk);
 			__DEBUG.Throw(result && chunk._count == 0);
 			chunk.Dispose();
-			__DEBUG.Assert(columnList.Count == _nextSlotTracker.nextAvailable.columnChunkIndex, "somehow our column allocations is out of step with our next free tracking.");
+			__DEBUG.Assert(_columns[atomId].Count == _nextSlotTracker.nextAvailable.columnChunkIndex, "somehow our column allocations is out of step with our next free tracking.");
+		}
+		foreach (var type in ComponentTypes)
+		{
+			_FreeChunkHelper(type);
+
+		}
+		foreach (var type in CustomMetaComponentTypes)
+		{
+			_FreeChunkHelper(type);
 		}
 	}
 }
@@ -566,10 +708,11 @@ public partial class Allocator  //alloc/free/pack logic
 
 
 			//loop all components zeroing out data and informing chunk of added item
-			foreach (var (type, columnList) in _componentColumns)
+			foreach (var atomId in _atomIdsUsed)
 			{
-				columnList[slot.columnChunkIndex].OnAllocSlot(ref allocToken);
+				_columns[atomId][slot.columnChunkIndex].OnAllocSlot(ref allocToken);
 			}
+
 
 
 
@@ -579,7 +722,7 @@ public partial class Allocator  //alloc/free/pack logic
 			allocMetadata = new AllocMetadata()
 			{
 				allocToken = allocToken,
-				componentCount = _componentColumns.Count,
+				componentCount = _atomIdsUsed.Count,
 			};
 			__CHECKED.Throw(allocMetadata == allocToken.GetComponentReadRef<AllocMetadata>(), "component reference verification failed.  why?");
 
@@ -606,7 +749,8 @@ public partial class Allocator  //alloc/free/pack logic
 
 	private bool _TryQueryMetadata(AllocSlot slot, out AllocMetadata metadata)
 	{
-		var columnList = _componentColumns[typeof(AllocMetadata)];
+		var atomId = Atom.GetId<AllocMetadata>();
+		var columnList = _columns[atomId];//  _componentColumns[typeof(AllocMetadata)];
 		if (columnList.Count < slot.columnChunkIndex)
 		{
 			metadata = default;
@@ -626,9 +770,10 @@ public partial class Allocator  //alloc/free/pack logic
 
 
 		//make sure proper chunk is referenced, and field
-		foreach (var (type, columnList) in _componentColumns)
+		//foreach (var (type, columnList) in _componentColumns)
+		foreach(var atomId in _atomIdsUsed)
 		{
-			var columnChunk = columnList[allocToken.allocSlot.columnChunkIndex];
+			var columnChunk = _columns[atomId][allocToken.allocSlot.columnChunkIndex];
 
 			__CHECKED.Throw(columnChunk._chunkLookupId == allocToken.GetChunkLookupId(), "lookup id mismatch");
 
@@ -636,7 +781,8 @@ public partial class Allocator  //alloc/free/pack logic
 
 
 		//verify chunk accessor workflows are correct
-		var manualGetChunk = _componentColumns[typeof(AllocMetadata)][allocToken.allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
+		//var manualGetChunk = _componentColumns[typeof(AllocMetadata)][allocToken.allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
+		var manualGetChunk = GetChunk<AllocMetadata>(ref allocToken);
 		var autoGetChunk = allocToken.GetContainingChunk<AllocMetadata>();
 		__CHECKED.Throw(manualGetChunk == autoGetChunk, "should match");
 
@@ -675,15 +821,17 @@ public partial class Allocator  //alloc/free/pack logic
 		//parallel through all columns, deleting
 		var allocTokensArraySegment = so_AllocTokens.DangerousGetArray();
 		var allocArray = allocTokensArraySegment.Array;
-		Parallel.ForEach(_componentColumns, (pair, loopState) =>
+		Parallel.ForEach(_atomIdsUsed, (atomId, loopState) =>
 		{
-			var (type, columnList) = pair;
+			var columnList = _columns[atomId];
+			//var (type, columnList) = pair;
 			for (var i = 0; i < allocTokensArraySegment.Count; i++)
 			{
 				ref var allocToken = ref allocArray[i];
 				columnList[allocToken.allocSlot.columnChunkIndex].OnFreeSlot(ref allocToken);
 			}
 		});
+
 
 
 
@@ -724,7 +872,8 @@ public partial class Allocator  //alloc/free/pack logic
 		var newSlotAllocToken = _GenerateLiveAllocToken(highestAlive.externalId, lowestFree);
 
 		//do a single alloc for that freeSlot componentColumns
-		foreach (var (type, columnList) in _componentColumns)
+		//foreach (var (type, columnList) in _componentColumns)
+		foreach(var columnList in _columns)
 		{
 			//copy data from old while allocting the slot
 			columnList[lowestFree.columnChunkIndex].OnPackSlot(ref newSlotAllocToken, ref highestAlive);
@@ -732,7 +881,8 @@ public partial class Allocator  //alloc/free/pack logic
 			columnList[highestAlive.allocSlot.columnChunkIndex].OnFreeSlot(ref highestAlive);
 		}
 		//update the metadata component
-		var metadataChunk = _componentColumns[typeof(AllocMetadata)][newSlotAllocToken.allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
+		//var metadataChunk = _componentColumns[typeof(AllocMetadata)][newSlotAllocToken.allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
+		var metadataChunk = GetChunk<AllocMetadata>(ref newSlotAllocToken);
 		ref var metadataComponent = ref metadataChunk.Span[newSlotAllocToken.allocSlot.chunkRowIndex];
 		metadataComponent.allocToken = newSlotAllocToken;
 
