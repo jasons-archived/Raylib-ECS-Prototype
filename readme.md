@@ -236,3 +236,5 @@ Logical object structure is
 - Free Chunk should only happen when 2 full chunks are empty, to prevent thrashing
   - put the free in a lazy slot.  preallocate async.
   - `Parallel.ForEach(_columns, (columnList, loopState) ` line in Allocator.Free() should be changed to __.ForRange() workflow
+- For Chunk global lookups
+   - AllocatorId --> ColumnList   so access is `Chunk<T>._GLOBAL_LOOKUP[allocatorId][chunkId][rowId]`

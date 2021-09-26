@@ -1,10 +1,12 @@
 ﻿using DumDum.Bcl.Diagnostics;
+using Microsoft.Toolkit.HighPerformance.Buffers;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -467,5 +469,97 @@ public unsafe struct StructArray100<T> where T : unmanaged
 
 
 
+public static class ParallelFor
+{
 
+	private static SpanOwner<(int startInclusive, int length)> _Range_ComputeBatches(int start, int length, float batchSizeMultipler)
+	{
+		__ERROR.Throw(batchSizeMultipler > 0, $"{nameof(batchSizeMultipler)} should be greater than zero");
+		var endExclusive = start + length;
+
+		var didCount = 0;
+		//number of batches we want
+		var batchCount = Math.Min(length, Environment.ProcessorCount);
+
+		//figure out batch size
+		var batchSize = length / batchCount;
+
+		batchSize = (int)(batchSize * batchSizeMultipler);
+		batchSize = Math.Min(batchSize, length);
+		batchSize = Math.Max(1, batchSize);
+
+		//update batchCount bsed on actual batchSize
+		if (length % batchSize == 0)
+		{
+			batchCount = length / batchSize;
+		}
+		else
+		{
+			batchCount = (length / batchSize) + 1;
+		}
+
+
+		var owner = SpanOwner<(int startInclusive, int length)>.Allocate(batchCount);
+		var span = owner.Span;
+
+		//calculate batches and put into span
+		{
+			var batchStartInclusive = start;
+			var batchEndExclusive = batchStartInclusive + batchSize;
+			var loopIndex = 0;
+			while (batchEndExclusive <= endExclusive)
+			{
+				var thisBatchLength = batchEndExclusive - batchStartInclusive;
+				__ERROR.Throw(thisBatchLength == batchSize);
+				//do work:  batchStartInclusive, batchSize
+				didCount += batchSize;
+				span[loopIndex] = (batchStartInclusive, batchSize);
+
+				//increment
+				batchStartInclusive += batchSize;
+				batchEndExclusive += batchSize;
+				loopIndex++;
+			}
+			var remainder = endExclusive - batchStartInclusive;
+			__ERROR.Throw(remainder < batchSize);
+			if (remainder > 0)
+			{
+				//do last part:   batchStartInclusive, remainder
+				didCount += remainder;
+				span[loopIndex] = (batchStartInclusive, remainder);
+			}
+			__ERROR.Throw(didCount == length);
+		}
+
+		return owner;
+	}
+	public static ValueTask Range(int start, int length, Func<(int start, int length), ValueTask> action) => Range(start, length, 1f, action);
+	public static ValueTask Range(int start, int length, float batchSizeMultipler, Func<(int start, int length), ValueTask> action)
+	{
+		if (length == 0)
+		{
+			return ValueTask.CompletedTask;
+		}
+		using var owner = _Range_ComputeBatches(start, length, batchSizeMultipler);
+
+		return _Range_ExecuteAction(owner.DangerousGetArray(), action);
+	}
+	private static async ValueTask _Range_ExecuteAction(ArraySegment<(int start, int length)> spanOwnerDangerousArray, Func<(int start, int length), ValueTask> action)
+	{
+		await Parallel.ForEachAsync<(int start, int length)>(spanOwnerDangerousArray, (batch, cancelToken) =>Unsafe.AsRef(in action).Invoke(batch));
+	}
+
+	public static Task Each<T>(IEnumerable<T> source, Func<T, CancellationToken, ValueTask> action)
+	{
+		return Parallel.ForEachAsync(source, action);
+	}
+
+	public static Task Each<T>(IEnumerable<T> source, Func<T, ValueTask> action)
+	{
+		return Parallel.ForEachAsync(source,(item,cancelToken)=>Unsafe.AsRef(in action).Invoke(item));
+	}
+
+
+
+}
 

@@ -36,22 +36,23 @@ public interface IComponent
 /// <summary>
 /// only good for the current frame, unless chunk packing is disabled.  in that case it's good for lifetime of entity in the archetype.
 /// </summary>
-public record struct AllocToken : IComparable<AllocToken>
+public readonly record struct AllocToken : IComparable<AllocToken>
 {
-	public bool isAlive;
-	public long externalId;
+	public readonly bool isAlive { get; init; }
+	public readonly long externalId { get; init; }
 
 
 	/// <summary>
 	/// the id of the allocator that created/tracks this allocSlot.  //TODO: make the archetype also use this ID as it's own (on create allocator, use it's ID)
 	/// If needed, the allocator can be accessed via `Allocator._GLOBAL_LOOKUP(allocatorId)`
 	/// </summary>
-	public int allocatorId;
-	public AllocSlot allocSlot;
+	public readonly int allocatorId { get; init; }
+	public readonly int allocatorVersion { get; init; }
+	public readonly AllocSlot allocSlot { get; init; }
 	/// <summary>
 	/// needs to match Allocator._packVersion, otherwise a pack took place and the token needs to be refreshed.
 	/// </summary>
-	public int packVersion;
+	public readonly int packVersion { get; init; }
 	/// <summary>
 	/// can be used to directly find a chunk from `Chunk[TComponent]._GLOBAL_LOOKUP(chunkId)`
 	/// </summary>
@@ -93,11 +94,11 @@ public record struct AllocToken : IComparable<AllocToken>
 		_CHECKED_VerifyInstance<T>();
 		var chunkLookupId = GetChunkLookupId();
 
-		//lock (Chunk<T>._GLOBAL_LOOKUP)
+		lock (Chunk<T>._GLOBAL_LOOKUP)
 		{
 			if (!Chunk<T>._GLOBAL_LOOKUP.TryGetValue(chunkLookupId, out var chunk))
 			{
-				if (!Chunk<T>._GLOBAL_LOOKUP.TryGetValue(chunkLookupId, out chunk))
+				//if (!Chunk<T>._GLOBAL_LOOKUP.TryGetValue(chunkLookupId, out chunk))
 				{
 					__ERROR.Throw(GetAllocator().HasComponentType<T>(), $"the archetype this element is attached to does not have a component of type {typeof(T).FullName}. Be aware that base classes do not match.");
 					//need to refresh token
@@ -109,7 +110,11 @@ public record struct AllocToken : IComparable<AllocToken>
 	}
 	public Allocator GetAllocator()
 	{
-		return Allocator._GLOBAL_LOOKUP[allocatorId];
+		var toReturn = Allocator._GLOBAL_LOOKUP.Span[allocatorId];
+		__ERROR.Throw(toReturn != null && toReturn._version == allocatorVersion, "alloc token seems to be expired");
+		__CHECKED.Throw(toReturn._allocatorId == allocatorId);
+
+		return toReturn;
 	}
 	[Conditional("CHECKED")]
 	private void _CHECKED_VerifyInstance<T>()
@@ -125,7 +130,7 @@ public record struct AllocToken : IComparable<AllocToken>
 		var atomId = Allocator.Atom.GetId<T>();
 
 		//var chunk = GetAllocator()._componentColumns[typeof(AllocMetadata)][allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
-		var chunk = GetAllocator()._columns[atomId][allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
+		var chunk = GetAllocator()._GetColumnsSpan()[atomId][allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
 		__CHECKED.Throw(GetContainingChunk<AllocMetadata>() == chunk, "chunk lookup between both techniques does not match");
 		__CHECKED.Throw(this == chunk.Span[allocSlot.chunkRowIndex].allocToken);
 	}
@@ -346,7 +351,10 @@ public partial class Allocator  //ATOM logic
 
 		private abstract class AtomHelper
 		{
-			protected static int _counter;
+			/// <summary>
+			/// don't start at zero so that signifies an error
+			/// </summary>
+			protected static int _counter = 1;
 			public abstract int GetId();
 		}
 		private class AtomHelper<T> : AtomHelper
@@ -422,9 +430,13 @@ public partial class Allocator  //ATOM logic
 public partial class Allocator : IDisposable //init logic
 {
 
-	public static int _allocatorId_GlobalCounter;
-	public static Dictionary<int, Allocator> _GLOBAL_LOOKUP = new();
-	public int _allocatorId = _allocatorId_GlobalCounter._InterlockedIncrement();
+	//public static int _allocatorId_GlobalCounter;
+	//public static Dictionary<int, Allocator> _GLOBAL_LOOKUP = new();
+	//public int _allocatorId = _allocatorId_GlobalCounter._InterlockedIncrement();
+	public static AllocSlotList<Allocator> _GLOBAL_LOOKUP = new();
+	public int _allocatorId = -1;
+	private static int _versionCounter;
+	public int _version = _versionCounter++;
 
 	/// <summary>
 	/// if you want to add additional custom components to each entity, list them here.  These are not used to compute the <see cref="_componentsHashId"/>
@@ -446,7 +458,9 @@ public partial class Allocator : IDisposable //init logic
 	/// <summary>
 	/// ATOM_ID --> chunkId --> rowId --> The_Component
 	/// </summary>
-	public List<List<Chunk>> _columns = new();
+	public List<List<Chunk>> _columnStorage = new();
+
+	public Span<List<Chunk>> _GetColumnsSpan() { return _columnStorage._AsSpan_Unsafe(); }
 
 	/// <summary>
 	/// all the atomId's used in columns.  can use the atomId to get the offset to the proper column
@@ -456,10 +470,11 @@ public partial class Allocator : IDisposable //init logic
 	public List<Chunk> GetColumn<T>()
 	{
 		var atomId = Atom.GetId<T>();
-		return _columns[atomId];
+		return _GetColumnsSpan()[atomId];
 	}
 	public Chunk<T> GetChunk<T>(ref AllocToken allocToken)
 	{
+		__CHECKED_VerifyAllocToken(ref allocToken);
 		var column = GetColumn<T>();
 		return column[allocToken.allocSlot.columnChunkIndex] as Chunk<T>;
 	}
@@ -469,15 +484,27 @@ public partial class Allocator : IDisposable //init logic
 		return ref chunk.Span[allocToken.allocSlot.chunkRowIndex];
 	}
 
+	public static ref T GetComponent<T>(ref AllocToken allocToken)
+	{
+		var atomId = Atom.GetId<T>();
+		var chunk = _GLOBAL_LOOKUP.Span[allocToken.allocatorId]._GetColumnsSpan()[atomId]._AsSpan_Unsafe()[allocToken.allocSlot.columnChunkIndex] as Chunk<T>;
+		return ref chunk.Span[allocToken.allocSlot.chunkRowIndex];
+	}
+
 	public bool HasComponentType<T>()
 	{
 		//return _componentColumns.ContainsKey(typeof(T));
 		var atomId = Atom.GetId<T>();
-		return _columns.Count > atomId && _columns[atomId] != null;
+		var columns = _GetColumnsSpan();
+		return columns.Length > atomId && columns[atomId] != null;
 	}
 
 	public void Initialize()
 	{
+		//add self to global lookup
+		__ERROR.Throw(_allocatorId == -1, "why already set?");
+		_allocatorId = _GLOBAL_LOOKUP.AllocSlot();
+
 		//__DEBUG.AssertOnce(_allocatorId < 10, "//TODO: change allocatorId to use a pool, not increment, otherwise risk of collisions with long-running programs");
 		__DEBUG.Throw(ComponentTypes != null, "need to set properties before init");
 		//generate hash for fast matching of archetypes
@@ -486,31 +513,33 @@ public partial class Allocator : IDisposable //init logic
 			_componentsHashId += type.GetHashCode();
 		}
 
+
+		void _AllocColumnsHelper(Type type)
+		{
+			var atomId = Atom.GetId(type);
+			__DEBUG.Throw(_atomIdsUsed.Contains(atomId) == false);
+			_atomIdsUsed.Add(atomId);
+			while (_columnStorage.Count() <= atomId)
+			{
+				_columnStorage.Add(null);
+			}
+			__DEBUG.Throw(_columnStorage[atomId] == null);
+			_columnStorage[atomId] = new();
+		}
+
+
 		//create columns
 		foreach (var type in ComponentTypes)
 		{
 			//_componentColumns.Add(type, new());
-			var atomId = Atom.GetId(type);
-			_atomIdsUsed.Add(atomId);
-			while (_columns.Count <= atomId)
-			{
-				_columns.Add(null);
-			}
-			_columns[atomId] = new();
-
+			_AllocColumnsHelper(type);
 		}
 		//add our special metadata component column
 		__DEBUG.Throw(CustomMetaComponentTypes.Contains(typeof(AllocMetadata)), "we must have allocMetadata to store info on each entity added");
 		foreach (var type in CustomMetaComponentTypes)
 		{
 			//_componentColumns.Add(type, new());	
-			var atomId = Atom.GetId(type);
-			_atomIdsUsed.Add(atomId);
-			while (_columns.Count <= atomId)
-			{
-				_columns.Add(null);
-			}
-			_columns[atomId] = new();
+			_AllocColumnsHelper(type);
 		}
 
 
@@ -525,10 +554,15 @@ public partial class Allocator : IDisposable //init logic
 		//create the first (blank) chunk for each column
 		_AllocNextChunk();
 
-		lock (_GLOBAL_LOOKUP)
-		{
-			_GLOBAL_LOOKUP.Add(_allocatorId, this);
-		}
+
+
+
+
+		//lock (_GLOBAL_LOOKUP)
+		//{
+		//	_GLOBAL_LOOKUP.Add(_allocatorId, this);
+		//}
+		_GLOBAL_LOOKUP.Span[_allocatorId] = this;
 	}
 	public bool IsDisposed { get; private set; } = false;
 	public void Dispose()
@@ -539,35 +573,39 @@ public partial class Allocator : IDisposable //init logic
 			return;
 		}
 		IsDisposed = true;
-		lock (_GLOBAL_LOOKUP)
-		{
-			_GLOBAL_LOOKUP.Remove(_allocatorId);
-		}
+		//lock (_GLOBAL_LOOKUP)
+		//{
+		//	_GLOBAL_LOOKUP.Remove(_allocatorId);
+		//}
+
+		var columns = _GetColumnsSpan();
 		//foreach (var (type, columnList) in _componentColumns)
 		//foreach (var columnList in _columns)
-		foreach(var atomId in _atomIdsUsed)
+		foreach (var atomId in _atomIdsUsed)
 		{
-			var columnList = _columns[atomId];
+			var columnList = columns[atomId];
 			foreach (var chunk in columnList)
 			{
 				chunk.Dispose();
 			}
 			columnList.Clear();
-			_columns[atomId] = null;
+			columns[atomId] = null;
 		}
 #if CHECKED
-		foreach (var columnList in _columns)
+		foreach (var columnList in columns)
 		{
 			__CHECKED.Throw(columnList == null);
 		}
 #endif
 
-			_columns.Clear();
-		_columns = null;
+		columns.Clear();
+		_columnStorage = null;
 		_free.Clear();
 		_free = null;
 		_lookup.Clear();
 		_lookup = null;
+		_GLOBAL_LOOKUP.FreeSlot(_allocatorId);
+		_allocatorId = -1;
 	}
 #if DEBUG
 	~Allocator()
@@ -588,12 +626,13 @@ public partial class Allocator //chunk management logic
 	{
 		void _AllocChunkHelper(Type type)
 		{
+			var columns = _GetColumnsSpan();
 			var atomId = Atom.GetId(type);
 			var chunkType = typeof(Chunk<>).MakeGenericType(type);
 			var chunk = Activator.CreateInstance(chunkType) as Chunk;
 			chunk.Initialize(_nextSlotTracker.chunkSize, _nextSlotTracker.nextAvailable.GetChunkLookupId(_allocatorId));
-			__DEBUG.Assert(_columns[atomId].Count == _nextSlotTracker.nextAvailable.columnChunkIndex, "somehow our column allocations is out of step with our next free tracking.");
-			_columns[atomId].Add(chunk);
+			__DEBUG.Assert(columns[atomId].Count == _nextSlotTracker.nextAvailable.columnChunkIndex, "somehow our column allocations is out of step with our next free tracking.");
+			columns[atomId].Add(chunk);
 		}
 
 		foreach (var type in ComponentTypes)
@@ -612,11 +651,12 @@ public partial class Allocator //chunk management logic
 	{
 		void _FreeChunkHelper(Type type)
 		{
+			var columns = _GetColumnsSpan();
 			var atomId = Atom.GetId(type);
-			var result = _columns[atomId]._TryTakeLast(out var chunk);
+			var result = columns[atomId]._TryTakeLast(out var chunk);
 			__DEBUG.Throw(result && chunk._count == 0);
 			chunk.Dispose();
-			__DEBUG.Assert(_columns[atomId].Count == _nextSlotTracker.nextAvailable.columnChunkIndex, "somehow our column allocations is out of step with our next free tracking.");
+			__DEBUG.Assert(columns[atomId].Count == _nextSlotTracker.nextAvailable.columnChunkIndex, "somehow our column allocations is out of step with our next free tracking.");
 		}
 		foreach (var type in ComponentTypes)
 		{
@@ -680,6 +720,10 @@ public partial class Allocator  //alloc/free/pack logic
 		}
 
 		__DEBUG.Assert(output.Length == externalIds.Length);
+
+
+		var columns = _GetColumnsSpan();
+
 		for (var i = 0; i < externalIds.Length; i++)
 		{
 			var externalId = externalIds[i];
@@ -710,7 +754,7 @@ public partial class Allocator  //alloc/free/pack logic
 			//loop all components zeroing out data and informing chunk of added item
 			foreach (var atomId in _atomIdsUsed)
 			{
-				_columns[atomId][slot.columnChunkIndex].OnAllocSlot(ref allocToken);
+				columns[atomId][slot.columnChunkIndex].OnAllocSlot(ref allocToken);
 			}
 
 
@@ -737,20 +781,22 @@ public partial class Allocator  //alloc/free/pack logic
 	}
 	private AllocToken _GenerateLiveAllocToken(long externalId, AllocSlot slot)
 	{
-		return new()
+		return new AllocToken
 		{
 			isAlive = true,
 			allocatorId = _allocatorId,
 			allocSlot = slot,
 			externalId = externalId,
 			packVersion = _packVersion,
+			allocatorVersion = _version,
 		};
 	}
 
 	private bool _TryQueryMetadata(AllocSlot slot, out AllocMetadata metadata)
 	{
+		var columns = _GetColumnsSpan();
 		var atomId = Atom.GetId<AllocMetadata>();
-		var columnList = _columns[atomId];//  _componentColumns[typeof(AllocMetadata)];
+		var columnList = columns[atomId];//  _componentColumns[typeof(AllocMetadata)];
 		if (columnList.Count < slot.columnChunkIndex)
 		{
 			metadata = default;
@@ -768,12 +814,13 @@ public partial class Allocator  //alloc/free/pack logic
 		var storedToken = _lookup[allocToken.externalId];
 		__ERROR.Throw(storedToken == allocToken);
 
+		var columns = _GetColumnsSpan();
 
 		//make sure proper chunk is referenced, and field
 		//foreach (var (type, columnList) in _componentColumns)
-		foreach(var atomId in _atomIdsUsed)
+		foreach (var atomId in _atomIdsUsed)
 		{
-			var columnChunk = _columns[atomId][allocToken.allocSlot.columnChunkIndex];
+			var columnChunk = columns[atomId][allocToken.allocSlot.columnChunkIndex];
 
 			__CHECKED.Throw(columnChunk._chunkLookupId == allocToken.GetChunkLookupId(), "lookup id mismatch");
 
@@ -823,7 +870,9 @@ public partial class Allocator  //alloc/free/pack logic
 		var allocArray = allocTokensArraySegment.Array;
 		Parallel.ForEach(_atomIdsUsed, (atomId, loopState) =>
 		{
-			var columnList = _columns[atomId];
+
+			var columns = _GetColumnsSpan();
+			var columnList = columns[atomId];
 			//var (type, columnList) = pair;
 			for (var i = 0; i < allocTokensArraySegment.Count; i++)
 			{
@@ -873,7 +922,9 @@ public partial class Allocator  //alloc/free/pack logic
 
 		//do a single alloc for that freeSlot componentColumns
 		//foreach (var (type, columnList) in _componentColumns)
-		foreach(var columnList in _columns)
+
+		var columns = _GetColumnsSpan();
+		foreach (var columnList in columns)
 		{
 			//copy data from old while allocting the slot
 			columnList[lowestFree.columnChunkIndex].OnPackSlot(ref newSlotAllocToken, ref highestAlive);
@@ -1119,7 +1170,7 @@ public record struct ChunkLookupId
 
 public class Chunk<TComponent> : Chunk
 {
-	public static Dictionary<long, Chunk<TComponent>> _GLOBAL_LOOKUP = new(100000);
+	public static Dictionary<long, Chunk<TComponent>> _GLOBAL_LOOKUP = new(0);
 
 	private MemoryOwner<TComponent> _storage;
 	public Memory<TComponent> Memory { get => _storage.Memory; }
@@ -1265,7 +1316,6 @@ public class AllocSlotList<T> : IDisposable
 	/// </summary>
 	public Span<T> Span
 	{
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		get => System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_storage);
 	}
 
@@ -1291,6 +1341,10 @@ public class AllocSlotList<T> : IDisposable
 		return slot;
 	}
 
+	/// <summary>
+	/// This will null the slot, no need to do so manually
+	/// </summary>
+	/// <param name="slot"></param>
 	public void FreeSlot(int slot)
 	{
 		lock (_freeSlots)
@@ -1315,7 +1369,7 @@ public class AllocSlotList<T> : IDisposable
 					_freeSlots.Sort();
 
 					//while the last free slot is the last slot in storage, remove both
-					while (_freeSlots[_freeSlots.Count - 1] == _storage.Count - 1)
+					while (_freeSlots.Count > 0 && _freeSlots[_freeSlots.Count - 1] == _storage.Count - 1)
 					{
 
 						var result = _freeSlots._TryTakeLast(out var removedFreeSlot);
