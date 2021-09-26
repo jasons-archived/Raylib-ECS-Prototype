@@ -12,7 +12,7 @@ namespace DumDum.Bcl.Collections._unused
 	[NotThreadSafe]
 	public class ResizableArray<TItem>
 	{
-		private TItem[] _storage;
+		public TItem[] _storage;
 		public int Length { get; protected set; }
 		private RaceCheck _check;
 
@@ -49,7 +49,7 @@ namespace DumDum.Bcl.Collections._unused
 		{
 			if (index >= Length)
 			{
-				Grow(index - Length);
+				Grow(index - (Length-1));
 				this[index] = newCtor();
 			}
 			return this[index];

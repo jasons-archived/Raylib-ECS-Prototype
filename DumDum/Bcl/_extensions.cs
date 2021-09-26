@@ -58,6 +58,20 @@ public static class zz__Extensions_List
 		target.RemoveAt(target.Count - 1);
 	}
 
+	/// <summary>
+	/// expands the list to the target capacity if it's not already, then sets the value at that index
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
+	/// <param name="target"></param>
+	public static void _ExpandAndSet<T>(this IList<T> target, int index,T value)
+	{
+		while (target.Count <= index)
+		{
+			target.Add(default(T));
+		}
+		target[index] = value;
+	}
+
 	public static void _Randomize<T>(this IList<T> target)
 	{
 		//lock (_rand)
