@@ -10,7 +10,7 @@ namespace DumDum.Bcl.Collections._unused
 	/// </summary>
 	/// <typeparam name="TItem"></typeparam>
 	[NotThreadSafe]
-	public class ResizableArray<TItem>
+	public class ResizableArray<TItem> where TItem:class
 	{
 		public TItem[] _storage;
 		public int Length { get; protected set; }
@@ -49,7 +49,9 @@ namespace DumDum.Bcl.Collections._unused
 		{
 			if (index >= Length)
 			{
-				Grow(index - (Length-1));
+				Grow(index - (Length-1));				
+			}
+			if(this[index] == null){
 				this[index] = newCtor();
 			}
 			return this[index];

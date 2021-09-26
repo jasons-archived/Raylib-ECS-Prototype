@@ -472,7 +472,7 @@ public unsafe struct StructArray100<T> where T : unmanaged
 public static class ParallelFor
 {
 
-	private static SpanOwner<(int startInclusive, int length)> _Range_ComputeBatches(int start, int length, float batchSizeMultipler)
+	private static SpanPool<(int startInclusive, int endExclusive)> _Range_ComputeBatches(int start, int length, float batchSizeMultipler)
 	{
 		__ERROR.Throw(batchSizeMultipler > 0, $"{nameof(batchSizeMultipler)} should be greater than zero");
 		var endExclusive = start + length;
@@ -499,7 +499,7 @@ public static class ParallelFor
 		}
 
 
-		var owner = SpanOwner<(int startInclusive, int length)>.Allocate(batchCount);
+		var owner = SpanPool<(int startInclusive, int endExclusive)>.Allocate(batchCount);
 		var span = owner.Span;
 
 		//calculate batches and put into span
@@ -513,7 +513,7 @@ public static class ParallelFor
 				__ERROR.Throw(thisBatchLength == batchSize);
 				//do work:  batchStartInclusive, batchSize
 				didCount += batchSize;
-				span[loopIndex] = (batchStartInclusive, batchSize);
+				span[loopIndex] = (batchStartInclusive, batchEndExclusive);
 
 				//increment
 				batchStartInclusive += batchSize;
@@ -521,20 +521,21 @@ public static class ParallelFor
 				loopIndex++;
 			}
 			var remainder = endExclusive - batchStartInclusive;
+			batchEndExclusive = batchStartInclusive + remainder;
 			__ERROR.Throw(remainder < batchSize);
 			if (remainder > 0)
 			{
 				//do last part:   batchStartInclusive, remainder
 				didCount += remainder;
-				span[loopIndex] = (batchStartInclusive, remainder);
+				span[loopIndex] = (batchStartInclusive, batchEndExclusive);
 			}
 			__ERROR.Throw(didCount == length);
 		}
 
 		return owner;
 	}
-	public static ValueTask Range(int start, int length, Func<(int start, int length), ValueTask> action) => Range(start, length, 1f, action);
-	public static ValueTask Range(int start, int length, float batchSizeMultipler, Func<(int start, int length), ValueTask> action)
+	public static ValueTask Range(int start, int length, Func<int, int, ValueTask> action) => Range(start, length, 1f, action);
+	public static ValueTask Range(int start, int length, float batchSizeMultipler, Func<int, int, ValueTask> action)
 	{
 		if (length == 0)
 		{
@@ -544,9 +545,9 @@ public static class ParallelFor
 
 		return _Range_ExecuteAction(owner.DangerousGetArray(), action);
 	}
-	private static async ValueTask _Range_ExecuteAction(ArraySegment<(int start, int length)> spanOwnerDangerousArray, Func<(int start, int length), ValueTask> action)
+	private static async ValueTask _Range_ExecuteAction(ArraySegment<(int start, int endExclusive)> spanOwnerDangerousArray, Func<int, int, ValueTask> action)
 	{
-		await Parallel.ForEachAsync<(int start, int length)>(spanOwnerDangerousArray, (batch, cancelToken) =>Unsafe.AsRef(in action).Invoke(batch));
+		await Parallel.ForEachAsync(spanOwnerDangerousArray, (batch, cancelToken) =>Unsafe.AsRef(in action).Invoke(batch.start,batch.endExclusive));
 	}
 
 	public static Task Each<T>(IEnumerable<T> source, Func<T, CancellationToken, ValueTask> action)
@@ -563,3 +564,71 @@ public static class ParallelFor
 
 }
 
+
+public ref struct SpanPool<T>
+{
+	public static SpanPool<T> Allocate(int size)
+	{
+		return new SpanPool<T>(SpanOwner<T>.Allocate(size));
+	}
+
+	public SpanPool(SpanOwner<T> owner)
+	{
+		_owner = owner;
+#if CHECKED
+		_disposeCheck = new();
+#endif
+	}
+
+	public SpanOwner<T> _owner;
+
+	public Span<T> Span { get => _owner.Span; }
+	public ArraySegment<T> DangerousGetArray()
+	{
+		return _owner.DangerousGetArray();
+	}
+
+
+#if CHECKED
+	private DisposeSentinel _disposeCheck;
+#endif
+	public void Dispose()
+	{
+		_owner.Dispose();
+
+#if CHECKED
+		_disposeCheck.Dispose();
+#endif
+	}
+
+
+}
+
+
+public class DisposeSentinel : IDisposable
+{
+
+	public bool IsDisposed { get; private set; }
+
+	public void Dispose()
+	{
+		if (IsDisposed)
+		{
+			return;
+		}
+		IsDisposed = true;
+	}
+	public string CtorStackTrace { get; private set; }
+	public DisposeSentinel()
+	{
+		CtorStackTrace = System.Environment.StackTrace;
+	}
+
+	~DisposeSentinel()
+	{
+		if (!IsDisposed)
+		{
+			__ERROR.Assert(false, "Did not call .Dispose() of the embedding type properly.    Callstack: " + CtorStackTrace);
+		}
+	}
+}

@@ -32,11 +32,18 @@ using DumDum.Engine.Sim;
 
 Allocator.__TEST_Unit_SingleAllocator();
 
-Allocator.__TEST_Unit_SeriallAllocators();
+//Allocator.__TEST_Unit_SeriallAllocators();
+//Allocator.__TEST_Unit_SeriallAllocators();
+//Allocator.__TEST_Unit_SeriallAllocators();
+//Allocator.__TEST_Unit_SeriallAllocators();
+
+
+await Allocator.__TEST_Unit_ParallelAllocators();
 
 
 
-Allocator.__TEST_Unit_ParallelAllocators();
+
+System.Environment.Exit(0);
 
 var manager = new SimManager() { };
 

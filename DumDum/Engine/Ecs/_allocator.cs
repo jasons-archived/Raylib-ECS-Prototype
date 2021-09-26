@@ -232,26 +232,46 @@ public record struct AllocSlot : IComparable<AllocSlot>
 	}
 }
 
+
 public partial class Allocator //unit test
 {
 
 
-	[Conditional("TEST")]
-	public static unsafe void __TEST_Unit_ParallelAllocators()
+	public static async Task __TEST_Unit_ParallelAllocators()
 	{
 		//for (var i = 0; i < 1000; i++)
 		//{
 		//	Task.Run(() => __TEST_Unit_SingleAllocator());
 		//}
 
-		var result = Parallel.For(0, 10000, (index) => __TEST_Unit_SingleAllocator());
-		__ERROR.Throw(result.IsCompleted);
+
+
+
+
+		//var result = Parallel.For(0, 10000, (index) => __TEST_Unit_SingleAllocator());
+		//__ERROR.Throw(result.IsCompleted);
+
+
+
+		await ParallelFor.Range(0, 100000, (start,endExclusive) =>
+		{
+			for (var i = start; i < endExclusive; i++)
+			{
+				__TEST_Unit_SingleAllocator();
+			}
+
+			return ValueTask.CompletedTask;
+
+		});
+
+
+
 	}
 	[Conditional("TEST")]
 	public static unsafe void __TEST_Unit_SeriallAllocators()
 	{
-		var count = 10000;
-		var allocOwner = SpanOwner<Allocator>.Allocate(count);
+		var count = 1000;
+		using var allocOwner = SpanPool<Allocator>.Allocate(count);
 		var allocs = allocOwner.Span;
 		for (var i = 0; i < count; i++)
 		{
@@ -261,8 +281,10 @@ public partial class Allocator //unit test
 		{
 			allocs[i].Dispose();
 		}
+		allocs.Clear();
 		//var result = Parallel.For(0, 10000, (index) => __TEST_Unit_SingleAllocator());
 		//__ERROR.Throw(result.IsCompleted);
+
 	}
 
 	[Conditional("TEST")]
@@ -285,7 +307,7 @@ public partial class Allocator //unit test
 		};
 		allocator.Initialize();
 
-		var externalIdsOwner = SpanOwner<long>.Allocate(__.Rand.Next(0, 1000));
+		using var externalIdsOwner = SpanPool<long>.Allocate(__.Rand.Next(0, 1000));
 		var set = new HashSet<long>();
 		var externalIds = externalIdsOwner.Span;
 		while (set.Count < externalIds.Length)
@@ -299,9 +321,143 @@ public partial class Allocator //unit test
 			count++;
 		}
 		//Span<long> externalIds = stackalloc long[] { 2, 4, 8, 7, -2 };
-		var tokensOwner = SpanOwner<AllocToken>.Allocate(externalIds.Length);
+		using var tokensOwner = SpanPool<AllocToken>.Allocate(externalIds.Length);
 		var tokens = tokensOwner.Span;
 		allocator.Alloc(externalIds, tokens);
+		return allocator;
+	}
+
+	private static unsafe Allocator _TEST_HELPER_CreateEditAllocator()
+	{
+		var allocator = new Allocator()
+		{
+			AutoPack = __.Rand._NextBoolean(),
+			ChunkSize = __.Rand.Next(1, 100),
+			ComponentTypes = new() { typeof(int), typeof(string) },
+
+
+		};
+		allocator.Initialize();
+
+		using var externalIdsOwner = SpanPool<long>.Allocate(__.Rand.Next(0, 1000));
+		var set = new HashSet<long>();
+		var externalIds = externalIdsOwner.Span;
+		while (set.Count < externalIds.Length)
+		{
+			set.Add(__.Rand.NextInt64());
+		}
+
+		var count = 0;
+		foreach (var id in set)
+		{
+			externalIds[count] = id;
+			count++;
+		}
+		//Span<long> externalIds = stackalloc long[] { 2, 4, 8, 7, -2 };
+		using var tokensOwner = SpanPool<AllocToken>.Allocate(externalIds.Length);
+		var tokens = tokensOwner.Span;
+		allocator.Alloc(externalIds, tokens);
+
+
+		//test edits
+		for(var i=0;i<tokens.Length; i++)
+		{
+			var token = tokens[i];
+
+
+			ref var num = ref token.GetComponentWriteRef<int>();
+			__ERROR.Throw(num == 0);
+			num = i;
+			var numRead = token.GetComponentReadRef<int>();
+			__ERROR.Throw(numRead == i);
+
+			num = i + 1;
+			numRead = token.GetComponentReadRef<int>();
+			__ERROR.Throw(numRead == i+1);
+
+
+			ref var myStr = ref token.GetComponentWriteRef<string>();
+			__ERROR.Throw(myStr == null);
+			myStr = $"hello {i}";
+			__ERROR.Throw(token.GetComponentReadRef<string>() == myStr);
+
+
+			ref var numExId = ref token.GetComponentWriteRef<int>();
+			__ERROR.Throw(num == numExId);
+			numExId =(int)token.externalId;
+			__ERROR.Throw(num == numExId);
+
+		}
+
+		//split into 2 groups
+		var evenSet = new HashSet<long>();
+		var oddSet = new HashSet<long>();
+
+		foreach(var externalId in set)
+		{
+			if (externalId % 2 == 0)
+			{
+				evenSet.Add(externalId);
+			}
+			else
+			{
+				oddSet.Add(externalId);
+			}
+		}
+
+
+		//delete odds
+		allocator.Free(oddSet.ToArray());
+
+		//verify that evens still here
+		for (var i = 0; i < tokens.Length; i++)
+		{
+			var token = tokens[i];
+			if (token.externalId % 2 != 0)
+			{
+				continue;
+			}
+
+			var num = token.GetComponentReadRef<int>();
+			__ERROR.Throw(num == token.externalId);
+
+			__ERROR.Throw(token.GetComponentReadRef<string>() == $"hello {i}");
+
+
+		}
+		//verify no odds
+		foreach(var (externalId, allocToken) in allocator._lookup)
+		{
+			ref var numExId = ref allocToken.GetComponentWriteRef<int>();
+			__ERROR.Throw(numExId % 2 == 0);
+			__ERROR.Throw(allocToken.externalId % 2 == 0);
+			__ERROR.Throw(allocToken.GetComponentReadRef<string>().StartsWith("hello"));
+		}
+		//add odds
+		using var oddTokens = SpanPool<AllocToken>.Allocate(oddSet.Count);
+		var oddSpan = oddTokens.Span;
+		allocator.Alloc(oddSet.ToArray(),oddSpan);
+
+		//delete evens
+		allocator.Free(evenSet.ToArray());
+
+		//verify only odds
+		foreach (var (externalId, allocToken) in allocator._lookup)
+		{
+			ref var numExId = ref allocToken.GetComponentWriteRef<int>();
+			__ERROR.Throw(numExId % 2 == 1);
+			__ERROR.Throw(allocToken.externalId % 2 == 1);
+			__ERROR.Throw(allocToken.GetComponentReadRef<string>().StartsWith("hello"));
+		}
+
+		//delete odds again
+		allocator.Free(oddSet.ToArray());
+
+
+		//verify empty
+		__ERROR.Throw(allocator._lookup.Count == 0);
+
+
 		return allocator;
 	}
 }
@@ -574,6 +730,9 @@ public partial class Allocator : IDisposable //init logic
 		_GLOBAL_LOOKUP.Span[_allocatorId] = this;
 	}
 	public bool IsDisposed { get; private set; } = false;
+#if CHECKED
+	private DisposeSentinel _disposeCheck = new();
+#endif
 	public void Dispose()
 	{
 		if (IsDisposed)
@@ -582,6 +741,10 @@ public partial class Allocator : IDisposable //init logic
 			return;
 		}
 		IsDisposed = true;
+#if CHECKED
+		_disposeCheck.Dispose();
+#endif
+
 		//lock (_GLOBAL_LOOKUP)
 		//{
 		//	_GLOBAL_LOOKUP.Remove(_allocatorId);
@@ -614,6 +777,7 @@ public partial class Allocator : IDisposable //init logic
 		_lookup.Clear();
 		_lookup = null;
 		_GLOBAL_LOOKUP.FreeSlot(_allocatorId);
+		__ERROR.Throw(_GLOBAL_LOOKUP.Span.Length<=_allocatorId || _GLOBAL_LOOKUP.Span[_allocatorId] == null);
 		_allocatorId = -1;
 	}
 #if DEBUG
@@ -864,7 +1028,7 @@ public partial class Allocator  //alloc/free/pack logic
 	/// </summary>
 	public unsafe void Free(Span<long> externalIds)
 	{
-		using var so_AllocTokens = SpanOwner<AllocToken>.Allocate(externalIds.Length);
+		using var so_AllocTokens = SpanPool<AllocToken>.Allocate(externalIds.Length);
 		var allocTokens = so_AllocTokens.Span;
 		//get tokens for freeing
 		for (var i = 0; i < externalIds.Length; i++)
@@ -1155,7 +1319,6 @@ public abstract class Chunk : IDisposable
 	public int _writeVersion;
 
 
-
 	/// <summary>
 	/// delete from global chunk store
 	/// </summary>
@@ -1205,6 +1368,10 @@ public class Chunk<TComponent> : Chunk
 	/// this is an array obtained by a object pool (cache).  It is longer than actually needed.  Do not use the extra slots.  always get length from _storage or Span
 	/// </summary>
 	private TComponent[] _DANGEROUS_refStorage;
+
+#if CHECKED
+	private DisposeSentinel _disposeCheck = new();
+#endif
 	public bool IsDisposed { get; private set; } = false;
 	public override void Dispose()
 	{
@@ -1214,6 +1381,10 @@ public class Chunk<TComponent> : Chunk
 			return;
 		}
 		IsDisposed = true;
+
+#if CHECKED
+		_disposeCheck.Dispose();
+#endif
 		//lock (_GLOBAL_LOOKUP)
 		//{
 		//	var result = _GLOBAL_LOOKUP._TryRemove(_chunkLookupId, out _);
@@ -1362,7 +1533,7 @@ public class Chunk<TComponent> : Chunk
 }
 
 
-public class AllocSlotList<T> : IDisposable
+public class AllocSlotList<T> : IDisposable where T:class
 {
 	private List<T> _storage = new();
 	public int _count;
@@ -1394,6 +1565,7 @@ public class AllocSlotList<T> : IDisposable
 				_count++;
 			}
 		}
+		__DEBUG.Throw(_storage[slot]==default(T));
 		return slot;
 	}
 
@@ -1407,30 +1579,32 @@ public class AllocSlotList<T> : IDisposable
 		{
 			_freeSlots.Add(slot);
 
-		}
-		lock (_storage)
-		{
-			_count--;
-			_storage[slot] = default(T);
-
-			//try to pack if possible
-			if (slot == _storage.Count - 1)
+			lock (_storage)
 			{
-				//the slot we are freeing is the last slot in the _storage array.    
-				lock (_freeSlots)
+				_count--;
+				_storage[slot] = default(T);
+
+
+				__DEBUG.Throw(_storage[slot] == default(T));
+				//try to pack if possible
+				if (slot == _storage.Count - 1)
 				{
-					//now have exclusive lock on _freeSlots and _storage
-
-					//sort free so highest at end
-					_freeSlots.Sort();
-
-					//while the last free slot is the last slot in storage, remove both
-					while (_freeSlots.Count > 0 && _freeSlots[_freeSlots.Count - 1] == _storage.Count - 1)
+					//the slot we are freeing is the last slot in the _storage array.    
+					lock (_freeSlots)
 					{
+						//now have exclusive lock on _freeSlots and _storage
 
-						var result = _freeSlots._TryTakeLast(out var removedFreeSlot);
-						__DEBUG.Throw(result && removedFreeSlot == _storage.Count - 1);
-						_storage._RemoveLast();
+						//sort free so highest at end
+						_freeSlots.Sort();
+
+						//while the last free slot is the last slot in storage, remove both
+						while (_freeSlots.Count > 0 && _freeSlots[_freeSlots.Count - 1] == _storage.Count - 1)
+						{
+
+							var result = _freeSlots._TryTakeLast(out var removedFreeSlot);
+							__DEBUG.Throw(result && removedFreeSlot == _storage.Count - 1);
+							_storage._RemoveLast();
+						}
 					}
 				}
 			}

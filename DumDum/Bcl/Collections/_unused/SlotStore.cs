@@ -8,7 +8,7 @@ namespace DumDum.Bcl.Collections._unused
 	/// <para>thread safe writes and non-blocking reads if not using `ref return` accessors</para>
 	/// </summary>
 	/// <typeparam name="T"></typeparam>
-	public class SlotStore<T>
+	public class SlotStore<T> where T:class
 	{
 
 
