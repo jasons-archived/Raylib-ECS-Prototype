@@ -474,7 +474,7 @@ public static class ParallelFor
 
 	private static SpanPool<(int startInclusive, int endExclusive)> _Range_ComputeBatches(int start, int length, float batchSizeMultipler)
 	{
-		__ERROR.Throw(batchSizeMultipler > 0, $"{nameof(batchSizeMultipler)} should be greater than zero");
+		__ERROR.Throw(batchSizeMultipler >= 0, $"{nameof(batchSizeMultipler)} should be greater or equal to than zero");
 		var endExclusive = start + length;
 
 		var didCount = 0;
@@ -534,7 +534,24 @@ public static class ParallelFor
 
 		return owner;
 	}
+	/// <summary>
+	/// Range is ideal for cache coherency and lowest overhead.  If you require an action per element, it can behave like `Parallel.For` (set batchSizeMultipler=0).
+	/// </summary>
+	/// <param name="action">(start,endExclusive)=>ValueTask</param>
 	public static ValueTask Range(int start, int length, Func<int, int, ValueTask> action) => Range(start, length, 1f, action);
+	/// <summary>
+	/// Range is ideal for cache coherency and lowest overhead.  If you require an action per element, it can behave like `Parallel.For` (set batchSizeMultipler=0).
+	/// </summary>
+	/// <param name="start"></param>
+	/// <param name="length"></param>
+	/// <param name="batchSizeMultipler">The range is split into batches, with each batch being the total/cpu count.  The number of (and size of) batches can be modified by this parameter.
+	/// <para>1 = The default. 1 batch per cpu.  Generally a good balance as it will utilize all cores if available, while not overwhelming the thread pool (allowing other work a fair chance in backlog situations) </para>
+	/// <para>0.5 = 2 batches per cpu, with each batch half sized.   useful if the work required for each element is varied. </para>
+	/// <para>0 = each batch is 1 element.  useful if parallelizing independent systems that are long running and use dissimilar regions of memory.</para>
+	/// <para>2 = double sized batches, utilizing a maximum of half cpu cores.  Useful for offering parallel work while reducing multicore overhead.</para>
+	/// <para>4 = quad size batches, use 1/4 cpu cores at max.</para></param>
+	/// <param name="action">(start,endExclusive)=>ValueTask</param>
+	/// <returns></returns>
 	public static ValueTask Range(int start, int length, float batchSizeMultipler, Func<int, int, ValueTask> action)
 	{
 		if (length == 0)

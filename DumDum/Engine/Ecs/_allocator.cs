@@ -92,7 +92,7 @@ public readonly record struct AllocToken : IComparable<AllocToken>
 	}
 	public Chunk<T> GetContainingChunk<T>()
 	{
-		_CHECKED_VerifyInstance<T>();
+		//_CHECKED_VerifyInstance<T>();
 		//var chunkLookupId = GetChunkLookupId();
 
 		//lock (Chunk<T>._GLOBAL_LOOKUP)
@@ -138,10 +138,11 @@ public readonly record struct AllocToken : IComparable<AllocToken>
 		//get chunk via the allocator, where the default way is direct through the Chunk<T>._GLOBAL_LOOKUP
 		var atomId = Allocator.Atom.GetId<T>();
 
-		//var chunk = GetAllocator()._componentColumns[typeof(AllocMetadata)][allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
-		var chunk = GetAllocator()._GetColumnsSpan()[atomId][allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
-		__CHECKED.Throw(GetContainingChunk<AllocMetadata>() == chunk, "chunk lookup between both techniques does not match");
-		__CHECKED.Throw(this == chunk.Span[allocSlot.chunkRowIndex].allocToken);
+		//var chunk = GetAllocator()._componentColumns[typeof(AllocMetadata)][allocSlot.columnChunkIndex] as Chunk<T>;
+		var chunk = GetAllocator()._GetColumnsSpan()[atomId][allocSlot.columnChunkIndex] as Chunk<T>;
+		__CHECKED.Throw(GetContainingChunk<T>() == chunk, "chunk lookup between both techniques does not match");
+		var allocMetaChunk = GetContainingChunk<AllocMetadata>();
+		__CHECKED.Throw(this == allocMetaChunk.Span[allocSlot.chunkRowIndex].allocToken);
 	}
 
 	public int CompareTo(AllocToken other)
@@ -251,18 +252,22 @@ public partial class Allocator //unit test
 		//var result = Parallel.For(0, 10000, (index) => __TEST_Unit_SingleAllocator());
 		//__ERROR.Throw(result.IsCompleted);
 
-
-
-		await ParallelFor.Range(0, 100000, (start,endExclusive) =>
+		var PARALLEL_LOOPS = 1000;
+		var execCount = 0;
+		await ParallelFor.Range(0, PARALLEL_LOOPS, (start,endExclusive) =>
 		{
+			var tempCount = 0;
 			for (var i = start; i < endExclusive; i++)
 			{
 				__TEST_Unit_SingleAllocator();
+				tempCount++;
 			}
+			Interlocked.Add(ref execCount, tempCount);
 
 			return ValueTask.CompletedTask;
 
 		});
+		__ERROR.Throw(execCount == PARALLEL_LOOPS);
 
 
 
@@ -291,6 +296,15 @@ public partial class Allocator //unit test
 	public static unsafe void __TEST_Unit_SingleAllocator()
 	{
 		var allocator = _TEST_HELPER_CreateAllocator();
+
+		allocator.Dispose();
+	}
+
+
+	[Conditional("TEST")]
+	public static unsafe void __TEST_Unit_SingleAllocator_AndEdit()
+	{
+		var allocator = _TEST_HELPER_CreateAndEditAllocator();
 
 		allocator.Dispose();
 	}
@@ -327,7 +341,7 @@ public partial class Allocator //unit test
 		return allocator;
 	}
 
-	private static unsafe Allocator _TEST_HELPER_CreateEditAllocator()
+	private static unsafe Allocator _TEST_HELPER_CreateAndEditAllocator()
 	{
 		var allocator = new Allocator()
 		{
@@ -1104,6 +1118,13 @@ public partial class Allocator  //alloc/free/pack logic
 		var columns = _GetColumnsSpan();
 		foreach (var columnList in columns)
 		{
+			if (columnList == null)
+			{
+				//not our atom
+				__CHECKED.Throw(_atomIdsUsed.Contains())
+			}
+
+
 			//copy data from old while allocting the slot
 			columnList[lowestFree.columnChunkIndex].OnPackSlot(ref newSlotAllocToken, ref highestAlive);
 			//deallocate old slot componentColumns

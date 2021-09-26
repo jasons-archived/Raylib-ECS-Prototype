@@ -31,6 +31,7 @@ using DumDum.Engine.Sim;
 //Console.WriteLine("hi");
 
 Allocator.__TEST_Unit_SingleAllocator();
+Allocator.__TEST_Unit_SingleAllocator_AndEdit();
 
 //Allocator.__TEST_Unit_SeriallAllocators();
 //Allocator.__TEST_Unit_SeriallAllocators();
