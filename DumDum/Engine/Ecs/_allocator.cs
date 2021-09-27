@@ -79,14 +79,20 @@ public readonly record struct AllocToken : IComparable<AllocToken>
 
 	public ref T GetComponentWriteRef<T>()
 	{
-		_CHECKED_VerifyInstance<T>();
+		var (result,reason) = GetAllocator().CheckIsValid(this);
+		__ERROR.Throw(result, reason);
+
+		//_CHECKED_VerifyInstance<T>();
 		var chunk = GetContainingChunk<T>();
 		return ref chunk.GetWriteRef(this);
 
 	}
 	public ref readonly T GetComponentReadRef<T>()
 	{
-		_CHECKED_VerifyInstance<T>();
+		var (result, reason) = GetAllocator().CheckIsValid(this);
+		__ERROR.Throw(result, reason);
+
+		//_CHECKED_VerifyInstance<T>();
 		var chunk = GetContainingChunk<T>();
 		return ref chunk.GetReadRef(this);
 	}
@@ -117,33 +123,38 @@ public readonly record struct AllocToken : IComparable<AllocToken>
 
 
 	}
+	/// <summary>
+	/// Get allocator this token is associated with.  If a null is returned or an exception is thrown, it is likely our AllocToken is out of date.
+	/// </summary>
 	public Allocator GetAllocator()
 	{
-		var toReturn = Allocator._GLOBAL_LOOKUP.Span[allocatorId];
-		__ERROR.Throw(toReturn != null && toReturn._version == allocatorVersion, "alloc token seems to be expired");
-		__CHECKED.Throw(toReturn._allocatorId == allocatorId);
+		return Allocator._GLOBAL_LOOKUP.Span[allocatorId];
 
-		return toReturn;
-	}
-	[Conditional("CHECKED")]
-	private void _CHECKED_VerifyInstance<T>()
-	{
-		if (typeof(T) == typeof(AllocMetadata))
-		{
-			//otherwise can cause infinite recursion
-			return;
-		}
-		ref readonly var allocMetadata = ref GetComponentReadRef<AllocMetadata>();
-		__CHECKED.Throw(allocMetadata.allocToken == this, "mismatch");
-		//get chunk via the allocator, where the default way is direct through the Chunk<T>._GLOBAL_LOOKUP
-		var atomId = Allocator.Atom.GetId<T>();
+		//var toReturn = Allocator._GLOBAL_LOOKUP.Span[allocatorId];
+		//__ERROR.Throw(toReturn != null && toReturn._version == allocatorVersion, "alloc token seems to be expired");
+		//__CHECKED.Throw(toReturn._allocatorId == allocatorId);
 
-		//var chunk = GetAllocator()._componentColumns[typeof(AllocMetadata)][allocSlot.columnChunkIndex] as Chunk<T>;
-		var chunk = GetAllocator()._GetColumnsSpan()[atomId][allocSlot.chunkIndex] as Chunk<T>;
-		__CHECKED.Throw(GetContainingChunk<T>() == chunk, "chunk lookup between both techniques does not match");
-		var allocMetaChunk = GetContainingChunk<AllocMetadata>();
-		__CHECKED.Throw(this == allocMetaChunk.Span[allocSlot.rowSlotIndex].allocToken);
+		//return toReturn;
 	}
+	//[Conditional("CHECKED")]
+	//private void _CHECKED_VerifyInstance<T>()
+	//{
+	//	if (typeof(T) == typeof(AllocMetadata))
+	//	{
+	//		//otherwise can cause infinite recursion
+	//		return;
+	//	}
+	//	ref readonly var allocMetadata = ref GetComponentReadRef<AllocMetadata>();
+	//	__CHECKED.Throw(allocMetadata.allocToken == this, "mismatch");
+	//	//get chunk via the allocator, where the default way is direct through the Chunk<T>._GLOBAL_LOOKUP
+	//	var atomId = Allocator.Atom.GetId<T>();
+
+	//	//var chunk = GetAllocator()._componentColumns[typeof(AllocMetadata)][allocSlot.columnChunkIndex] as Chunk<T>;
+	//	var chunk = GetAllocator()._GetColumnsSpan()[atomId][allocSlot.chunkIndex] as Chunk<T>;
+	//	__CHECKED.Throw(GetContainingChunk<T>() == chunk, "chunk lookup between both techniques does not match");
+	//	var allocMetaChunk = GetContainingChunk<AllocMetadata>();
+	//	__CHECKED.Throw(this == allocMetaChunk.Span[allocSlot.rowSlotIndex].allocToken);
+	//}
 
 	public int CompareTo(AllocToken other)
 	{
@@ -286,7 +297,7 @@ public partial class Allocator //unit test
 		var allocs = allocOwner.Span;
 		for (var i = 0; i < count; i++)
 		{
-			allocs[i] = _TEST_HELPER_CreateAllocator();
+			allocs[i] = _TEST_HELPER_CreateAndEditAllocator();
 		}
 		for (var i = 0; i < count; i++)
 		{
@@ -659,13 +670,15 @@ public partial class Allocator : IDisposable //init logic
 	}
 	public Chunk<T> GetChunk<T>(ref AllocToken allocToken)
 	{
-		__CHECKED_VerifyAllocToken(ref allocToken);
+		var (result, reason) = CheckIsValid(ref allocToken);
+		__ERROR.Throw(result, reason);
+
+		__CHECKED_INTERNAL_VerifyAllocToken(ref allocToken);
 		var column = GetColumn<T>();
 		return column[allocToken.allocSlot.chunkIndex] as Chunk<T>;
 	}
 	public ref T GetComponentRef<T>(ref AllocToken allocToken)
 	{
-		__CHECKED_VerifyAllocToken(ref allocToken);
 		var chunk = GetChunk<T>(ref allocToken);
 		return ref chunk.Span[allocToken.allocSlot.rowSlotIndex];
 	}
@@ -1032,13 +1045,19 @@ public partial class Allocator  //alloc/free/pack logic
 				allocToken = allocToken,
 				componentCount = _atomIdsUsed.Count,
 			};
-			__CHECKED.Throw(allocMetadata == allocToken.GetComponentReadRef<AllocMetadata>(), "component reference verification failed.  why?");
 
 
 			//add to lookup
 			_lookup.Add(externalId, allocToken);
 
-			__CHECKED_VerifyAllocToken(ref allocToken);
+
+			__CHECKED.Throw(allocMetadata == allocToken.GetComponentReadRef<AllocMetadata>(), "component reference verification failed.  why?");
+
+#if CHECKED
+			var (result, reason) = CheckIsValid(ref allocToken);
+			__ERROR.Throw(result, reason);
+#endif
+			__CHECKED_INTERNAL_VerifyAllocToken(ref allocToken);
 		}
 
 
@@ -1056,11 +1075,42 @@ public partial class Allocator  //alloc/free/pack logic
 		};
 	}
 
-
-
-	[Conditional("CHECKED")]
-	public void __CHECKED_VerifyAllocToken(ref AllocToken allocToken)
+	public (bool result, string reason) CheckIsValid(AllocToken allocToken)
 	{
+		unsafe
+		{
+			return CheckIsValid(ref *&allocToken);
+		}
+	}
+	public (bool result, string reason) CheckIsValid(ref AllocToken allocToken)
+	{
+		var result = true;
+		string reason = null;
+		if (allocToken.isAlive == false)
+		{
+			reason = "allocToken is not alive";
+			result= false;
+		}else 		if(_packVersion != allocToken.packVersion)
+		{
+			reason = "wrong packVersion.  aquire a new AllocToken every update from Archetype.GetAllocToken() with AutoPack=true. But for best performance over many entities, use Archetype.Query()";
+			result = false;
+		}
+
+		__CHECKED_INTERNAL_VerifyAllocToken(ref allocToken);
+
+		return (result, reason);
+	}
+
+
+	/// <summary>
+	/// verify engine state internally.  Use `CheckIsValid()` to verify user input
+	/// </summary>
+	/// <param name="allocToken"></param>
+	[Conditional("CHECKED")]
+	public void __CHECKED_INTERNAL_VerifyAllocToken(ref AllocToken allocToken)
+	{
+		
+		//__ERROR.Throw(_packVersion == allocToken.packVersion, "allocToken out of date.  a pack occured.  you need to reaquire the token every frame if AutoPack==true");
 		var storedToken = _lookup[allocToken.externalId];
 		__ERROR.Throw(storedToken == allocToken);
 
@@ -1110,7 +1160,10 @@ public partial class Allocator  //alloc/free/pack logic
 		{
 			allocTokens[i] = _lookup[externalIds[i]];
 			__CHECKED.Throw(allocTokens[i].externalId == externalIds[i]);
-			__CHECKED_VerifyAllocToken(ref allocTokens[i]);
+			var (result, reason) = CheckIsValid(ref allocTokens[i]);
+			__ERROR.Throw(result, reason);
+
+			__CHECKED_INTERNAL_VerifyAllocToken(ref allocTokens[i]);
 			//remove them now??  maybe will cause further issues with verification
 			_lookup.Remove(externalIds[i]);
 		}
@@ -1162,7 +1215,7 @@ public partial class Allocator  //alloc/free/pack logic
 	{
 		//verify freeSlot is free, and allocToken is valid
 #if CHECKED
-		__CHECKED_VerifyAllocToken(ref highestAlive);
+		__CHECKED_INTERNAL_VerifyAllocToken(ref highestAlive);
 		__CHECKED.Assert(highestAlive.allocSlot > lowestFree);
 		if (!__TryQueryMetadata(lowestFree, out var freeSlotMeta))
 		{
@@ -1201,7 +1254,7 @@ public partial class Allocator  //alloc/free/pack logic
 		_lookup[newSlotAllocToken.externalId] = newSlotAllocToken;
 
 		//make sure our newly moved is all setup properly
-		__CHECKED_VerifyAllocToken(ref newSlotAllocToken);
+		__CHECKED_INTERNAL_VerifyAllocToken(ref newSlotAllocToken);
 	}
 
 	public bool Pack(int maxCount)
@@ -1223,58 +1276,120 @@ public partial class Allocator  //alloc/free/pack logic
 
 		var count = Math.Min(maxCount, _free.Count);
 
-
+		//sort our free list so that the ones closest to rowIndex zero will be swapped out with higher live ones
 		if (_isFreeSorted != true)
 		{
 			_free.Sort();
 			_isFreeSorted = true;
 		}
 
+		//loop through our free items
 		for (var i = 0; i < count; i++)
-		{
-
+		{			
 			var firstFreeSlotToFill = _free[i];
 
-			if (!_nextSlotTracker.TryGetHighestAllocatedSlot(out var highestAllocatedSlot))
+			//find the highestAliveToken, reducing our allocated until that occurs
+			AllocSlot highestAllocatedSlot;
+			AllocMetadata highestAliveToken;
+			while (true)
 			{
-				__ERROR.Assert(false, "investigate?  no slots are filled?  probably okay, just clear our slots?");
-				break;
+				var result = _nextSlotTracker.TryGetHighestAllocatedSlot(out highestAllocatedSlot);
+				if (result == false)
+				{
+					__ERROR.Assert(false, "no more slots?  is our allocator totally empty?  be sure");
+					//no more slots available.  we are done
+					break;
+				}
+				result = __TryQueryMetadata(highestAllocatedSlot, out highestAliveToken);
+				if(result == false)
+				{
+					__ERROR.Assert(false, "why are we not getting a slot?   our nextSlotTracker thinks there should be this allocated.  investigate");
+				}
+				if (highestAliveToken.IsAlive == true)
+				{
+					//we have a live slot!
+					break;
+				}
+				else
+				{
+#if CHECKED
+					//verify The highest slot is free.  
+					var foundMeta = _UNCHECKED_GetComponent<AllocMetadata>(ref highestAllocatedSlot);
+					__ERROR.Throw(foundMeta.IsAlive == false);
+					
+#endif
+
+					//decrement our allocations because the top slot is not alive
+					_nextSlotTracker.FreeLast(out var shouldFreeChunk);
+#if CHECKED
+					//verify next free is actually free
+					result = __TryQueryMetadata(_nextSlotTracker.nextAvailable, out var shouldBeFreeMetadata);
+					__ERROR.Throw(result && shouldBeFreeMetadata.IsAlive == false && shouldBeFreeMetadata.allocToken.isAlive == false);
+#endif
+					if (shouldFreeChunk)
+					{
+						_FreeLastChunk();
+					}
+				}
 			}
-			if (firstFreeSlotToFill > highestAllocatedSlot)
+			if (firstFreeSlotToFill >= highestAllocatedSlot)
 			{
 				__ERROR.Assert(false, "investigate?  our free are higher than our filled?  probably okay, just clear our slots?");
+				//the above while loop already deallocated to before our current free slot.  so we are done
 				break;
 			}
 
-
-			var highSlotResult = __TryQueryMetadata(highestAllocatedSlot, out var highestAliveToken);
-			if (highSlotResult == false || highestAliveToken.IsAlive == false)
-			{
-				//__ERROR.Throw(false, "if our highestAllocatedSlot is not alive, it should have been sorted ");
-				var foundMeta = _UNCHECKED_GetComponent<AllocMetadata>(ref highestAllocatedSlot);
-				__ERROR.Throw(foundMeta.IsAlive == false);
-				//The highest slot is free.  
-			}
-			else
+			//if we get here, we have a live `highestAliveToken` and a `firstFreeSlotToFill` that is below it.   lets swap
 			{
 				//swap out free and highest
 				__CHECKED.Throw(highestAliveToken.IsAlive == true);
-				__CHECKED_VerifyAllocToken(ref highestAliveToken.allocToken);
+				__CHECKED_INTERNAL_VerifyAllocToken(ref highestAliveToken.allocToken);
 				_PackHelper_MoveSlotToFree(highestAliveToken.allocToken, firstFreeSlotToFill);
 			}
 
 
-			//decrement our slotTracker position now that we have moved our top item (or if top was already free)
-			_nextSlotTracker.FreeLast(out var shouldFreeChunk);
-#if CHECKED
-			//verify next free is actually free
-			var result = __TryQueryMetadata(_nextSlotTracker.nextAvailable, out var shouldBeFreeMetadata);
-			__ERROR.Throw(result && shouldBeFreeMetadata.IsAlive ==false && shouldBeFreeMetadata.allocToken.isAlive == false);
-#endif
-			if (shouldFreeChunk)
-			{
-				_FreeLastChunk();
-			}
+
+
+//////			if (!_nextSlotTracker.TryGetHighestAllocatedSlot(out var highestAllocatedSlot))
+//////			{
+//////				__ERROR.Assert(false, "investigate?  no slots are filled?  probably okay, just clear our slots?");
+//////				break;
+//////			}
+//////			if (firstFreeSlotToFill > highestAllocatedSlot)
+//////			{
+//////				__ERROR.Assert(false, "investigate?  our free are higher than our filled?  probably okay, just clear our slots?");
+//////				break;
+//////			}
+
+
+//////			var highSlotResult = __TryQueryMetadata(highestAllocatedSlot, out var highestAliveToken);
+//////			if (highSlotResult == false || highestAliveToken.IsAlive == false)
+//////			{
+//////				//__ERROR.Throw(false, "if our highestAllocatedSlot is not alive, it should have been sorted ");
+//////				var foundMeta = _UNCHECKED_GetComponent<AllocMetadata>(ref highestAllocatedSlot);
+//////				__ERROR.Throw(foundMeta.IsAlive == false);
+//////				//The highest slot is free.  
+//////			}
+//////			else
+//////			{
+//////				//swap out free and highest
+//////				__CHECKED.Throw(highestAliveToken.IsAlive == true);
+//////				__CHECKED_VerifyAllocToken(ref highestAliveToken.allocToken);
+//////				_PackHelper_MoveSlotToFree(highestAliveToken.allocToken, firstFreeSlotToFill);
+//////			}
+
+
+//////			//decrement our slotTracker position now that we have moved our top item (or if top was already free)
+//////			_nextSlotTracker.FreeLast(out var shouldFreeChunk);
+//////#if CHECKED
+//////			//verify next free is actually free
+//////			var result = __TryQueryMetadata(_nextSlotTracker.nextAvailable, out var shouldBeFreeMetadata);
+//////			__ERROR.Throw(result && shouldBeFreeMetadata.IsAlive ==false && shouldBeFreeMetadata.allocToken.isAlive == false);
+//////#endif
+//////			if (shouldFreeChunk)
+//////			{
+//////				_FreeLastChunk();
+//////			}
 
 		}
 		//remove these free slots now that we are done filling them
@@ -1628,6 +1743,7 @@ public class Chunk<TComponent> : Chunk
 	{
 		//lock (_GLOBAL_LOOKUP)
 		{
+			allocToken.GetAllocator().__CHECKED_INTERNAL_VerifyAllocToken(ref allocToken);
 			//__DEBUG.Throw(allocToken.GetChunkLookupId() == _chunkLookupId, "allocToken does not belong to this chunk");
 			__DEBUG.Throw(allocToken.allocatorId == allocatorId && allocToken.allocatorVersion == allocatorVersion && allocToken.allocSlot.chunkIndex == columnIndex, "allocToken does not belong to this chunk");
 
