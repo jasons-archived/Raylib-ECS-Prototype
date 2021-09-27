@@ -54,20 +54,25 @@ public class AllocatorBenchmark
 	public HashSet<long> evenSet = new HashSet<long>();
 	public HashSet<long> oddSet = new HashSet<long>();
 
-	[Params(10000)]
+	[Params(100000)]
 	public int EntityCount { get; set; }
 
 	[Params(true,false)]
 	public bool AutoPack { get; set; }
 
-	[Params(100,1000,10000)]
+	[Params(100
+		//,1000,10000
+		)]
 	public int ChunkSize { get; set; }
 
-	[Params(1f,4f)]
+	[Params(1f
+		//,4f
+		)]
 	public float PBatchX { get; set; }
 
 
-	[Params(10,100)]
+	[Params(//10,
+		100)]
 	public int Allocators { get; set; }
 
 	//[IterationSetup]
@@ -129,9 +134,9 @@ public class Program
 #if DEBUG
 
 		//run in debug mode (can hit breakpoints in VS)
-		var summary = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, new BenchmarkDotNet.Configs.DebugInProcessConfig());		
+		//var summary = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, new BenchmarkDotNet.Configs.DebugInProcessConfig());		
 //run a specific benchmark
-		//var summary = BenchmarkRunner.Run<Parallel_Lookup>(new BenchmarkDotNet.Configs.DebugInProcessConfig());
+		var summary = BenchmarkRunner.Run<AllocatorBenchmark>(new BenchmarkDotNet.Configs.DebugInProcessConfig());
 #else
 		var summary = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
 #endif

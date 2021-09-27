@@ -8,7 +8,7 @@ namespace DumDum.Bcl.Collections._unused
 	/// <para>thread safe writes and non-blocking reads if not using `ref return` accessors</para>
 	/// </summary>
 	/// <typeparam name="T"></typeparam>
-	public class SlotStore<T> where T:class
+	public class SlotStore<T> where T : class
 	{
 
 
@@ -64,14 +64,14 @@ namespace DumDum.Bcl.Collections._unused
 		//		}
 		//	}
 		//}
-		public ref T this[int slot]
+		public T this[int slot]
 		{
 			get
 			{
-				#if CHECKED
+#if CHECKED
 				__CHECKED.Throw(this._CHECKED_allocationTracker.ContainsKey(slot), "slot is not allocated and you are using it");
 #endif
-				return ref _storage[slot];
+				return _storage[slot];
 			}
 		}
 
@@ -81,7 +81,7 @@ namespace DumDum.Bcl.Collections._unused
 		public int Alloc(T data)
 		{
 			var slot = Alloc();
-			this._storage[slot] = data;
+			_storage.Set(slot, data);
 			return slot;
 
 
@@ -90,7 +90,7 @@ namespace DumDum.Bcl.Collections._unused
 		public int Alloc(ref T data)
 		{
 			var slot = Alloc();
-			this._storage[slot] = data;
+			_storage.Set(slot, data);
 			return slot;
 		}
 
@@ -104,7 +104,7 @@ namespace DumDum.Bcl.Collections._unused
 				if (this._freeSlots.Count > 0)
 				{
 					slot = this._freeSlots.Pop();
-					#if CHECKED
+#if CHECKED
 					__CHECKED.Throw(this._CHECKED_allocationTracker.TryAdd(slot, true), "slot already allocated");
 #endif
 				}
@@ -123,11 +123,11 @@ namespace DumDum.Bcl.Collections._unused
 			lock (this._lock)
 			{
 				this.Version++;
-				#if CHECKED
+#if CHECKED
 				__CHECKED.Throw(this._CHECKED_allocationTracker.TryRemove(slot, out var temp), "slot is not allocated but trying to remove");
 #endif
 				this._freeSlots.Push(slot);
-				this._storage[slot] = default;
+				_storage.Set(slot, null);
 			}
 		}
 

@@ -19,7 +19,7 @@ namespace DumDum.Bcl;
 /// lolo: a static utils helper
 /// </summary>
 public unsafe static class __
-{	
+{
 	private static ThreadLocal<Random> _rand = new(() => new());
 	/// <summary>
 	/// get a thread-local Random
@@ -92,8 +92,8 @@ public unsafe struct PercentileSampler800<T> where T : unmanaged, IComparable<T>
 	public Percentiles<T> GetPercentiles()
 	{
 		__CHECKED.Throw(_isCtored, "you need to use a .ctor() otherwise fields are not init");
-		
-		return new(_samples.AsSpan().Slice(0,Math.Min(SampleCount,_fill)));
+
+		return new(_samples.AsSpan().Slice(0, Math.Min(SampleCount, _fill)));
 	}
 
 	public override string ToString()
@@ -118,7 +118,7 @@ public unsafe struct PercentileSampler800<T> where T : unmanaged, IComparable<T>
 /// </summary>
 /// <remarks>for a good explanation of "why", see: https://www.dynatrace.com/news/blog/why-averages-suck-and-percentiles-are-great/</remarks>
 /// <typeparam name="T"></typeparam>
-public struct Percentiles<T> where T: unmanaged, IComparable<T>
+public struct Percentiles<T> where T : unmanaged, IComparable<T>
 {
 	/// <summary>
 	/// how many samples were present on the input data
@@ -171,13 +171,13 @@ public struct Percentiles<T> where T: unmanaged, IComparable<T>
 		p50 = sortedSamples[50 * len / 100];
 		p75 = sortedSamples[75 * len / 100];
 		p95 = sortedSamples[95 * len / 100];
-		p100 = sortedSamples[len-1];
+		p100 = sortedSamples[len - 1];
 
 	}
 
 	public override string ToString()
 	{
-			return $"[{p0} {{{p5} ({p25} ={p50}= {p75}) {p95}}} {p100}](x{sampleCount})";	
+		return $"[{p0} {{{p5} ({p25} ={p50}= {p75}) {p95}}} {p100}](x{sampleCount})";
 	}
 	/// <summary>
 	/// generate string while passing a custom format function to the percentile samples
@@ -187,7 +187,7 @@ public struct Percentiles<T> where T: unmanaged, IComparable<T>
 	/// <returns></returns>
 	public string ToString<TOut>(Func<T, TOut> formater)
 	{
-			return $"[{formater(p0)} {{{formater(p5)} ({formater(p25)} ={formater(p50)}= {formater(p75)}) {formater(p95)}}} {formater(p100)}](x{sampleCount})";		
+		return $"[{formater(p0)} {{{formater(p5)} ({formater(p25)} ={formater(p50)}= {formater(p75)}) {formater(p95)}}} {formater(p100)}](x{sampleCount})";
 	}
 }
 
@@ -564,7 +564,7 @@ public static class ParallelFor
 	}
 	private static async ValueTask _Range_ExecuteAction(ArraySegment<(int start, int endExclusive)> spanOwnerDangerousArray, Func<int, int, ValueTask> action)
 	{
-		await Parallel.ForEachAsync(spanOwnerDangerousArray, (batch, cancelToken) =>Unsafe.AsRef(in action).Invoke(batch.start,batch.endExclusive));
+		await Parallel.ForEachAsync(spanOwnerDangerousArray, (batch, cancelToken) => Unsafe.AsRef(in action).Invoke(batch.start, batch.endExclusive));
 	}
 
 	public static Task Each<T>(IEnumerable<T> source, Func<T, CancellationToken, ValueTask> action)
@@ -574,7 +574,7 @@ public static class ParallelFor
 
 	public static Task Each<T>(IEnumerable<T> source, Func<T, ValueTask> action)
 	{
-		return Parallel.ForEachAsync(source,(item,cancelToken)=>Unsafe.AsRef(in action).Invoke(item));
+		return Parallel.ForEachAsync(source, (item, cancelToken) => Unsafe.AsRef(in action).Invoke(item));
 	}
 
 
@@ -646,6 +646,34 @@ public class DisposeSentinel : IDisposable
 		if (!IsDisposed)
 		{
 			__ERROR.Assert(false, "Did not call .Dispose() of the embedding type properly.    Callstack: " + CtorStackTrace);
+		}
+	}
+}
+
+
+/// <summary>
+/// DANGER. adapted from, and for inlining Array unbounded workflow: https://github.com/CommunityToolkit/WindowsCommunityToolkit/blob/059cf83f1fb02a4fbb4ce24249ea6e38f504983b/Microsoft.Toolkit.HighPerformance/Extensions/ArrayExtensions.cs#L86/// 
+/// If you store a reference to this, it must be recreated every array resize.
+/// </summary>
+/// <remarks>Do not change the layout of this.  it follows the current DotNet6 layout of Array.</remarks>
+[StructLayout(LayoutKind.Sequential)]
+public sealed class __UNSAFE_ArrayData<T>
+{
+	public IntPtr Length;
+	public byte Data;
+	/// <summary>
+	/// UNBOUNDED.  No array bounds are checked.  if you request an index past the end.... ???  Here be dragons.
+	/// </summary>
+	/// <param name="index"></param>
+	/// <returns></returns>	
+	public ref T this[int index]
+	{
+		[MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
+		get
+		{
+			ref T r0 = ref Unsafe.As<byte, T>(ref Data);
+			ref T ri = ref Unsafe.Add(ref r0, index);
+			return ref ri;
 		}
 	}
 }

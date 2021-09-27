@@ -8,7 +8,7 @@ namespace DumDum.Bcl.Collections._unused
 	/// <para>Internally stores using a weak reference so it does not prevent garbage collection.</para> 
 	/// </summary>
 	/// <typeparam name="T"></typeparam>
-	[ThreadSafe]
+	[ThreadSafety(ThreadSituation.Always)]
 	public class ObjLookup<T> where T : class
 	{
 

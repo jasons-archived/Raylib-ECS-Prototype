@@ -958,7 +958,7 @@ public class NodeFrameState
 /// cheap non-blocking way to track resource availabiltiy
 /// <para>NOT thread safe.</para>
 /// </summary>
-[NotThreadSafe]
+[ThreadSafety(ThreadSituation.Never)]
 public class ReadWriteCounter
 {
 	public int _writes;

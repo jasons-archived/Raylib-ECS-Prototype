@@ -145,19 +145,24 @@ Generally following the [standard dotnet design guidelines](https://docs.microso
 1. member fields prefixed with `_` and first letter lowercase. 
    - prefixing makes it easy to distinguish between local and member variables.   
    - using a modern IDE you can ignore the "cost" when doing discovery (intelisense dropdown, autocomplete)
-1. prefix Class Properties/Methods meant for "internal use only" with `_`
+1. Prefix Class Properties/Methods with `DANGER` if is it's returned value can result in undefined behavior.  
+   - This is chiefly used for pointer based `unsafe` computations where "bad input" may not result in an exception thrown, but instead results in corrupted data being returned.
+3. prefix Class Properties/Methods meant for "internal use only" with `_`
    - even `protected internal` members are visible to derived classes.  prefixing with an underscore signals to the user that these are not meant for common workflow scenarios.
-2. Prefix important/commonly used globals with `__` such as `__DEBUG.Assert()`
+4. Prefix important/commonly used globals with `__` such as `__DEBUG.Assert()`
    - same reasoning as the member field `_` prefix shown above.
-3. Prefix ***very*** special classes/members with ``__WHAT_`, where `WHAT` is the special thing.
+5. Prefix ***very*** special classes/members with ``__WHAT_`, where `WHAT` is the special thing.
    - for example, conditional unit test entrypoints might be named `__TEST_Unit()` or maybe `__UNITTEST_GcVerification()` or `__UNITTEST_RunAll()`
-4. Prefix extension methods with `_` and if there is anything unusual about them, add a suffix like `_Unsafe` to give a hint to the users.  
+6. Prefix extension methods with `_` and if there is anything unusual about them, add a suffix like `_Unsafe` to give a hint to the users.  
    - prefixing allows easy identification as a custom extension method without impacting autocomplete/intelisense.
    - if using a suffix, Add approriate intellisense docs (to the containing static class at minimum) so the user can understand the meaning of the suffix.
      - `_Unsafe` is used for code that has some tricky usage pattern, usuall because of using pointers (unsafe code) that will go out of scope once the underlying object changes.  Generally speaking, use these method results immediately and do not make changes (add/removes for collections) until afterwards.
      - `_Exp` is used for experimental code that seems to work fine, but might have some hidden performance "gotcha" or relies on some experimental feature that might change/break/be-deleted in the future.
-5. Prefix extension method containing static classes with `zz_Extensions_` 
+7. Prefix extension method containing static classes with `zz_Extensions_` 
    - so that it doesn't polute intellisense dropdowns, and is still descriptive.
+1. add the `[ThreadSafe]` attribute for classes that are thread safe for certain situations.   
+   - For example thread safe for Add,ReadExisting use `[ThreadSafe(ThreadSituation.Add,ThreadSituation.ReadExisting)]`.
+   - This doesn't do anything except add a little documentation for now.   Later we can add attribute based runtime verification.
 
 it would be good to also follow these: 
 - https://github.com/dotnet/runtime/blob/main/docs/coding-guidelines/coding-style.md  which we also mostly follow.

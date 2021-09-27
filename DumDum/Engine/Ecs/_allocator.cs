@@ -118,7 +118,7 @@ public readonly record struct AllocToken : IComparable<AllocToken>
 		//	return chunk;
 		//}
 
-		var column = Chunk<T>._LOOKUP._storage[allocatorId];
+		var column = Chunk<T>._LOOKUP[allocatorId];
 		__DEBUG.Throw(column.Count > allocSlot.chunkIndex, "chunk doesn't exist");
 		var chunk = column._AsSpan_Unsafe()[allocSlot.chunkIndex];
 		__DEBUG.Throw(chunk != null);
@@ -258,9 +258,9 @@ public partial class Allocator //unit test
 {
 
 
-	public static async Task __TEST_Unit_ParallelAllocators(bool autoPack, int chunkSize, MemoryOwner<long> externalIds, float batchSizeMultipler,int allocatorCount, HashSet<long> evenSet, HashSet<long> oddSet)
+	public static async Task __TEST_Unit_ParallelAllocators(bool autoPack, int chunkSize, MemoryOwner<long> externalIds, float batchSizeMultipler, int allocatorCount, HashSet<long> evenSet, HashSet<long> oddSet)
 	{
-
+		//Console.WriteLine("start parallel");
 		var PARALLEL_LOOPS = allocatorCount;
 		var execCount = 0;
 		await ParallelFor.Range(0, PARALLEL_LOOPS, batchSizeMultipler, (start, endExclusive) =>
@@ -268,7 +268,7 @@ public partial class Allocator //unit test
 			var tempCount = 0;
 			for (var i = start; i < endExclusive; i++)
 			{
-				__TEST_Unit_SingleAllocator_AndEdit(autoPack,chunkSize,externalIds,evenSet,oddSet);
+				__TEST_Unit_SingleAllocator_AndEdit(autoPack, chunkSize, externalIds, evenSet, oddSet);
 				tempCount++;
 			}
 			Interlocked.Add(ref execCount, tempCount);
@@ -289,7 +289,7 @@ public partial class Allocator //unit test
 		var allocs = allocOwner.Span;
 		for (var i = 0; i < count; i++)
 		{
-			allocs[i] = _TEST_HELPER_CreateAndEditAllocator(autoPack,chunkSize,externalIds, evenSet, oddSet);
+			allocs[i] = _TEST_HELPER_CreateAndEditAllocator(autoPack, chunkSize, externalIds, evenSet, oddSet);
 		}
 		for (var i = 0; i < count; i++)
 		{
@@ -313,7 +313,8 @@ public partial class Allocator //unit test
 	[Conditional("TEST")]
 	public static unsafe void __TEST_Unit_SingleAllocator_AndEdit(bool autoPack, int chunkSize, MemoryOwner<long> externalIds, HashSet<long> evenSet, HashSet<long> oddSet)
 	{
-		var allocator = _TEST_HELPER_CreateAndEditAllocator(autoPack,chunkSize,externalIds, evenSet, oddSet);
+		//Console.WriteLine("start single");
+		var allocator = _TEST_HELPER_CreateAndEditAllocator(autoPack, chunkSize, externalIds, evenSet, oddSet);
 
 		allocator.Dispose();
 	}
@@ -468,6 +469,29 @@ public partial class Allocator //unit test
 		//verify empty
 		__ERROR.Throw(allocator._lookup.Count == 0);
 
+
+		foreach (var column in allocator._columnStorage)
+		{
+			if (column == null)
+			{
+				//invalid atomid
+
+				continue;
+			}
+			if (autoPack == true)
+			{
+				__ERROR.Throw(column.Count == 1 && column[0]._count == 0, "columns should be empty except a single, empty chunk");
+			}
+			else
+			{
+				foreach (var chunk in column)
+				{
+					__ERROR.Throw(chunk._count == 0, "autoPack==false chunks should all be empty");
+				}
+
+			}
+			__ERROR.Throw(column[0].allocatorId == allocator._allocatorId && column[0].allocatorVersion == allocator._version, "column doesn't match our allocator");
+		}
 
 		return allocator;
 	}
@@ -660,7 +684,7 @@ public partial class Allocator : IDisposable //init logic
 	public ref T GetComponentRef<T>(ref AllocToken allocToken)
 	{
 		var chunk = GetChunk<T>(ref allocToken);
-		return ref chunk.Span[allocToken.allocSlot.rowSlotIndex];
+		return ref chunk.UnsafeArray[allocToken.allocSlot.rowSlotIndex];
 	}
 
 	public static ref T GetComponent<T>(ref AllocToken allocToken)
@@ -687,7 +711,7 @@ public partial class Allocator : IDisposable //init logic
 			return false;
 		}
 		var chunk = column[slot.chunkIndex] as Chunk<AllocMetadata>;
-		metadata = chunk.Span[slot.rowSlotIndex];
+		metadata = chunk.UnsafeArray[slot.rowSlotIndex];
 		return true;
 	}
 
@@ -696,7 +720,7 @@ public partial class Allocator : IDisposable //init logic
 	{
 		var atomId = Atom.GetId<T>();
 		var chunk = _GLOBAL_LOOKUP.Span[allocToken.allocatorId]._GetColumnsSpan()[atomId]._AsSpan_Unsafe()[allocToken.allocSlot.chunkIndex] as Chunk<T>;
-		return ref chunk.Span[allocToken.allocSlot.rowSlotIndex];
+		return ref chunk.UnsafeArray[allocToken.allocSlot.rowSlotIndex];
 	}
 	/// <summary>
 	/// INTERNAL USE ONLY.  doesn't do checks to ensure token is valid.
@@ -725,7 +749,7 @@ public partial class Allocator : IDisposable //init logic
 			return ref Unsafe.NullRef<T>();
 		}
 		exists = true;
-		return ref chunk.Span[slot.rowSlotIndex];
+		return ref chunk.UnsafeArray[slot.rowSlotIndex];
 	}
 	/// <summary>
 	/// INTERNAL USE ONLY.  doesn't do checks to ensure token is valid.
@@ -733,7 +757,7 @@ public partial class Allocator : IDisposable //init logic
 	protected internal ref T _UNCHECKED_GetComponent<T>(ref AllocSlot slot)
 	{
 		//var atomId = Atom.GetId<T>();
-		return ref (GetColumn<T>()._AsSpan_Unsafe()[slot.chunkIndex] as Chunk<T>).Span[slot.rowSlotIndex];
+		return ref (GetColumn<T>()._AsSpan_Unsafe()[slot.chunkIndex] as Chunk<T>).UnsafeArray[slot.rowSlotIndex];
 	}
 
 
@@ -1018,7 +1042,7 @@ public partial class Allocator  //alloc/free/pack logic
 
 
 			//set the allocMetadata builtin componenent
-			ref var allocMetadata = ref allocToken.GetContainingChunk<AllocMetadata>().Span[allocToken.allocSlot.rowSlotIndex];
+			ref var allocMetadata = ref allocToken.GetContainingChunk<AllocMetadata>().UnsafeArray[allocToken.allocSlot.rowSlotIndex];
 			__CHECKED.Throw(allocMetadata == default(AllocMetadata), "expect this to be cleared out, why not?");
 			allocMetadata = new AllocMetadata()
 			{
@@ -1070,7 +1094,8 @@ public partial class Allocator  //alloc/free/pack logic
 		{
 			reason = "token is not alive";
 			result = false;
-		}else if(!_lookup.TryGetValue(allocToken.externalId, out var lookupToken))
+		}
+		else if (!_lookup.TryGetValue(allocToken.externalId, out var lookupToken))
 		{
 			reason = "token does not have a matching entityId.  was it removed?";
 			result = false;
@@ -1125,12 +1150,12 @@ public partial class Allocator  //alloc/free/pack logic
 		__CHECKED.Throw(manualGetChunk == autoGetChunk, "should match");
 
 		//verify allocMetadatas match
-		__ERROR.Throw(manualGetChunk.Span[allocToken.allocSlot.rowSlotIndex].allocToken == allocToken);
+		__ERROR.Throw(manualGetChunk.UnsafeArray[allocToken.allocSlot.rowSlotIndex].allocToken == allocToken);
 
 
 
 		//verify access thru Chunk<T> works also
-		var chunkLookupChunk = Chunk<AllocMetadata>._LOOKUP._storage[allocToken.allocatorId]._AsSpan_Unsafe()[allocToken.allocSlot.chunkIndex];
+		var chunkLookupChunk = Chunk<AllocMetadata>._LOOKUP[allocToken.allocatorId]._AsSpan_Unsafe()[allocToken.allocSlot.chunkIndex];
 		__ERROR.Throw(chunkLookupChunk == manualGetChunk);
 
 	}
@@ -1148,7 +1173,7 @@ public partial class Allocator  //alloc/free/pack logic
 	/// </summary>
 	public unsafe void Free(Span<long> externalIds)
 	{
-		if(externalIds.Length == 0)
+		if (externalIds.Length == 0)
 		{
 			return;
 		}
@@ -1271,7 +1296,7 @@ public partial class Allocator  //alloc/free/pack logic
 			{
 				var result = _nextSlotTracker.TryGetHighestAllocatedSlot(out highestAllocatedSlot);
 				if (result == false)
-				{					
+				{
 					//  we are done
 					__ERROR.Assert(_lookup.Count == 0, "no more slots available.  we expect this to happen if the Allocator is totally empty.");
 					break;
@@ -1602,16 +1627,16 @@ public class Chunk<TComponent> : Chunk
 
 	private MemoryOwner<TComponent> _storage;
 	public Memory<TComponent> Memory { get => _storage.Memory; }
-	public Span<TComponent> Span
-	{
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		get => _storage.Span;
-	}
+	//public ArraySegment<TComponent> Span
+	//{
+	//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	//	get => _storage.DangerousGetArray();
+	//}
 
 	/// <summary>
 	/// this is an array obtained by a object pool (cache).  It is longer than actually needed.  Do not use the extra slots.  always get length from _storage or Span
 	/// </summary>
-	private TComponent[] _DANGEROUS_refStorage;
+	public TComponent[] UnsafeArray;
 
 #if CHECKED
 	private DisposeSentinel _disposeCheck = new();
@@ -1634,8 +1659,8 @@ public class Chunk<TComponent> : Chunk
 		//	var result = _GLOBAL_LOOKUP._TryRemove(_chunkLookupId, out _);
 		//	__ERROR.Throw(result);
 		//}
-		__CHECKED.Throw(_LOOKUP._storage[allocatorId][columnIndex] == this, "ref mismatch");
-		_LOOKUP._storage[allocatorId][columnIndex] = null;
+		__CHECKED.Throw(_LOOKUP[allocatorId][columnIndex] == this, "ref mismatch");
+		_LOOKUP[allocatorId][columnIndex] = null;
 
 		allocatorId = -1;
 		allocatorVersion = -1;
@@ -1646,7 +1671,7 @@ public class Chunk<TComponent> : Chunk
 
 		//our allocator.FreeLastChunk code checks count.   we don't want to check count here because of cases like game shutdown
 		//__ERROR.Throw(_count == 0); 
-		_DANGEROUS_refStorage = null;
+		UnsafeArray = null;
 		_storage.Dispose();
 		_storage = null;
 	}
@@ -1674,14 +1699,14 @@ public class Chunk<TComponent> : Chunk
 		column._ExpandAndSet(columnIndex, this);
 
 		_storage = MemoryOwner<TComponent>.Allocate(_length, AllocationMode.Clear); //TODO: maybe no need to clear?
-		_DANGEROUS_refStorage = _storage.DangerousGetArray().Array;
+		UnsafeArray = _storage.DangerousGetArray().Array;
 	}
 	internal override void OnAllocSlot(ref AllocToken allocToken)
 	{
 		_count++;
 #if DEBUG
 		//clear the slot
-		Span[allocToken.allocSlot.rowSlotIndex] = default(TComponent);
+		UnsafeArray[allocToken.allocSlot.rowSlotIndex] = default(TComponent);
 #endif
 	}
 	/// <summary>
@@ -1690,7 +1715,7 @@ public class Chunk<TComponent> : Chunk
 	internal override void OnPackSlot(ref AllocToken allocToken, ref AllocToken moveComponentDataFrom)
 	{
 		_count++;
-		Span[allocToken.allocSlot.rowSlotIndex] = moveComponentDataFrom.GetComponentReadRef<TComponent>();
+		UnsafeArray[allocToken.allocSlot.rowSlotIndex] = moveComponentDataFrom.GetComponentReadRef<TComponent>();
 #if DEBUG
 		//lock (_GLOBAL_LOOKUP)
 		{
@@ -1699,9 +1724,9 @@ public class Chunk<TComponent> : Chunk
 			//var result = _GLOBAL_LOOKUP.TryGetValue(chunkLookupId, out var chunk);
 			//__ERROR.Throw(result);
 
-			var chunk = _LOOKUP._storage[moveComponentDataFrom.allocatorId]._AsSpan_Unsafe()[moveComponentDataFrom.allocSlot.chunkIndex];
+			var chunk = _LOOKUP[moveComponentDataFrom.allocatorId]._AsSpan_Unsafe()[moveComponentDataFrom.allocSlot.chunkIndex];
 
-			chunk.Span[moveComponentDataFrom.allocSlot.rowSlotIndex] = default(TComponent);
+			chunk.UnsafeArray[moveComponentDataFrom.allocSlot.rowSlotIndex] = default(TComponent);
 		}
 #endif
 
@@ -1717,7 +1742,7 @@ public class Chunk<TComponent> : Chunk
 		//}
 
 		//clear the slot
-		Span[allocToken.allocSlot.rowSlotIndex] = default(TComponent);
+		UnsafeArray[allocToken.allocSlot.rowSlotIndex] = default(TComponent);
 	}
 	public unsafe ref TComponent GetWriteRef(AllocToken allocToken)
 	{
@@ -1732,12 +1757,12 @@ public class Chunk<TComponent> : Chunk
 			//inform metadata that a write is occuring.  //TODO: is this needed?  If not, remove it to reduce random memory access
 			//var result = Chunk<AllocMetadata>._GLOBAL_LOOKUP.TryGetValue(_chunkLookupId, out var chunk);
 			//__ERROR.Throw(result);
-			var allocMetadataChunk = Chunk<AllocMetadata>._LOOKUP._storage[allocToken.allocatorId]._AsSpan_Unsafe()[allocToken.allocSlot.chunkIndex];
-			ref var allocMetadata = ref allocMetadataChunk.Span[rowIndex];
+			var allocMetadataChunk = Chunk<AllocMetadata>._LOOKUP[allocToken.allocatorId]._AsSpan_Unsafe()[allocToken.allocSlot.chunkIndex];
+			ref var allocMetadata = ref allocMetadataChunk.UnsafeArray[rowIndex];
 			allocMetadata.fieldWrites++;
 
 			_writeVersion++;
-			return ref Span[rowIndex];
+			return ref UnsafeArray[rowIndex];
 		}
 	}
 	public unsafe ref readonly TComponent GetReadRef(AllocToken allocToken)
@@ -1748,7 +1773,7 @@ public class Chunk<TComponent> : Chunk
 	{
 		_CHECKED_VerifyIntegrity(ref allocToken);
 		var rowIndex = allocToken.allocSlot.rowSlotIndex;
-		return ref Span[rowIndex];
+		return ref UnsafeArray[rowIndex];
 
 	}
 
@@ -1763,15 +1788,15 @@ public class Chunk<TComponent> : Chunk
 
 			//var result = Chunk<TComponent>._GLOBAL_LOOKUP.TryGetValue(_chunkLookupId, out var chunk);
 			//__ERROR.Throw(result);
-			var chunk = _LOOKUP._storage[allocToken.allocatorId]._AsSpan_Unsafe()[allocToken.allocSlot.chunkIndex];
+			var chunk = _LOOKUP[allocToken.allocatorId]._AsSpan_Unsafe()[allocToken.allocSlot.chunkIndex];
 			__CHECKED.Throw(chunk == this, "alloc system internal integrity failure");
 			__CHECKED.Throw(!IsDisposed, "use after dispose");
 
 			var rowIndex = allocToken.allocSlot.rowSlotIndex;
 			//result = Chunk<AllocMetadata>._GLOBAL_LOOKUP.TryGetValue(_chunkLookupId, out var allocMetadataChunk);
 			//__ERROR.Throw(result);
-			var allocMetadataChunk = Chunk<AllocMetadata>._LOOKUP._storage[allocToken.allocatorId]._AsSpan_Unsafe()[allocToken.allocSlot.chunkIndex];
-			ref var allocMetadata = ref allocMetadataChunk.Span[rowIndex];
+			var allocMetadataChunk = Chunk<AllocMetadata>._LOOKUP[allocToken.allocatorId]._AsSpan_Unsafe()[allocToken.allocSlot.chunkIndex];
+			ref var allocMetadata = ref allocMetadataChunk.UnsafeArray[rowIndex];
 			__DEBUG.Throw(allocMetadata.allocToken == allocToken, "invalid alloc token.   why?");
 		}
 	}
