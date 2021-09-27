@@ -23,7 +23,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Bcl\_advanced\" />
     <Folder Include="Engine\_internal\" />
   </ItemGroup>
 
