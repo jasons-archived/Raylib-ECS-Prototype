@@ -48,6 +48,9 @@ public readonly record struct AllocToken : IComparable<AllocToken>
 	/// If needed, the allocator can be accessed via `Allocator._GLOBAL_LOOKUP(allocatorId)`
 	/// </summary>
 	public readonly int allocatorId { get; init; }
+	/// <summary>
+	/// used to verify allocator was not replaced with another
+	/// </summary>
 	public readonly int allocatorVersion { get; init; }
 	public readonly AllocSlot allocSlot { get; init; }
 	/// <summary>
@@ -79,7 +82,7 @@ public readonly record struct AllocToken : IComparable<AllocToken>
 
 	public ref T GetComponentWriteRef<T>()
 	{
-		var (result,reason) = GetAllocator().CheckIsValid(this);
+		var (result, reason) = GetAllocator().CheckIsValid(this);
 		__ERROR.Throw(result, reason);
 
 		//_CHECKED_VerifyInstance<T>();
@@ -441,22 +444,23 @@ public partial class Allocator //unit test
 		allocator.Free(oddSet.ToArray());
 
 		//verify that evens still here
-		for (var i = 0; i < tokens.Length; i++)
 		{
-			var token = tokens[i];
-			if (token.externalId % 2 != 0)
+			var i = 0;
+			foreach (var (externalId, allocToken) in allocator._lookup)
 			{
-				continue;
+				if (allocToken.externalId % 2 != 0)
+				{
+					__ERROR.Throw(false, "only even should exist");
+				}
+
+				var num = allocToken.GetComponentReadRef<int>();
+				__ERROR.Throw(num == (int)allocToken.externalId);
+				__ERROR.Throw(allocToken.GetComponentReadRef<string>().StartsWith("hello"));
+				i++;
+
 			}
-
-			var num = token.GetComponentReadRef<int>();
-			__ERROR.Throw(num == (int)token.externalId);
-
-			__ERROR.Throw(token.GetComponentReadRef<string>() == $"hello {i}");
-
-
 		}
-		//verify no odds
+		//same verify only evens,
 		foreach (var (externalId, allocToken) in allocator._lookup)
 		{
 			ref var numExId = ref allocToken.GetComponentWriteRef<int>();
@@ -1088,15 +1092,23 @@ public partial class Allocator  //alloc/free/pack logic
 		string reason = null;
 		if (allocToken.isAlive == false)
 		{
-			reason = "allocToken is not alive";
-			result= false;
-		}else 		if(_packVersion != allocToken.packVersion)
+			reason = "token is not alive";
+			result = false;
+		}else if(!_lookup.TryGetValue(allocToken.externalId, out var lookupToken))
+		{
+			reason = "token does not have a matching entityId.  was it removed?";
+			result = false;
+		}
+		else if (lookupToken.packVersion != allocToken.packVersion)
 		{
 			reason = "wrong packVersion.  aquire a new AllocToken every update from Archetype.GetAllocToken() with AutoPack=true. But for best performance over many entities, use Archetype.Query()";
 			result = false;
 		}
 
-		__CHECKED_INTERNAL_VerifyAllocToken(ref allocToken);
+		if (result == true)
+		{
+			__CHECKED_INTERNAL_VerifyAllocToken(ref allocToken);
+		}
 
 		return (result, reason);
 	}
@@ -1109,7 +1121,7 @@ public partial class Allocator  //alloc/free/pack logic
 	[Conditional("CHECKED")]
 	public void __CHECKED_INTERNAL_VerifyAllocToken(ref AllocToken allocToken)
 	{
-		
+
 		//__ERROR.Throw(_packVersion == allocToken.packVersion, "allocToken out of date.  a pack occured.  you need to reaquire the token every frame if AutoPack==true");
 		var storedToken = _lookup[allocToken.externalId];
 		__ERROR.Throw(storedToken == allocToken);
@@ -1153,6 +1165,10 @@ public partial class Allocator  //alloc/free/pack logic
 	/// </summary>
 	public unsafe void Free(Span<long> externalIds)
 	{
+		if(externalIds.Length == 0)
+		{
+			return;
+		}
 		using var so_AllocTokens = SpanPool<AllocToken>.Allocate(externalIds.Length);
 		var allocTokens = so_AllocTokens.Span;
 		//get tokens for freeing
@@ -1264,11 +1280,58 @@ public partial class Allocator  //alloc/free/pack logic
 		//if free is higher than highest active slot, done.
 		//take highest active allocSlot and swap it with the free
 
+
+		///<summary>helper function to walk from our highest slot downward (deallocating any free) until it hits a live slot.</summary>
+		void _TryFreeAndGetNextAlive(out AllocSlot highestAllocatedSlot, out AllocMetadata highestAliveToken)
+		{
+			while (true)
+			{
+				var result = _nextSlotTracker.TryGetHighestAllocatedSlot(out highestAllocatedSlot);
+				if (result == false)
+				{					
+					//  we are done
+					__ERROR.Assert(_lookup.Count == 0, "no more slots available.  we expect this to happen if the Allocator is totally empty.");
+					break;
+				}
+				result = __TryQueryMetadata(highestAllocatedSlot, out highestAliveToken);
+				if (result == false)
+				{
+					__ERROR.Assert(false, "why are we not getting a slot?   our nextSlotTracker thinks there should be this allocated.  investigate");
+				}
+				if (highestAliveToken.IsAlive == true)
+				{
+					//we have a live slot!
+					break;
+				}
+				else
+				{
+#if CHECKED
+					//verify The highest slot is free.  
+					var foundMeta = _UNCHECKED_GetComponent<AllocMetadata>(ref highestAllocatedSlot);
+					__ERROR.Throw(foundMeta.IsAlive == false);
+
+#endif
+
+					//decrement our allocations because the top slot is not alive
+					_nextSlotTracker.FreeLast(out var shouldFreeChunk);
+#if CHECKED
+					//verify next free is actually free
+					result = __TryQueryMetadata(_nextSlotTracker.nextAvailable, out var shouldBeFreeMetadata);
+					__ERROR.Throw(result && shouldBeFreeMetadata.IsAlive == false && shouldBeFreeMetadata.allocToken.isAlive == false);
+#endif
+					if (shouldFreeChunk)
+					{
+						_FreeLastChunk();
+					}
+				}
+			}
+		}
+
+
 		if (_free.Count == 0)
 		{
 			return false;
 		}
-
 
 		_packVersion++;
 
@@ -1285,57 +1348,18 @@ public partial class Allocator  //alloc/free/pack logic
 
 		//loop through our free items
 		for (var i = 0; i < count; i++)
-		{			
+		{
 			var firstFreeSlotToFill = _free[i];
 
 			//find the highestAliveToken, reducing our allocated until that occurs
 			AllocSlot highestAllocatedSlot;
 			AllocMetadata highestAliveToken;
-			while (true)
-			{
-				var result = _nextSlotTracker.TryGetHighestAllocatedSlot(out highestAllocatedSlot);
-				if (result == false)
-				{
-					__ERROR.Assert(false, "no more slots?  is our allocator totally empty?  be sure");
-					//no more slots available.  we are done
-					break;
-				}
-				result = __TryQueryMetadata(highestAllocatedSlot, out highestAliveToken);
-				if(result == false)
-				{
-					__ERROR.Assert(false, "why are we not getting a slot?   our nextSlotTracker thinks there should be this allocated.  investigate");
-				}
-				if (highestAliveToken.IsAlive == true)
-				{
-					//we have a live slot!
-					break;
-				}
-				else
-				{
-#if CHECKED
-					//verify The highest slot is free.  
-					var foundMeta = _UNCHECKED_GetComponent<AllocMetadata>(ref highestAllocatedSlot);
-					__ERROR.Throw(foundMeta.IsAlive == false);
-					
-#endif
-
-					//decrement our allocations because the top slot is not alive
-					_nextSlotTracker.FreeLast(out var shouldFreeChunk);
-#if CHECKED
-					//verify next free is actually free
-					result = __TryQueryMetadata(_nextSlotTracker.nextAvailable, out var shouldBeFreeMetadata);
-					__ERROR.Throw(result && shouldBeFreeMetadata.IsAlive == false && shouldBeFreeMetadata.allocToken.isAlive == false);
-#endif
-					if (shouldFreeChunk)
-					{
-						_FreeLastChunk();
-					}
-				}
-			}
+			_TryFreeAndGetNextAlive(out highestAllocatedSlot, out highestAliveToken);
 			if (firstFreeSlotToFill >= highestAllocatedSlot)
 			{
-				__ERROR.Assert(false, "investigate?  our free are higher than our filled?  probably okay, just clear our slots?");
-				//the above while loop already deallocated to before our current free slot.  so we are done
+				//our first free slot is higher up than our highest allocated.   Because the _free list is sorted, everything else to free is already in unallocated territory.
+				//this happens because during the pack, when our `_TryFreeAndGetNextAlive` finds a dead slot on top it will deallocate it.
+				//the above while loop already deallocated to before our current free slot.  so we are done				
 				break;
 			}
 
@@ -1345,56 +1369,60 @@ public partial class Allocator  //alloc/free/pack logic
 				__CHECKED.Throw(highestAliveToken.IsAlive == true);
 				__CHECKED_INTERNAL_VerifyAllocToken(ref highestAliveToken.allocToken);
 				_PackHelper_MoveSlotToFree(highestAliveToken.allocToken, firstFreeSlotToFill);
+
+
 			}
 
 
 
 
-//////			if (!_nextSlotTracker.TryGetHighestAllocatedSlot(out var highestAllocatedSlot))
-//////			{
-//////				__ERROR.Assert(false, "investigate?  no slots are filled?  probably okay, just clear our slots?");
-//////				break;
-//////			}
-//////			if (firstFreeSlotToFill > highestAllocatedSlot)
-//////			{
-//////				__ERROR.Assert(false, "investigate?  our free are higher than our filled?  probably okay, just clear our slots?");
-//////				break;
-//////			}
+			//////			if (!_nextSlotTracker.TryGetHighestAllocatedSlot(out var highestAllocatedSlot))
+			//////			{
+			//////				__ERROR.Assert(false, "investigate?  no slots are filled?  probably okay, just clear our slots?");
+			//////				break;
+			//////			}
+			//////			if (firstFreeSlotToFill > highestAllocatedSlot)
+			//////			{
+			//////				__ERROR.Assert(false, "investigate?  our free are higher than our filled?  probably okay, just clear our slots?");
+			//////				break;
+			//////			}
 
 
-//////			var highSlotResult = __TryQueryMetadata(highestAllocatedSlot, out var highestAliveToken);
-//////			if (highSlotResult == false || highestAliveToken.IsAlive == false)
-//////			{
-//////				//__ERROR.Throw(false, "if our highestAllocatedSlot is not alive, it should have been sorted ");
-//////				var foundMeta = _UNCHECKED_GetComponent<AllocMetadata>(ref highestAllocatedSlot);
-//////				__ERROR.Throw(foundMeta.IsAlive == false);
-//////				//The highest slot is free.  
-//////			}
-//////			else
-//////			{
-//////				//swap out free and highest
-//////				__CHECKED.Throw(highestAliveToken.IsAlive == true);
-//////				__CHECKED_VerifyAllocToken(ref highestAliveToken.allocToken);
-//////				_PackHelper_MoveSlotToFree(highestAliveToken.allocToken, firstFreeSlotToFill);
-//////			}
+			//////			var highSlotResult = __TryQueryMetadata(highestAllocatedSlot, out var highestAliveToken);
+			//////			if (highSlotResult == false || highestAliveToken.IsAlive == false)
+			//////			{
+			//////				//__ERROR.Throw(false, "if our highestAllocatedSlot is not alive, it should have been sorted ");
+			//////				var foundMeta = _UNCHECKED_GetComponent<AllocMetadata>(ref highestAllocatedSlot);
+			//////				__ERROR.Throw(foundMeta.IsAlive == false);
+			//////				//The highest slot is free.  
+			//////			}
+			//////			else
+			//////			{
+			//////				//swap out free and highest
+			//////				__CHECKED.Throw(highestAliveToken.IsAlive == true);
+			//////				__CHECKED_VerifyAllocToken(ref highestAliveToken.allocToken);
+			//////				_PackHelper_MoveSlotToFree(highestAliveToken.allocToken, firstFreeSlotToFill);
+			//////			}
 
 
-//////			//decrement our slotTracker position now that we have moved our top item (or if top was already free)
-//////			_nextSlotTracker.FreeLast(out var shouldFreeChunk);
-//////#if CHECKED
-//////			//verify next free is actually free
-//////			var result = __TryQueryMetadata(_nextSlotTracker.nextAvailable, out var shouldBeFreeMetadata);
-//////			__ERROR.Throw(result && shouldBeFreeMetadata.IsAlive ==false && shouldBeFreeMetadata.allocToken.isAlive == false);
-//////#endif
-//////			if (shouldFreeChunk)
-//////			{
-//////				_FreeLastChunk();
-//////			}
+			//////			//decrement our slotTracker position now that we have moved our top item (or if top was already free)
+			//////			_nextSlotTracker.FreeLast(out var shouldFreeChunk);
+			//////#if CHECKED
+			//////			//verify next free is actually free
+			//////			var result = __TryQueryMetadata(_nextSlotTracker.nextAvailable, out var shouldBeFreeMetadata);
+			//////			__ERROR.Throw(result && shouldBeFreeMetadata.IsAlive ==false && shouldBeFreeMetadata.allocToken.isAlive == false);
+			//////#endif
+			//////			if (shouldFreeChunk)
+			//////			{
+			//////				_FreeLastChunk();
+			//////			}
 
 		}
-		//remove these free slots now that we are done filling them
-		_free.RemoveRange(0, count);
 
+		{
+			//finally, remove any more dead slots on top.  This can occur if the last `_free` items iterated (above) were swaps.
+			_TryFreeAndGetNextAlive(out var highestAllocatedSlot, out var highestAliveToken);
+		}
 #if CHECKED
 		//verify that our highest allocated is either free or init
 		if (_lookup.Count > 0)
@@ -1405,8 +1433,11 @@ public partial class Allocator  //alloc/free/pack logic
 			__CHECKED.Throw(highestMetadata.IsAlive || _free.Contains(highestAllocated));
 		}
 #endif
+		//remove these free slots now that we are done filling them
+		_free.RemoveRange(0, count);
 
 		return true;
+
 	}
 
 
