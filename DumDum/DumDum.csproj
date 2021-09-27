@@ -19,7 +19,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <Deterministic>False</Deterministic>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-    <DefineConstants>$(DefineConstants);CHECKED;TEST</DefineConstants>
+    <DefineConstants>$(DefineConstants);TEST</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

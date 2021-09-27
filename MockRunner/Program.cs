@@ -12,8 +12,51 @@ using DumDum.Bcl.Diagnostics;
 using DumDum.Engine.Allocation;
 using DumDum.Engine.Ecs;
 using DumDum.Engine.Sim;
+using Microsoft.Toolkit.HighPerformance.Buffers;
 
 
+
+
+MemoryOwner<long> externalIdsOwner;
+HashSet<long> evenSet = new HashSet<long>();
+HashSet<long> oddSet = new HashSet<long>();
+
+
+void Setup(int EntityCount)
+{
+	externalIdsOwner = MemoryOwner<long>.Allocate(EntityCount);
+	var externalIds = externalIdsOwner.Span;
+	var set = new HashSet<long>();
+	while (set.Count < externalIds.Length)
+	{
+		set.Add(__.Rand.NextInt64());
+	}
+	var count = 0;
+	foreach (var id in set)
+	{
+		externalIds[count] = id;
+		count++;
+	}
+	__ERROR.Throw(count == EntityCount);
+
+
+
+	//split into 2 groups
+	foreach (var externalId in externalIds)
+	{
+		if (externalId % 2 == 0)
+		{
+			evenSet.Add(externalId);
+		}
+		else
+		{
+			oddSet.Add(externalId);
+		}
+	}
+
+
+
+}
 //static async Task Main(string[] args)
 //{
 //	var task = Task.Run(() => { Console.WriteLine("HELLO"); });
@@ -30,16 +73,18 @@ using DumDum.Engine.Sim;
 //Task.WaitAll(Task.Delay(100000));
 //Console.WriteLine("hi");
 
-Allocator.__TEST_Unit_SingleAllocator();
-Allocator.__TEST_Unit_SingleAllocator_AndEdit();
+Setup(10000);
+//Allocator.__TEST_Unit_SingleAllocator();
+Allocator.__TEST_Unit_SingleAllocator_AndEdit(true,1000,externalIdsOwner,evenSet,oddSet);
 
-//Allocator.__TEST_Unit_SeriallAllocators();
-//Allocator.__TEST_Unit_SeriallAllocators();
-//Allocator.__TEST_Unit_SeriallAllocators();
-//Allocator.__TEST_Unit_SeriallAllocators();
+////Allocator.__TEST_Unit_SeriallAllocators();
+////Allocator.__TEST_Unit_SeriallAllocators();
+////Allocator.__TEST_Unit_SeriallAllocators();
+////Allocator.__TEST_Unit_SeriallAllocators();
 
 
-await Allocator.__TEST_Unit_ParallelAllocators();
+
+await Allocator.__TEST_Unit_ParallelAllocators(true,1000,externalIdsOwner,1,100,evenSet,oddSet);
 
 
 
@@ -101,6 +146,10 @@ while (true)
 	await manager.Update(TimeSpan.FromTicks(lastElapsed));
 	//Console.WriteLine($"last Elapsed = {lastElapsed}");
 }
+
+
+
+
 
 //[DebuggerVisualizer(typeof(List<T>),)]
 public class MyClass<T>

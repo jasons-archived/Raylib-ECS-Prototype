@@ -258,28 +258,17 @@ public partial class Allocator //unit test
 {
 
 
-	public static async Task __TEST_Unit_ParallelAllocators()
+	public static async Task __TEST_Unit_ParallelAllocators(bool autoPack, int chunkSize, MemoryOwner<long> externalIds, float batchSizeMultipler,int allocatorCount, HashSet<long> evenSet, HashSet<long> oddSet)
 	{
-		//for (var i = 0; i < 1000; i++)
-		//{
-		//	Task.Run(() => __TEST_Unit_SingleAllocator());
-		//}
 
-
-
-
-
-		//var result = Parallel.For(0, 10000, (index) => __TEST_Unit_SingleAllocator());
-		//__ERROR.Throw(result.IsCompleted);
-
-		var PARALLEL_LOOPS = 1000;
+		var PARALLEL_LOOPS = allocatorCount;
 		var execCount = 0;
-		await ParallelFor.Range(0, PARALLEL_LOOPS,1, (start, endExclusive) =>
+		await ParallelFor.Range(0, PARALLEL_LOOPS, batchSizeMultipler, (start, endExclusive) =>
 		{
 			var tempCount = 0;
 			for (var i = start; i < endExclusive; i++)
 			{
-				__TEST_Unit_SingleAllocator_AndEdit();
+				__TEST_Unit_SingleAllocator_AndEdit(autoPack,chunkSize,externalIds,evenSet,oddSet);
 				tempCount++;
 			}
 			Interlocked.Add(ref execCount, tempCount);
@@ -293,14 +282,14 @@ public partial class Allocator //unit test
 
 	}
 	[Conditional("TEST")]
-	public static unsafe void __TEST_Unit_SeriallAllocators()
+	public static unsafe void __TEST_Unit_SeriallAllocators(bool autoPack, int chunkSize, MemoryOwner<long> externalIds, int allocatorCount, HashSet<long> evenSet, HashSet<long> oddSet)
 	{
-		var count = 1000;
+		var count = allocatorCount;
 		using var allocOwner = SpanPool<Allocator>.Allocate(count);
 		var allocs = allocOwner.Span;
 		for (var i = 0; i < count; i++)
 		{
-			allocs[i] = _TEST_HELPER_CreateAndEditAllocator();
+			allocs[i] = _TEST_HELPER_CreateAndEditAllocator(autoPack,chunkSize,externalIds, evenSet, oddSet);
 		}
 		for (var i = 0; i < count; i++)
 		{
@@ -322,9 +311,9 @@ public partial class Allocator //unit test
 
 
 	[Conditional("TEST")]
-	public static unsafe void __TEST_Unit_SingleAllocator_AndEdit()
+	public static unsafe void __TEST_Unit_SingleAllocator_AndEdit(bool autoPack, int chunkSize, MemoryOwner<long> externalIds, HashSet<long> evenSet, HashSet<long> oddSet)
 	{
-		var allocator = _TEST_HELPER_CreateAndEditAllocator();
+		var allocator = _TEST_HELPER_CreateAndEditAllocator(autoPack,chunkSize,externalIds, evenSet, oddSet);
 
 		allocator.Dispose();
 	}
@@ -361,32 +350,35 @@ public partial class Allocator //unit test
 		return allocator;
 	}
 
-	private static unsafe Allocator _TEST_HELPER_CreateAndEditAllocator()
+	private static unsafe Allocator _TEST_HELPER_CreateAndEditAllocator(bool autoPack, int chunkSize, MemoryOwner<long> externalIdsOwner, HashSet<long> evenSet, HashSet<long> oddSet)
 	{
 		var allocator = new Allocator()
 		{
-			AutoPack = __.Rand._NextBoolean(),
-			ChunkSize = __.Rand.Next(1, 100),
+			AutoPack = autoPack,
+			ChunkSize = chunkSize,
 			ComponentTypes = new() { typeof(int), typeof(string) },
 
 
 		};
 		allocator.Initialize();
 
-		using var externalIdsOwner = SpanPool<long>.Allocate(__.Rand.Next(0, 1000));
-		var set = new HashSet<long>();
-		var externalIds = externalIdsOwner.Span;
-		while (set.Count < externalIds.Length)
-		{
-			set.Add(__.Rand.NextInt64());
-		}
+		//using var externalIdsOwner = SpanPool<long>.Allocate(__.Rand.Next(0, 1000));
+		//var set = new HashSet<long>();
+		//var externalIds = externalIdsOwner.Span;
+		//while (set.Count < externalIds.Length)
+		//{
+		//	set.Add(__.Rand.NextInt64());
+		//}
 
-		var count = 0;
-		foreach (var id in set)
-		{
-			externalIds[count] = id;
-			count++;
-		}
+		//var count = 0;
+		//foreach (var id in set)
+		//{
+		//	externalIds[count] = id;
+		//	count++;
+		//}
+
+		var externalIds = externalIdsOwner.Span;
+
 		//Span<long> externalIds = stackalloc long[] { 2, 4, 8, 7, -2 };
 		using var tokensOwner = SpanPool<AllocToken>.Allocate(externalIds.Length);
 		var tokens = tokensOwner.Span;
@@ -421,22 +413,6 @@ public partial class Allocator //unit test
 			numExId = (int)token.externalId;
 			__ERROR.Throw(num == numExId);
 
-		}
-
-		//split into 2 groups
-		var evenSet = new HashSet<long>();
-		var oddSet = new HashSet<long>();
-
-		foreach (var externalId in set)
-		{
-			if (externalId % 2 == 0)
-			{
-				evenSet.Add(externalId);
-			}
-			else
-			{
-				oddSet.Add(externalId);
-			}
 		}
 
 

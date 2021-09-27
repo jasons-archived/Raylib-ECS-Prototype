@@ -39,8 +39,9 @@ namespace DumDum.Bcl.Collections._unused
 			this._storage = new(initialCapacity);
 			this._storage.Clear();
 			this._freeSlots = new(initialCapacity);
+#if CHECKED
 			this._CHECKED_allocationTracker = new();
-
+#endif
 			for (var i = 0; i < initialCapacity; i++)
 			{
 				this._freeSlots.Push(initialCapacity - i);
@@ -67,7 +68,9 @@ namespace DumDum.Bcl.Collections._unused
 		{
 			get
 			{
+				#if CHECKED
 				__CHECKED.Throw(this._CHECKED_allocationTracker.ContainsKey(slot), "slot is not allocated and you are using it");
+#endif
 				return ref _storage[slot];
 			}
 		}
@@ -101,7 +104,9 @@ namespace DumDum.Bcl.Collections._unused
 				if (this._freeSlots.Count > 0)
 				{
 					slot = this._freeSlots.Pop();
+					#if CHECKED
 					__CHECKED.Throw(this._CHECKED_allocationTracker.TryAdd(slot, true), "slot already allocated");
+#endif
 				}
 				else
 				{
@@ -118,9 +123,9 @@ namespace DumDum.Bcl.Collections._unused
 			lock (this._lock)
 			{
 				this.Version++;
-
+				#if CHECKED
 				__CHECKED.Throw(this._CHECKED_allocationTracker.TryRemove(slot, out var temp), "slot is not allocated but trying to remove");
-
+#endif
 				this._freeSlots.Push(slot);
 				this._storage[slot] = default;
 			}

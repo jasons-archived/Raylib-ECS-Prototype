@@ -16,6 +16,8 @@ namespace DumDum.Bcl.Collections._unused
 		public int Length { get; protected set; }
 		private RaceCheck _check;
 
+		
+
 		public ResizableArray(int length = 0)
 		{
 			_storage = new TItem[length];
@@ -49,10 +51,19 @@ namespace DumDum.Bcl.Collections._unused
 		{
 			if (index >= Length)
 			{
-				Grow(index - (Length-1));				
+				lock(_storage)
+				{
+					if (index >= Length)
+					{
+						Grow(index - (Length - 1));
+					}
+				}
 			}
 			if(this[index] == null){
-				this[index] = newCtor();
+				lock (_storage)
+				{
+					this[index] = newCtor();
+				}
 			}
 			return this[index];
 		}
@@ -63,37 +74,46 @@ namespace DumDum.Bcl.Collections._unused
 		/// <returns></returns>
 		public int Grow(int count)
 		{
-			_check.Enter();
-			if ((count + Length) > _storage.Length)
+			lock (_storage)
 			{
-				var newCapacity = Math.Max(_storage.Length * 2, Length + count);
-				this._SetCapacity(newCapacity);
-			}
+				_check.Enter();
+				if ((count + Length) > _storage.Length)
+				{
+					var newCapacity = Math.Max(_storage.Length * 2, Length + count);
+					this._SetCapacity(newCapacity);
+				}
 
-			var current = Length;
-			Length += count;
-			_check.Exit();
-			return current;
+				var current = Length;
+				Length += count;
+				_check.Exit();
+				return current;
+			}
 		}
 
 		public void Shrink(int count)
 		{
-			_check.Enter();
-			Length -= count;
-			Array.Clear(_storage, Length, count);
-			this._TryPack();
-			_check.Exit();
+			lock (_storage)
+			{
+				_check.Enter();
+				Length -= count;
+				Array.Clear(_storage, Length, count);
+				this._TryPack();
+				_check.Exit();
+			}
 		}
 
 		public void SetLength(int newLength)
 		{
-			_check.Enter();
-			if (newLength < _storage.Length)
+			lock (_storage)
 			{
-				this._SetCapacity(newLength);
+				_check.Enter();
+				if (newLength < _storage.Length)
+				{
+					this._SetCapacity(newLength);
+				}
+				Length = newLength;
+				_check.Exit();
 			}
-			Length = newLength;
-			_check.Exit();
 		}
 
 		private void _TryPack()

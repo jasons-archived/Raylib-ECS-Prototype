@@ -45,7 +45,9 @@ namespace DumDum.Bcl.Collections._unused
 
 		public ref TData GetRef(int slot)
 		{
+			#if CHECKED
 			__CHECKED.Throw(this._CHECKED_allocationTracker.ContainsKey(slot), "slot is not allocated and you are using it");
+#endif
 			return ref this._storage[slot];
 		}
 		public ref TData this[int slot]
@@ -65,8 +67,9 @@ namespace DumDum.Bcl.Collections._unused
 			{
 				this.Version++;
 				var slot = this._freeSlots.Pop();
+				#if CHECKED
 				__CHECKED.Throw(this._CHECKED_allocationTracker.TryAdd(slot, true), "slot already allocated");
-
+#endif
 				this._storage[slot] = data;
 				return slot;
 			}
@@ -78,9 +81,9 @@ namespace DumDum.Bcl.Collections._unused
 			lock (this._lock)
 			{
 				this.Version++;
-
+				#if CHECKED
 				__CHECKED.Throw(this._CHECKED_allocationTracker.TryRemove(slot, out var temp), "slot is not allocated but trying to remove");
-
+#endif
 				this._freeSlots.Push(slot);
 				this._storage[slot] = default;
 			}
