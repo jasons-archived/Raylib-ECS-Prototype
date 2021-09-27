@@ -274,12 +274,12 @@ public partial class Allocator //unit test
 
 		var PARALLEL_LOOPS = 1000;
 		var execCount = 0;
-		await ParallelFor.Range(0, PARALLEL_LOOPS, (start, endExclusive) =>
+		await ParallelFor.Range(0, PARALLEL_LOOPS,1, (start, endExclusive) =>
 		{
 			var tempCount = 0;
 			for (var i = start; i < endExclusive; i++)
 			{
-				__TEST_Unit_SingleAllocator();
+				__TEST_Unit_SingleAllocator_AndEdit();
 				tempCount++;
 			}
 			Interlocked.Add(ref execCount, tempCount);
@@ -1151,7 +1151,14 @@ public partial class Allocator  //alloc/free/pack logic
 		//verify allocMetadatas match
 		__ERROR.Throw(manualGetChunk.Span[allocToken.allocSlot.rowSlotIndex].allocToken == allocToken);
 
+
+
+		//verify access thru Chunk<T> works also
+		var chunkLookupChunk = Chunk<AllocMetadata>._LOOKUP._storage[allocToken.allocatorId]._AsSpan_Unsafe()[allocToken.allocSlot.chunkIndex];
+		__ERROR.Throw(chunkLookupChunk == manualGetChunk);
+
 	}
+
 
 
 
