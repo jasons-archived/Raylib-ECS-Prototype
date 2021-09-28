@@ -286,7 +286,7 @@ public partial class Allocator //unit test
 		//Console.WriteLine("start parallel");
 		var PARALLEL_LOOPS = allocatorCount;
 		var execCount = 0;
-		await ParallelFor.Range(0, PARALLEL_LOOPS, batchSizeMultipler, (start, endExclusive) =>
+		await ParallelFor.RangeAsync(0, PARALLEL_LOOPS, batchSizeMultipler, (start, endExclusive) =>
 		{
 			var tempCount = 0;
 			for (var i = start; i < endExclusive; i++)
@@ -1233,18 +1233,44 @@ public partial class Allocator  //alloc/free/pack logic
 		//parallel through all columns, deleting
 		var allocTokensArraySegment = so_AllocTokens.DangerousGetArray();
 		var allocArray = allocTokensArraySegment.Array;
-		Parallel.ForEach(_atomIdsUsed, (atomId, loopState) =>
+		////var workCount = 0;
+		ParallelFor.Range(0, _atomIdsUsed.Count, (start, end) =>
 		{
-
-			var columns = _GetColumnsSpan();
-			var columnList = columns[atomId];
-			//var (type, columnList) = pair;
-			for (var i = 0; i < allocTokensArraySegment.Count; i++)
+			var count = allocTokensArraySegment.Count;
+			Span<AllocToken> span = allocArray;
+			for (var aIndex = start; aIndex < end; aIndex++)
 			{
-				ref var allocToken = ref allocArray[i];
-				columnList[allocToken.allocSlot.chunkIndex].OnFreeSlot(ref allocToken);
+				//Interlocked.Increment(ref workCount);
+				var atomId = _atomIdsUsed[aIndex];
+
+
+
+				var columns = _GetColumnsSpan();
+				var columnList = columns[atomId];
+				//var (type, columnList) = pair;
+				for (var i = 0; i < count; i++)
+				{
+					ref var allocToken = ref span[i];
+					columnList[allocToken.allocSlot.chunkIndex].OnFreeSlot(ref allocToken);
+				}
 			}
 		});
+		////__ERROR.Throw(workCount==_atomIdsUsed.Count,"parallel is missing work"); 
+
+		//Parallel.ForEach(_atomIdsUsed, (atomId, loopState) =>
+		////foreach(var atomId in _atomIdsUsed)
+		//{
+
+		//	var columns = _GetColumnsSpan();
+		//	var columnList = columns[atomId];
+		//	//var (type, columnList) = pair;
+		//	for (var i = 0; i < allocTokensArraySegment.Count; i++)
+		//	{
+		//		ref var allocToken = ref allocArray[i];
+		//		columnList[allocToken.allocSlot.chunkIndex].OnFreeSlot(ref allocToken);
+		//	}
+		//}
+		//);
 
 
 
@@ -1316,6 +1342,12 @@ public partial class Allocator  //alloc/free/pack logic
 		__CHECKED_INTERNAL_VerifyAllocToken(ref newSlotAllocToken);
 	}
 
+	/// <summary>
+	/// pack the page, so that there are no gaps between live entities.  The earliest free slots are filled by moving the ending entities up to fill it.  
+	/// Rows that become empty will be recycled.
+	/// </summary>
+	/// <param name="maxCount"></param>
+	/// <returns></returns>
 	public bool Pack(int maxCount)
 	{
 		//sor frees
@@ -1651,7 +1683,6 @@ public record struct ChunkLookupId
 	public int allocatorId;
 }
 
-
 public class Chunk<TComponent> : Chunk
 {
 	//public static Dictionary<long, Chunk<TComponent>> _GLOBAL_LOOKUP = new(0);
@@ -1766,6 +1797,8 @@ public class Chunk<TComponent> : Chunk
 #endif
 
 	}
+
+	[MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
 	internal override void OnFreeSlot(ref AllocToken allocToken)
 	{
 		_count--;

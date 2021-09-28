@@ -55,25 +55,25 @@ public class AllocatorBenchmark
 	public HashSet<long> oddSet = new HashSet<long>();
 
 	[Params(100000)]
-	public int EntityCount { get; set; }
+	public int EntityCount { get; set; } = 100000;
 
 	[Params(true,false)]
-	public bool AutoPack { get; set; }
+	public bool AutoPack { get; set; } = true;
 
 	[Params(100
 		//,1000,10000
 		)]
-	public int ChunkSize { get; set; }
+	public int ChunkSize { get; set; } = 1;
 
 	[Params(1f
 		//,4f
 		)]
-	public float PBatchX { get; set; }
+	public float PBatchX { get; set; } = 1f;
 
 
 	[Params(//10,
 		100)]
-	public int Allocators { get; set; }
+	public int Allocators { get; set; } = 100;
 
 	//[IterationSetup]
 	//public void Temp()
@@ -118,6 +118,11 @@ public class AllocatorBenchmark
 
 	}
 
+//	[Benchmark]
+	public async Task Sequential_CreateEditDelete()
+	{
+		Allocator.__TEST_Unit_SingleAllocator_AndEdit(AutoPack, ChunkSize, externalIdsOwner, evenSet, oddSet);
+	}
 	[Benchmark]
 	public async Task Parallel_CreateEditDelete()
 	{
@@ -129,10 +134,12 @@ public class AllocatorBenchmark
 
 public class Program
 {
-	public static void Main(string[] args)
+	public static async Task Main(string[] args)
 	{
 #if DEBUG
-
+		var bm = new AllocatorBenchmark();
+		bm.Setup();
+		await bm.Sequential_CreateEditDelete();
 		//run in debug mode (can hit breakpoints in VS)
 		//var summary = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, new BenchmarkDotNet.Configs.DebugInProcessConfig());		
 //run a specific benchmark

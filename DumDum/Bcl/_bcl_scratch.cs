@@ -538,7 +538,7 @@ public static class ParallelFor
 	/// Range is ideal for cache coherency and lowest overhead.  If you require an action per element, it can behave like `Parallel.For` (set batchSizeMultipler=0).
 	/// </summary>
 	/// <param name="action">(start,endExclusive)=>ValueTask</param>
-	public static ValueTask Range(int start, int length, Func<int, int, ValueTask> action) => Range(start, length, 1f, action);
+	public static ValueTask RangeAsync(int start, int length, Func<int, int, ValueTask> action) => RangeAsync(start, length, 1f, action);
 	/// <summary>
 	/// Range is ideal for cache coherency and lowest overhead.  If you require an action per element, it can behave like `Parallel.For` (set batchSizeMultipler=0).
 	/// </summary>
@@ -552,7 +552,7 @@ public static class ParallelFor
 	/// <para>4 = quad size batches, use 1/4 cpu cores at max.</para></param>
 	/// <param name="action">(start,endExclusive)=>ValueTask</param>
 	/// <returns></returns>
-	public static ValueTask Range(int start, int length, float batchSizeMultipler, Func<int, int, ValueTask> action)
+	public static ValueTask RangeAsync(int start, int length, float batchSizeMultipler, Func<int, int, ValueTask> action)
 	{
 		if (length == 0)
 		{
@@ -560,23 +560,53 @@ public static class ParallelFor
 		}
 		using var owner = _Range_ComputeBatches(start, length, batchSizeMultipler);
 
-		return _Range_ExecuteAction(owner.DangerousGetArray(), action);
+		return _Range_ExecuteActionAsync(owner.DangerousGetArray(), action);
 	}
-	private static async ValueTask _Range_ExecuteAction(ArraySegment<(int start, int endExclusive)> spanOwnerDangerousArray, Func<int, int, ValueTask> action)
+	private static async ValueTask _Range_ExecuteActionAsync(ArraySegment<(int start, int endExclusive)> spanOwnerDangerousArray, Func<int, int, ValueTask> action)
 	{
 		await Parallel.ForEachAsync(spanOwnerDangerousArray, (batch, cancelToken) => Unsafe.AsRef(in action).Invoke(batch.start, batch.endExclusive));
 	}
 
-	public static Task Each<T>(IEnumerable<T> source, Func<T, CancellationToken, ValueTask> action)
+	public static Task EachAsync<T>(IEnumerable<T> source, Func<T, CancellationToken, ValueTask> action)
 	{
 		return Parallel.ForEachAsync(source, action);
 	}
 
-	public static Task Each<T>(IEnumerable<T> source, Func<T, ValueTask> action)
+	public static Task EachAsync<T>(IEnumerable<T> source, Func<T, ValueTask> action)
 	{
 		return Parallel.ForEachAsync(source, (item, cancelToken) => Unsafe.AsRef(in action).Invoke(item));
 	}
+	/// <summary>
+	/// Range is ideal for cache coherency and lowest overhead.  If you require an action per element, it can behave like `Parallel.For` (set batchSizeMultipler=0).
+	/// </summary>
+	/// <param name="action">(start,endExclusive)=>ValueTask</param>
+	public static void Range(int start, int length, Action<int, int> action) => Range(start, length, 1f, action);
+	/// <summary>
+	/// Range is ideal for cache coherency and lowest overhead.  If you require an action per element, it can behave like `Parallel.For` (set batchSizeMultipler=0).
+	/// </summary>
+	/// <param name="start"></param>
+	/// <param name="length"></param>
+	/// <param name="batchSizeMultipler">The range is split into batches, with each batch being the total/cpu count.  The number of (and size of) batches can be modified by this parameter.
+	/// <para>1 = The default. 1 batch per cpu.  Generally a good balance as it will utilize all cores if available, while not overwhelming the thread pool (allowing other work a fair chance in backlog situations) </para>
+	/// <para>0.5 = 2 batches per cpu, with each batch half sized.   useful if the work required for each element is varied. </para>
+	/// <para>0 = each batch is 1 element.  useful if parallelizing independent systems that are long running and use dissimilar regions of memory.</para>
+	/// <para>2 = double sized batches, utilizing a maximum of half cpu cores.  Useful for offering parallel work while reducing multicore overhead.</para>
+	/// <para>4 = quad size batches, use 1/4 cpu cores at max.</para></param>
+	/// <param name="action">(start,endExclusive)=>ValueTask</param>
+	/// <returns></returns>
+	public static void Range(int start, int length, float batchSizeMultipler, Action<int, int> action)
+	{
+		if (length == 0)
+		{
+			return;
+		}
+		using var owner = _Range_ComputeBatches(start, length, batchSizeMultipler);
+		var span = owner.Span;
+		var array = owner.DangerousGetArray().Array;
 
+		Parallel.For(0, span.Length, (index) =>Unsafe.AsRef(in action).Invoke(array[index].startInclusive, array[index].endExclusive));
+
+	}
 
 
 }
@@ -650,6 +680,15 @@ public class DisposeSentinel : IDisposable
 	}
 }
 
+
+[StructLayout(LayoutKind.Auto,Size =64)]
+public unsafe struct CacheLineRef<T>
+{
+	//[FieldOffset(0)]
+	public T value;
+	//[FieldOffset(0)]
+	private fixed byte _size[60];
+}
 
 /// <summary>
 /// DANGER. adapted from, and for inlining Array unbounded workflow: https://github.com/CommunityToolkit/WindowsCommunityToolkit/blob/059cf83f1fb02a4fbb4ce24249ea6e38f504983b/Microsoft.Toolkit.HighPerformance/Extensions/ArrayExtensions.cs#L86/// 

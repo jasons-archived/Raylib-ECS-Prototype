@@ -227,6 +227,9 @@ Logical object structure is
 - linq: https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/linq/
 - plinq: https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/introduction-to-plinq
 - ascii drawing tools: https://asciiflow.com/#/
+- github contributions CLA assistant:  https://github.com/cla-assistant/cla-assistant
+- - dotnet API browser: https://source.dot.net/#System.Private.CoreLib/List.cs,39
+- 
 ### c# tricks/notes/perf
 - use record structs for comparison/lookups: https://nietras.com/2021/06/14/csharp-10-record-struct/
 - use `MemoryOwner<T>` for shared pool objects
@@ -235,7 +238,9 @@ Logical object structure is
 - the Stack is only about  `1mb` so only use `stackalloc` for small temp allocations.   anything bigger use `MemoryOwner<T>`
 - on a `x64` win10 machine, a memorypage is `4096` bytes.  
 - for making instances of generic types:    `var listType = typeof(List<>).MakeGenericType(yourType)` and `Activator.CreateInstance(listType)`
-
+- Need to get some tips on some random c# feature?  https://goalkicker.com/DotNETFrameworkBook/DotNETFrameworkNotesForProfessionals.pdf
+  - also an algorithms book, for things like A* https://goalkicker.com/AlgorithmsBook/
+  
 
 # TODO:
 

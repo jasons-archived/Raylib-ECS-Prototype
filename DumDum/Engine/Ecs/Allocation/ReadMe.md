@@ -1,6 +1,6 @@
 ﻿# ECS Allocation
 
-The allocator is an important feature because in the ECS system these things need to be created and managed for each entity created:
+The Page is an important feature because in the ECS system these things need to be created and managed for each entity created:
 - EntityHandle
 - Each component the entity will use
   - Metadata
@@ -15,16 +15,70 @@ As part of managing this data, you need to:
 - Systems need to efficiently query component data
 
 To do this, the Allocation system was created.  It is comprised of the following main parts:
-- `Allocator`: one per archetype.  This manages allocation and tracking of all that archetypes components
+- `Page`: one per archetype.  This manages allocation and tracking of all that archetypes components  
 - `Chunk<TComponent>`: An array holding components of a certain type, for some of the entities of the archetype.  Imagine an archetype with 10,000 entities.  Instead of putting all the Xform components in a single huge array, we split it into smaller arrays, called chunks.  
-- `AllocHandle`: tracks and provides direct access to each component for a given Entity.  If the allocator is set to `autoPack==true` (the default) this handle is only good for the current frame.  After that it needs to be reaquired.  This is provided for flexibility but for builk component query/write operations it is much more efficient to use the `Allocator.Query()` methods
-
-Here is how thigs are laid out logically in memory:
+- `PageHandle`: tracks and provides direct access to each component for a given Entity.  If the Page is set to `autoPack==true` (the default) this handle is only good for the current frame.  After that it needs to be reaquired.  This is provided for flexibility but for builk component query/write operations it is much more efficient to use the `Page.Query()` methods
 
 
+## Layout
+
+### Row
+A row holds a "chunk" of the components of a specific type for a given Page (for a given Archetype).   
+Effectively a `TComponent[]` array.
 
 
+### Column
+A Column is a collection of all rows for the given TComponent for the Page.  
+Effectively a `List<TComponent[]>`.
 
+### Page 
+Is a class that holds a collection of columns, one per `TComponent`.  
+Effectively a `Dictionary<typeof(TComponent),Column<TComponent>>`
+
+### Slot
+Is a single component for a single entity.  These can reverse-lookup their owner entity by inspecting a special `PageMeta` component that is added to each
+
+
+Here is an example showing how thigs are laid out logically in memory:
+
+
+```
+ ┌──PAGE01─────────────────────────────────────────────────────────────────────────┐
+ │                                                                                 │
+ │    ┌───COLUMN<T1>────────────────────┐  ┌───COLUMN<T2>────────────────────┐     │
+ │    │                                 │  │                                 │     │
+ │    │  ┌────ROW0─────┬──────┬──────┐  │  │  ┌────ROW0─────┬──────┬──────┐  │     │
+ │    │  │ Slot0│ Slot1│ Slot2│ Slot3│  │  │  │ Slot0│ Slot1│ Slot2│ Slot3│  │     │
+ │    │  └──────┴──────┴──────┴──────┘  │  │  └──────┴──────┴──────┴──────┘  │     │
+ │    │                                 │  │                                 │     │
+ │    │  ┌────ROW1─────┬──────┬──────┐  │  │  ┌────ROW1─────┬──────┬──────┐  │     │
+ │    │  │ Slot0│ Slot1│ Slot2│ Slot3│  │  │  │ Slot0│ Slot1│ Slot2│ Slot3│  │     │
+ │    │  └──────┴──────┴──────┴──────┘  │  │  └──────┴──────┴──────┴──────┘  │     │
+ │    │                                 │  │                                 │     │
+ │    └─────────────────────────────────┘  └─────────────────────────────────┘     │
+ │                                                                                 │
+ └─────────────────────────────────────────────────────────────────────────────────┘
+
+ ┌──PAGE02─────────────────────────────────────────────────────────────────────────┐
+ │                                                                                 │
+ │                                         ┌───COLUMN<T2>────────────────────┐     │
+ │                                         │                                 │     │
+ │                                         │  ┌────ROW0─────┬──────┐         │     │
+ │                                         │  │ Slot0│ Slot1│ Slot2│         │     │
+ │                                         │  └──────┴──────┴──────┘         │     │
+ │                                         │                                 │     │
+ │                                         │                                 │     │
+ │                                         │                                 │     │
+ │                                         │                                 │     │
+ │                                         │                                 │     │
+ │                                         └─────────────────────────────────┘     │
+ │                                                                                 │
+ └─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+In the above, Page01 has two types of `TComponent` assigned to it.  Each TComponent has it's own column, and each row is set to have 4 slots each.   (The Page sets how long each row it contains will be).
+
+Page2 only has one component assigned to it, and it's row size is 3.  Regardless of how many entities each Page tracks, the row size will be the same.   As more entities are added/removed, more rows will be added/removed
 
 
 
