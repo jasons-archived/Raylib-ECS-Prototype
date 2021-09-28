@@ -39,7 +39,13 @@ public interface IComponent
 /// </summary>
 public readonly record struct AllocToken : IComparable<AllocToken>
 {
+	/// <summary>
+	/// check this to determine if the token is explicitly valid
+	/// </summary>
 	public readonly bool isAlive { get; init; }
+	/// <summary>
+	/// entityId
+	/// </summary>
 	public readonly long externalId { get; init; }
 
 
@@ -79,7 +85,10 @@ public readonly record struct AllocToken : IComparable<AllocToken>
 	//		//return (long)allocSlot.columnChunkIndex << 32 | (uint)allocatorId;
 	//		return (long)allocatorId << 32 | (uint)allocSlot.columnChunkIndex;
 	//	}
-
+	/// <summary>
+	/// obtain an ad-hoc reference to a component with write access.  
+	/// <para>BAD PERFORMANCE: you should prefer to use the Query() method instead</para>
+	/// </summary>
 	public ref T GetComponentWriteRef<T>()
 	{
 		var (result, reason) = GetAllocator().CheckIsValid(this);
@@ -90,6 +99,10 @@ public readonly record struct AllocToken : IComparable<AllocToken>
 		return ref chunk.GetWriteRef(this);
 
 	}
+	/// <summary>
+	/// obtain an ad-hoc reference to a component with read access.  
+	/// <para>BAD PERFORMANCE: you should prefer to use the Query() method instead</para>
+	/// </summary>
 	public ref readonly T GetComponentReadRef<T>()
 	{
 		var (result, reason) = GetAllocator().CheckIsValid(this);
@@ -99,6 +112,11 @@ public readonly record struct AllocToken : IComparable<AllocToken>
 		var chunk = GetContainingChunk<T>();
 		return ref chunk.GetReadRef(this);
 	}
+	/// <summary>
+	/// internal helper.   get the chunk this allocToken is mapped to for the given type
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
+	/// <returns></returns>
 	public Chunk<T> GetContainingChunk<T>()
 	{
 		//_CHECKED_VerifyInstance<T>();
@@ -159,6 +177,11 @@ public readonly record struct AllocToken : IComparable<AllocToken>
 	//	__CHECKED.Throw(this == allocMetaChunk.Span[allocSlot.rowSlotIndex].allocToken);
 	//}
 
+	/// <summary>
+	/// allows sorting
+	/// </summary>
+	/// <param name="other"></param>
+	/// <returns></returns>
 	public int CompareTo(AllocToken other)
 	{
 		return allocSlot.CompareTo(other.allocSlot);
@@ -490,7 +513,7 @@ public partial class Allocator //unit test
 				}
 
 			}
-			__ERROR.Throw(column[0].allocatorId == allocator._allocatorId && column[0].allocatorVersion == allocator._version, "column doesn't match our allocator");
+			__ERROR.Throw(column[0].allocatorId == allocator._allocatorId && column[0].allocatorVersion == allocator._fingerprint, "column doesn't match our allocator");
 		}
 
 		return allocator;
@@ -499,7 +522,10 @@ public partial class Allocator //unit test
 
 public partial class Allocator  //ATOM logic
 {
-
+	/// <summary>
+	/// helper to convert a Type into an id.  maybe not useful, if internal to Allocator we want to switch back to a Type keyed dictionary again (for columns).  
+	/// right now we are using atomId keyed columns.
+	/// </summary>
 	protected internal static class Atom
 	{
 		/**
@@ -626,6 +652,7 @@ public partial class Allocator  //ATOM logic
 
 /// <summary>
 /// allocator for archetypes 
+/// see ReadMe.md
 /// </summary>
 public partial class Allocator : IDisposable //init logic
 {
@@ -634,9 +661,15 @@ public partial class Allocator : IDisposable //init logic
 	//public static Dictionary<int, Allocator> _GLOBAL_LOOKUP = new();
 	//public int _allocatorId = _allocatorId_GlobalCounter._InterlockedIncrement();
 	public static AllocSlotList<Allocator> _GLOBAL_LOOKUP = new();
+	/// <summary>
+	/// this allocator instance can be looked up via the static Allocator._GLOBAL_LOOKUP[_allocatorId]
+	/// </summary>
 	public int _allocatorId = -1;
-	private static int _versionCounter;
-	public int _version = _versionCounter++;
+	private static int _fingerprintCounter;
+	/// <summary>
+	/// tracker so that every allocator has a different "fingerprint".  needed because allocatorId is reused when an allocator is disposed.
+	/// </summary>
+	public int _fingerprint = _fingerprintCounter++;
 
 	/// <summary>
 	/// if you want to add additional custom components to each entity, list them here.  These are not used to compute the <see cref="_componentsHashId"/>
@@ -644,7 +677,9 @@ public partial class Allocator : IDisposable //init logic
 	/// </summary>
 	public List<Type> CustomMetaComponentTypes = new List<Type>() { typeof(AllocMetadata) };
 
-
+	/// <summary>
+	/// the Type of components this allocator manages.  
+	/// </summary>
 	public List<Type> ComponentTypes { get; init; }
 
 
@@ -1075,7 +1110,7 @@ public partial class Allocator  //alloc/free/pack logic
 			allocSlot = slot,
 			externalId = externalId,
 			packVersion = _packVersion,
-			allocatorVersion = _version,
+			allocatorVersion = _fingerprint,
 		};
 	}
 
@@ -1681,7 +1716,7 @@ public class Chunk<TComponent> : Chunk
 		//	_chunkLookupId = chunkLookupId;
 		__DEBUG.Throw(this.allocatorId == -1, "already init");
 		allocatorId = allocator._allocatorId;
-		allocatorVersion = allocator._version;
+		allocatorVersion = allocator._fingerprint;
 		this.columnIndex = columnIndex;
 
 

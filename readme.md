@@ -24,6 +24,7 @@
     - [feature notes](#feature-notes)
     - [c# tricks/notes/perf](#c-tricksnotesperf)
 - [TODO:](#todo)
+- [issues](#issues)
 
 # DumDum?
 A codename?
@@ -219,12 +220,13 @@ Logical object structure is
 - math helper libs: Silk.net
 - input and other platform libs: Silk.net
 - kitbash:  https://kenney.nl/tools/assetforge and https://kenney.itch.io/kenshape
+- map editor: https://trenchbroom.github.io/
 - benchmarking: https://benchmarkdotnet.org/
 - online codepen:
   - https://sharplab.io/
 - linq: https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/linq/
 - plinq: https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/introduction-to-plinq
-- 
+- ascii drawing tools: https://asciiflow.com/#/
 ### c# tricks/notes/perf
 - use record structs for comparison/lookups: https://nietras.com/2021/06/14/csharp-10-record-struct/
 - use `MemoryOwner<T>` for shared pool objects
@@ -243,3 +245,16 @@ Logical object structure is
   - `Parallel.ForEach(_columns, (columnList, loopState) ` line in Allocator.Free() should be changed to __.ForRange() workflow
 - For Chunk global lookups
    - AllocatorId --> ColumnList   so access is `Chunk<T>._GLOBAL_LOOKUP[allocatorId][chunkId][rowId]`
+
+
+
+# issues
+
+- CPU Cache coherency/false sharing. 
+   - see https://www.youtube.com/watch?v=WDIkqP4JbkE&t=247s
+   - Problems arise only when all are true:
+      - Independent values/variables fall on one cache line (64Bytes on x86/64)
+      - Different cores concurrently access that line
+      - Frequently
+      - At least one is a writer
+      - 
