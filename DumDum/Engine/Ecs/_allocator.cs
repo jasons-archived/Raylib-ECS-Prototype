@@ -16,15 +16,6 @@ using System.Threading.Tasks;
 
 namespace DumDum.Engine.Allocation;
 
-/// <summary>
-/// just a hint that the derived object is a component.  not actually needed.
-/// </summary>
-public interface IComponent
-{
-
-}
-
-
 
 
 
@@ -35,9 +26,9 @@ public interface IComponent
 
 
 /// <summary>
-/// only good for the current frame, unless chunk packing is disabled.  in that case it's good for lifetime of entity in the archetype.
+/// only good for the current frame, unless chunk packing is disabled.  in that case it's good for lifetime of entity in the page.
 /// </summary>
-public readonly record struct AllocToken : IComparable<AllocToken>
+public readonly record struct PageAccessToken : IComparable<PageAccessToken>
 {
 	/// <summary>
 	/// check this to determine if the token is explicitly valid
@@ -50,17 +41,17 @@ public readonly record struct AllocToken : IComparable<AllocToken>
 
 
 	/// <summary>
-	/// the id of the allocator that created/tracks this allocSlot.  //TODO: make the archetype also use this ID as it's own (on create allocator, use it's ID)
-	/// If needed, the allocator can be accessed via `Allocator._GLOBAL_LOOKUP(allocatorId)`
+	/// the id of the page that created/tracks this slotRef.  //TODO: make the page also use this ID as it's own (on create page, use it's ID)
+	/// If needed, the page can be accessed via `Page._GLOBAL_LOOKUP(pageId)`
 	/// </summary>
-	public readonly int allocatorId { get; init; }
+	public readonly int pageId { get; init; }
 	/// <summary>
-	/// used to verify allocator was not replaced with another
+	/// used to verify page was not replaced with another
 	/// </summary>
-	public readonly int allocatorVersion { get; init; }
-	public readonly AllocSlot allocSlot { get; init; }
+	public readonly int pageVersion { get; init; }
+	public readonly SlotRef slotRef { get; init; }
 	/// <summary>
-	/// needs to match Allocator._packVersion, otherwise a pack took place and the token needs to be refreshed.
+	/// needs to match Page._packVersion, otherwise a pack took place and the token needs to be refreshed.
 	/// </summary>
 	public readonly int packVersion { get; init; }
 	//	/// <summary>
@@ -72,30 +63,30 @@ public readonly record struct AllocToken : IComparable<AllocToken>
 	//		//long correct = (long)left << 32 | (long)(uint)right;  //from: https://stackoverflow.com/a/33325313/1115220
 	//#if CHECKED
 
-	//		var chunkLookup = new ChunkLookupId { allocatorId = allocatorId, columnChunkIndex = allocSlot.columnChunkIndex };
+	//		var chunkLookup = new ChunkLookupId { pageId = pageId, columnChunkIndex = slotRef.columnChunkIndex };
 	//		var chunkLookupId = chunkLookup._packedValue;
-	//		var toReturn = (long)allocatorId << 32 | (uint)allocSlot.columnChunkIndex;
-	//		//var toReturn = (long)allocSlot.columnChunkIndex<< 32 | (uint)allocatorId;
+	//		var toReturn = (long)pageId << 32 | (uint)slotRef.columnChunkIndex;
+	//		//var toReturn = (long)slotRef.columnChunkIndex<< 32 | (uint)pageId;
 	//		__CHECKED.Throw(chunkLookupId == toReturn, "ints to long is wrong");
 	//#endif
 
 
 
 
-	//		//return (long)allocSlot.columnChunkIndex << 32 | (uint)allocatorId;
-	//		return (long)allocatorId << 32 | (uint)allocSlot.columnChunkIndex;
+	//		//return (long)slotRef.columnChunkIndex << 32 | (uint)pageId;
+	//		return (long)pageId << 32 | (uint)slotRef.columnChunkIndex;
 	//	}
 	/// <summary>
 	/// obtain an ad-hoc reference to a component with write access.  
 	/// <para>BAD PERFORMANCE: you should prefer to use the Query() method instead</para>
 	/// </summary>
-	public ref T GetComponentWriteRef<T>()
+	public ref TComponent GetComponentWriteRef<TComponent>()
 	{
-		var (result, reason) = GetAllocator().CheckIsValid(this);
+		var (result, reason) = GetPage().CheckIsValid(this);
 		__ERROR.Throw(result, reason);
 
 		//_CHECKED_VerifyInstance<T>();
-		var chunk = GetContainingChunk<T>();
+		var chunk = GetContainingChunk<TComponent>();
 		return ref chunk.GetWriteRef(this);
 
 	}
@@ -103,17 +94,17 @@ public readonly record struct AllocToken : IComparable<AllocToken>
 	/// obtain an ad-hoc reference to a component with read access.  
 	/// <para>BAD PERFORMANCE: you should prefer to use the Query() method instead</para>
 	/// </summary>
-	public ref readonly T GetComponentReadRef<T>()
+	public ref readonly TComponent GetComponentReadRef<TComponent>()
 	{
-		var (result, reason) = GetAllocator().CheckIsValid(this);
+		var (result, reason) = GetPage().CheckIsValid(this);
 		__ERROR.Throw(result, reason);
 
 		//_CHECKED_VerifyInstance<T>();
-		var chunk = GetContainingChunk<T>();
+		var chunk = GetContainingChunk<TComponent>();
 		return ref chunk.GetReadRef(this);
 	}
 	/// <summary>
-	/// internal helper.   get the chunk this allocToken is mapped to for the given type
+	/// internal helper.   get the chunk this pageToken is mapped to for the given type
 	/// </summary>
 	/// <typeparam name="T"></typeparam>
 	/// <returns></returns>
@@ -128,53 +119,53 @@ public readonly record struct AllocToken : IComparable<AllocToken>
 		//	{
 		//		//if (!Chunk<T>._GLOBAL_LOOKUP.TryGetValue(chunkLookupId, out chunk))
 		//		{
-		//			__ERROR.Throw(GetAllocator().HasComponentType<T>(), $"the archetype this element is attached to does not have a component of type {typeof(T).FullName}. Be aware that base classes do not match.");
+		//			__ERROR.Throw(GetPage().HasComponentType<T>(), $"the page this element is attached to does not have a component of type {typeof(T).FullName}. Be aware that base classes do not match.");
 		//			//need to refresh token
-		//			__ERROR.Throw(false, "the chunk this allocToken points to does not exist.  either entity was deleted or it was packed.  Do not use AllocTokens beyond the frame aquired unless archetype.allocator.AutoPack==false");
+		//			__ERROR.Throw(false, "the chunk this pageToken points to does not exist.  either entity was deleted or it was packed.  Do not use PageAccessTokens beyond the frame aquired unless page.page.AutoPack==false");
 		//		}
 		//	}
 		//	return chunk;
 		//}
 
-		var column = Chunk<T>._LOOKUP[allocatorId];
-		__DEBUG.Throw(column.Count > allocSlot.chunkIndex, "chunk doesn't exist");
-		var chunk = column._AsSpan_Unsafe()[allocSlot.chunkIndex];
+		var column = Chunk<T>._LOOKUP[pageId];
+		__DEBUG.Throw(column.Count > slotRef.chunkIndex, "chunk doesn't exist");
+		var chunk = column._AsSpan_Unsafe()[slotRef.chunkIndex];
 		__DEBUG.Throw(chunk != null);
 		return chunk;
 
 
 	}
 	/// <summary>
-	/// Get allocator this token is associated with.  If a null is returned or an exception is thrown, it is likely our AllocToken is out of date.
+	/// Get page this token is associated with.  If a null is returned or an exception is thchunkn, it is likely our PageAccessToken is out of date.
 	/// </summary>
-	public Allocator GetAllocator()
+	public Page GetPage()
 	{
-		return Allocator._GLOBAL_LOOKUP.Span[allocatorId];
+		return Page._GLOBAL_LOOKUP.Span[pageId];
 
-		//var toReturn = Allocator._GLOBAL_LOOKUP.Span[allocatorId];
-		//__ERROR.Throw(toReturn != null && toReturn._version == allocatorVersion, "alloc token seems to be expired");
-		//__CHECKED.Throw(toReturn._allocatorId == allocatorId);
+		//var toReturn = Page._GLOBAL_LOOKUP.Span[pageId];
+		//__ERROR.Throw(toReturn != null && toReturn._version == pageVersion, "alloc token seems to be expired");
+		//__CHECKED.Throw(toReturn._pageId == pageId);
 
 		//return toReturn;
 	}
 	//[Conditional("CHECKED")]
 	//private void _CHECKED_VerifyInstance<T>()
 	//{
-	//	if (typeof(T) == typeof(AllocMetadata))
+	//	if (typeof(T) == typeof(EntityMetadata))
 	//	{
 	//		//otherwise can cause infinite recursion
 	//		return;
 	//	}
-	//	ref readonly var allocMetadata = ref GetComponentReadRef<AllocMetadata>();
-	//	__CHECKED.Throw(allocMetadata.allocToken == this, "mismatch");
-	//	//get chunk via the allocator, where the default way is direct through the Chunk<T>._GLOBAL_LOOKUP
-	//	var atomId = Allocator.Atom.GetId<T>();
+	//	ref readonly var entityMetadata = ref GetComponentReadRef<EntityMetadata>();
+	//	__CHECKED.Throw(entityMetadata.pageToken == this, "mismatch");
+	//	//get chunk via the page, where the default way is direct through the Chunk<T>._GLOBAL_LOOKUP
+	//	var atomId = Page.Atom.GetId<T>();
 
-	//	//var chunk = GetAllocator()._componentColumns[typeof(AllocMetadata)][allocSlot.columnChunkIndex] as Chunk<T>;
-	//	var chunk = GetAllocator()._GetColumnsSpan()[atomId][allocSlot.chunkIndex] as Chunk<T>;
+	//	//var chunk = GetPage()._componentColumns[typeof(EntityMetadata)][slotRef.columnChunkIndex] as Chunk<T>;
+	//	var chunk = GetPage()._GetColumnsSpan()[atomId][slotRef.chunkIndex] as Chunk<T>;
 	//	__CHECKED.Throw(GetContainingChunk<T>() == chunk, "chunk lookup between both techniques does not match");
-	//	var allocMetaChunk = GetContainingChunk<AllocMetadata>();
-	//	__CHECKED.Throw(this == allocMetaChunk.Span[allocSlot.rowSlotIndex].allocToken);
+	//	var allocMetaChunk = GetContainingChunk<EntityMetadata>();
+	//	__CHECKED.Throw(this == allocMetaChunk.Span[slotRef.chunkSlotIndex].pageToken);
 	//}
 
 	/// <summary>
@@ -182,9 +173,9 @@ public readonly record struct AllocToken : IComparable<AllocToken>
 	/// </summary>
 	/// <param name="other"></param>
 	/// <returns></returns>
-	public int CompareTo(AllocToken other)
+	public int CompareTo(PageAccessToken other)
 	{
-		return allocSlot.CompareTo(other.allocSlot);
+		return slotRef.CompareTo(other.slotRef);
 	}
 
 
@@ -198,18 +189,18 @@ public readonly record struct AllocToken : IComparable<AllocToken>
 	//	}
 	//	else
 	//	{
-	//		return "AllocToken [NOT INITIALIZED]";
+	//		return "PageAccessToken [NOT INITIALIZED]";
 	//	}
 	//}
 }
 
 
 /// <summary>
-/// chunk -> row => slot
-/// on it's own, this is not enough to access an entities components, you need the alocator.   See <see cref="AllocToken"/>.
+/// chunk -> chunk => slot
+/// on it's own, this is not enough to access an entities components, you need the alocator.   See <see cref="PageAccessToken"/>.
 /// </summary>
 [StructLayout(LayoutKind.Explicit)]
-public record struct AllocSlot : IComparable<AllocSlot>
+public record struct SlotRef : IComparable<SlotRef>
 {
 
 	[FieldOffset(0)]
@@ -222,12 +213,12 @@ public record struct AllocSlot : IComparable<AllocSlot>
 	//public int chunkId;
 
 	//[FieldOffset(0)]
-	//public short allocatorId;
+	//public short pageId;
 	/// <summary>
 	/// the index to the slot from inside the chunk.
 	/// </summary>
 	[FieldOffset(0)]
-	public int rowSlotIndex;
+	public int chunkSlotIndex;
 
 	/// <summary>
 	/// the location of the chunk in the column
@@ -235,63 +226,63 @@ public record struct AllocSlot : IComparable<AllocSlot>
 	[FieldOffset(4)]
 	public int chunkIndex;
 
-	public AllocSlot(//short allocatorId, 
-		int columnIndex, int chunkRowIndex)
+	public SlotRef(//short pageId, 
+		int columnIndex, int chunkChunkIndex)
 	{
 		this = default;
-		//this.allocatorId = allocatorId;
+		//this.pageId = pageId;
 		this.chunkIndex = columnIndex;
-		this.rowSlotIndex = chunkRowIndex;
+		this.chunkSlotIndex = chunkChunkIndex;
 	}
 
-	public long GetChunkLookupId(int allocatorId)
+	public long GetChunkLookupId(int pageId)
 	{
-		//return (long)allocatorId << 32 | (uint)columnChunkIndex;
-		return (long)allocatorId << 32 | (uint)chunkIndex;
+		//return (long)pageId << 32 | (uint)columnChunkIndex;
+		return (long)pageId << 32 | (uint)chunkIndex;
 	}
 
-	public int CompareTo(AllocSlot other)
+	public int CompareTo(SlotRef other)
 	{
 		return _packedValue.CompareTo(other._packedValue);
 	}
 
-	public static bool operator <(AllocSlot left, AllocSlot right)
+	public static bool operator <(SlotRef left, SlotRef right)
 	{
 		return left.CompareTo(right) < 0;
 	}
 
-	public static bool operator <=(AllocSlot left, AllocSlot right)
+	public static bool operator <=(SlotRef left, SlotRef right)
 	{
 		return left.CompareTo(right) <= 0;
 	}
 
-	public static bool operator >(AllocSlot left, AllocSlot right)
+	public static bool operator >(SlotRef left, SlotRef right)
 	{
 		return left.CompareTo(right) > 0;
 	}
 
-	public static bool operator >=(AllocSlot left, AllocSlot right)
+	public static bool operator >=(SlotRef left, SlotRef right)
 	{
 		return left.CompareTo(right) >= 0;
 	}
 }
 
 
-public partial class Allocator //unit test
+public partial class Page //unit test
 {
 
 
-	public static async Task __TEST_Unit_ParallelAllocators(bool autoPack, int chunkSize, MemoryOwner<long> externalIds, float batchSizeMultipler, int allocatorCount, HashSet<long> evenSet, HashSet<long> oddSet)
+	public static async Task __TEST_Unit_ParallelPages(bool autoPack, int chunkSize, MemoryOwner<long> externalIds, float batchSizeMultipler, int pageCount, HashSet<long> evenSet, HashSet<long> oddSet)
 	{
 		//Console.WriteLine("start parallel");
-		var PARALLEL_LOOPS = allocatorCount;
+		var PARALLEL_LOOPS = pageCount;
 		var execCount = 0;
 		await ParallelFor.RangeAsync(0, PARALLEL_LOOPS, batchSizeMultipler, (start, endExclusive) =>
 		{
 			var tempCount = 0;
 			for (var i = start; i < endExclusive; i++)
 			{
-				__TEST_Unit_SingleAllocator_AndEdit(autoPack, chunkSize, externalIds, evenSet, oddSet);
+				__TEST_Unit_SinglePage_AndEdit(autoPack, chunkSize, externalIds, evenSet, oddSet);
 				tempCount++;
 			}
 			Interlocked.Add(ref execCount, tempCount);
@@ -305,46 +296,46 @@ public partial class Allocator //unit test
 
 	}
 	[Conditional("TEST")]
-	public static unsafe void __TEST_Unit_SeriallAllocators(bool autoPack, int chunkSize, MemoryOwner<long> externalIds, int allocatorCount, HashSet<long> evenSet, HashSet<long> oddSet)
+	public static unsafe void __TEST_Unit_SeriallPages(bool autoPack, int chunkSize, MemoryOwner<long> externalIds, int pageCount, HashSet<long> evenSet, HashSet<long> oddSet)
 	{
-		var count = allocatorCount;
-		using var allocOwner = SpanPool<Allocator>.Allocate(count);
+		var count = pageCount;
+		using var allocOwner = SpanPool<Page>.Allocate(count);
 		var allocs = allocOwner.Span;
 		for (var i = 0; i < count; i++)
 		{
-			allocs[i] = _TEST_HELPER_CreateAndEditAllocator(autoPack, chunkSize, externalIds, evenSet, oddSet);
+			allocs[i] = _TEST_HELPER_CreateAndEditPage(autoPack, chunkSize, externalIds, evenSet, oddSet);
 		}
 		for (var i = 0; i < count; i++)
 		{
 			allocs[i].Dispose();
 		}
 		allocs.Clear();
-		//var result = Parallel.For(0, 10000, (index) => __TEST_Unit_SingleAllocator());
+		//var result = Parallel.For(0, 10000, (index) => __TEST_Unit_SinglePage());
 		//__ERROR.Throw(result.IsCompleted);
 
 	}
 
 	[Conditional("TEST")]
-	public static unsafe void __TEST_Unit_SingleAllocator()
+	public static unsafe void __TEST_Unit_SinglePage()
 	{
-		var allocator = _TEST_HELPER_CreateAllocator();
+		var page = _TEST_HELPER_CreatePage();
 
-		allocator.Dispose();
+		page.Dispose();
 	}
 
 
 	[Conditional("TEST")]
-	public static unsafe void __TEST_Unit_SingleAllocator_AndEdit(bool autoPack, int chunkSize, MemoryOwner<long> externalIds, HashSet<long> evenSet, HashSet<long> oddSet)
+	public static unsafe void __TEST_Unit_SinglePage_AndEdit(bool autoPack, int chunkSize, MemoryOwner<long> externalIds, HashSet<long> evenSet, HashSet<long> oddSet)
 	{
 		//Console.WriteLine("start single");
-		var allocator = _TEST_HELPER_CreateAndEditAllocator(autoPack, chunkSize, externalIds, evenSet, oddSet);
+		var page = _TEST_HELPER_CreateAndEditPage(autoPack, chunkSize, externalIds, evenSet, oddSet);
 
-		allocator.Dispose();
+		page.Dispose();
 	}
 
-	private static unsafe Allocator _TEST_HELPER_CreateAllocator()
+	private static unsafe Page _TEST_HELPER_CreatePage()
 	{
-		var allocator = new Allocator()
+		var page = new Page()
 		{
 			AutoPack = __.Rand._NextBoolean(),
 			ChunkSize = __.Rand.Next(1, 100),
@@ -352,7 +343,7 @@ public partial class Allocator //unit test
 
 
 		};
-		allocator.Initialize();
+		page.Initialize();
 
 		using var externalIdsOwner = SpanPool<long>.Allocate(__.Rand.Next(0, 1000));
 		var set = new HashSet<long>();
@@ -368,15 +359,15 @@ public partial class Allocator //unit test
 			count++;
 		}
 		//Span<long> externalIds = stackalloc long[] { 2, 4, 8, 7, -2 };
-		using var tokensOwner = SpanPool<AllocToken>.Allocate(externalIds.Length);
+		using var tokensOwner = SpanPool<PageAccessToken>.Allocate(externalIds.Length);
 		var tokens = tokensOwner.Span;
-		allocator.Alloc(externalIds, tokens);
-		return allocator;
+		page.Alloc(externalIds, tokens);
+		return page;
 	}
 
-	private static unsafe Allocator _TEST_HELPER_CreateAndEditAllocator(bool autoPack, int chunkSize, MemoryOwner<long> externalIdsOwner, HashSet<long> evenSet, HashSet<long> oddSet)
+	private static unsafe Page _TEST_HELPER_CreateAndEditPage(bool autoPack, int chunkSize, MemoryOwner<long> externalIdsOwner, HashSet<long> evenSet, HashSet<long> oddSet)
 	{
-		var allocator = new Allocator()
+		var page = new Page()
 		{
 			AutoPack = autoPack,
 			ChunkSize = chunkSize,
@@ -384,7 +375,7 @@ public partial class Allocator //unit test
 
 
 		};
-		allocator.Initialize();
+		page.Initialize();
 
 		//using var externalIdsOwner = SpanPool<long>.Allocate(__.Rand.Next(0, 1000));
 		//var set = new HashSet<long>();
@@ -404,9 +395,9 @@ public partial class Allocator //unit test
 		var externalIds = externalIdsOwner.Span;
 
 		//Span<long> externalIds = stackalloc long[] { 2, 4, 8, 7, -2 };
-		using var tokensOwner = SpanPool<AllocToken>.Allocate(externalIds.Length);
+		using var tokensOwner = SpanPool<PageAccessToken>.Allocate(externalIds.Length);
 		var tokens = tokensOwner.Span;
-		allocator.Alloc(externalIds, tokens);
+		page.Alloc(externalIds, tokens);
 
 
 		//test edits
@@ -441,59 +432,59 @@ public partial class Allocator //unit test
 
 
 		//delete odds
-		allocator.Free(oddSet.ToArray());
+		page.Free(oddSet.ToArray());
 
 		//verify that evens still here
 		{
 			var i = 0;
-			foreach (var (externalId, allocToken) in allocator._lookup)
+			foreach (var (externalId, pageToken) in page._lookup)
 			{
-				if (allocToken.externalId % 2 != 0)
+				if (pageToken.externalId % 2 != 0)
 				{
 					__ERROR.Throw(false, "only even should exist");
 				}
 
-				var num = allocToken.GetComponentReadRef<int>();
-				__ERROR.Throw(num == (int)allocToken.externalId);
-				__ERROR.Throw(allocToken.GetComponentReadRef<string>().StartsWith("hello"));
+				var num = pageToken.GetComponentReadRef<int>();
+				__ERROR.Throw(num == (int)pageToken.externalId);
+				__ERROR.Throw(pageToken.GetComponentReadRef<string>().StartsWith("hello"));
 				i++;
 
 			}
 		}
 		//same verify only evens,
-		foreach (var (externalId, allocToken) in allocator._lookup)
+		foreach (var (externalId, pageToken) in page._lookup)
 		{
-			ref var numExId = ref allocToken.GetComponentWriteRef<int>();
+			ref var numExId = ref pageToken.GetComponentWriteRef<int>();
 			__ERROR.Throw(numExId % 2 == 0);
-			__ERROR.Throw(allocToken.externalId % 2 == 0);
-			__ERROR.Throw(allocToken.GetComponentReadRef<string>().StartsWith("hello"));
+			__ERROR.Throw(pageToken.externalId % 2 == 0);
+			__ERROR.Throw(pageToken.GetComponentReadRef<string>().StartsWith("hello"));
 		}
 		//add odds
-		using var oddTokens = SpanPool<AllocToken>.Allocate(oddSet.Count);
+		using var oddTokens = SpanPool<PageAccessToken>.Allocate(oddSet.Count);
 		var oddSpan = oddTokens.Span;
-		allocator.Alloc(oddSet.ToArray(), oddSpan);
+		page.Alloc(oddSet.ToArray(), oddSpan);
 
 		//delete evens
-		allocator.Free(evenSet.ToArray());
+		page.Free(evenSet.ToArray());
 
 		//verify only odds
-		foreach (var (externalId, allocToken) in allocator._lookup)
+		foreach (var (externalId, pageToken) in page._lookup)
 		{
-			ref var numExId = ref allocToken.GetComponentWriteRef<int>();
+			ref var numExId = ref pageToken.GetComponentWriteRef<int>();
 			__ERROR.Throw(numExId == 0, "we just wrote a new entity, old data should be blown away");
-			__ERROR.Throw(allocToken.externalId % 2 == 1);
-			__ERROR.Throw(allocToken.GetComponentReadRef<string>() == null);
+			__ERROR.Throw(pageToken.externalId % 2 == 1);
+			__ERROR.Throw(pageToken.GetComponentReadRef<string>() == null);
 		}
 
 		//delete odds again
-		allocator.Free(oddSet.ToArray());
+		page.Free(oddSet.ToArray());
 
 
 		//verify empty
-		__ERROR.Throw(allocator._lookup.Count == 0);
+		__ERROR.Throw(page._lookup.Count == 0);
 
 
-		foreach (var column in allocator._columnStorage)
+		foreach (var column in page._columnStorage)
 		{
 			if (column == null)
 			{
@@ -513,17 +504,17 @@ public partial class Allocator //unit test
 				}
 
 			}
-			__ERROR.Throw(column[0].allocatorId == allocator._allocatorId && column[0].allocatorVersion == allocator._fingerprint, "column doesn't match our allocator");
+			__ERROR.Throw(column[0].pageId == page._pageId && column[0].pageVersion == page._fingerprint, "column doesn't match our page");
 		}
 
-		return allocator;
+		return page;
 	}
 }
 
-public partial class Allocator  //ATOM logic
+public partial class Page  //ATOM logic
 {
 	/// <summary>
-	/// helper to convert a Type into an id.  maybe not useful, if internal to Allocator we want to switch back to a Type keyed dictionary again (for columns).  
+	/// helper to convert a Type into an id.  maybe not useful, if internal to Page we want to switch back to a Type keyed dictionary again (for columns).  
 	/// right now we are using atomId keyed columns.
 	/// </summary>
 	protected internal static class Atom
@@ -651,23 +642,23 @@ public partial class Allocator  //ATOM logic
 }
 
 /// <summary>
-/// allocator for archetypes 
+/// page for archetypes 
 /// see ReadMe.md
 /// </summary>
-public partial class Allocator : IDisposable //init logic
+public partial class Page : IDisposable //init logic
 {
 
-	//public static int _allocatorId_GlobalCounter;
-	//public static Dictionary<int, Allocator> _GLOBAL_LOOKUP = new();
-	//public int _allocatorId = _allocatorId_GlobalCounter._InterlockedIncrement();
-	public static AllocSlotList<Allocator> _GLOBAL_LOOKUP = new();
+	//public static int _pageId_GlobalCounter;
+	//public static Dictionary<int, Page> _GLOBAL_LOOKUP = new();
+	//public int _pageId = _pageId_GlobalCounter._InterlockedIncrement();
+	public static SlotList<Page> _GLOBAL_LOOKUP = new();
 	/// <summary>
-	/// this allocator instance can be looked up via the static Allocator._GLOBAL_LOOKUP[_allocatorId]
+	/// this page instance can be looked up via the static Page._GLOBAL_LOOKUP[_pageId]
 	/// </summary>
-	public int _allocatorId = -1;
+	public int _pageId = -1;
 	private static int _fingerprintCounter;
 	/// <summary>
-	/// tracker so that every allocator has a different "fingerprint".  needed because allocatorId is reused when an allocator is disposed.
+	/// tracker so that every page has a different "fingerprint".  needed because pageId is reused when an page is disposed.
 	/// </summary>
 	public int _fingerprint = _fingerprintCounter++;
 
@@ -675,26 +666,30 @@ public partial class Allocator : IDisposable //init logic
 	/// if you want to add additional custom components to each entity, list them here.  These are not used to compute the <see cref="_componentsHashId"/>
 	/// <para>be sure not to remove the items already in the list.</para>
 	/// </summary>
-	public List<Type> CustomMetaComponentTypes = new List<Type>() { typeof(AllocMetadata) };
+	public List<Type> CustomMetaComponentTypes = new List<Type>() { typeof(EntityMetadata) };
 
 	/// <summary>
-	/// the Type of components this allocator manages.  
+	/// the Type of components this page manages.  
 	/// </summary>
 	public List<Type> ComponentTypes { get; init; }
 
 
 	/// <summary>
-	/// used to quickly identify what collection of ComponentTypes this allocator is in charge of
+	/// used to quickly identify what collection of ComponentTypes this page is in charge of
 	/// </summary>
 	public int _componentsHashId;
 
 
 	//public Dictionary<Type, List<Chunk>> _componentColumns = new();
 	/// <summary>
-	/// ATOM_ID --> chunkId --> rowId --> The_Component
+	/// ATOM_ID --> chunkId --> chunkId --> The_Component
 	/// </summary>
 	public List<List<Chunk>> _columnStorage = new();
 
+	/// <summary>
+	/// internal helper.   Get a Span containing all columns.    
+	/// </summary>
+	/// <returns></returns>
 	public Span<List<Chunk>> _GetColumnsSpan() { return _columnStorage._AsSpan_Unsafe(); }
 
 	/// <summary>
@@ -707,61 +702,61 @@ public partial class Allocator : IDisposable //init logic
 		var atomId = Atom.GetId<T>();
 		return _GetColumnsSpan()[atomId];
 	}
-	public Chunk<T> GetChunk<T>(ref AllocToken allocToken)
+	public Chunk<T> GetChunk<T>(ref PageAccessToken pageToken)
 	{
-		var (result, reason) = CheckIsValid(ref allocToken);
+		var (result, reason) = CheckIsValid(ref pageToken);
 		__ERROR.Throw(result, reason);
 
-		__CHECKED_INTERNAL_VerifyAllocToken(ref allocToken);
+		__CHECKED_INTERNAL_VerifyPageAccessToken(ref pageToken);
 		var column = GetColumn<T>();
-		return column[allocToken.allocSlot.chunkIndex] as Chunk<T>;
+		return column[pageToken.slotRef.chunkIndex] as Chunk<T>;
 	}
-	public ref T GetComponentRef<T>(ref AllocToken allocToken)
+	public ref T GetComponentRef<T>(ref PageAccessToken pageToken)
 	{
-		var chunk = GetChunk<T>(ref allocToken);
-		return ref chunk.UnsafeArray[allocToken.allocSlot.rowSlotIndex];
+		var chunk = GetChunk<T>(ref pageToken);
+		return ref chunk.UnsafeArray[pageToken.slotRef.chunkSlotIndex];
 	}
 
-	public static ref T GetComponent<T>(ref AllocToken allocToken)
+	public static ref T GetComponent<T>(ref PageAccessToken pageToken)
 	{
-		return ref _GLOBAL_LOOKUP.Span[allocToken.allocatorId].GetComponentRef<T>(ref allocToken);
+		return ref _GLOBAL_LOOKUP.Span[pageToken.pageId].GetComponentRef<T>(ref pageToken);
 		//var atomId = Atom.GetId<T>();
-		//var chunk = _GLOBAL_LOOKUP.Span[allocToken.allocatorId]._GetColumnsSpan()[atomId]._AsSpan_Unsafe()[allocToken.allocSlot.columnChunkIndex] as Chunk<T>;
-		//return ref chunk.Span[allocToken.allocSlot.chunkRowIndex];
+		//var chunk = _GLOBAL_LOOKUP.Span[pageToken.pageId]._GetColumnsSpan()[atomId]._AsSpan_Unsafe()[pageToken.slotRef.columnChunkIndex] as Chunk<T>;
+		//return ref chunk.Span[pageToken.slotRef.chunkChunkIndex];
 	}
 
 
 	/// <summary>
 	/// will only return false if the slot is not present.  so check .IsAlive
 	/// </summary>
-	private bool __TryQueryMetadata(AllocSlot slot, out AllocMetadata metadata)
+	private bool __TryQueryMetadata(SlotRef slot, out EntityMetadata metadata)
 	{
 		//var columns = _GetColumnsSpan();
-		//var atomId = Atom.GetId<AllocMetadata>();
-		//var columnList = columns[atomId];//  _componentColumns[typeof(AllocMetadata)];
-		var column = GetColumn<AllocMetadata>();
+		//var atomId = Atom.GetId<EntityMetadata>();
+		//var columnList = columns[atomId];//  _componentColumns[typeof(EntityMetadata)];
+		var column = GetColumn<EntityMetadata>();
 		if (column == null || column.Count < slot.chunkIndex)
 		{
 			metadata = default;
 			return false;
 		}
-		var chunk = column[slot.chunkIndex] as Chunk<AllocMetadata>;
-		metadata = chunk.UnsafeArray[slot.rowSlotIndex];
+		var chunk = column[slot.chunkIndex] as Chunk<EntityMetadata>;
+		metadata = chunk.UnsafeArray[slot.chunkSlotIndex];
 		return true;
 	}
 
 
-	protected internal static ref T _UNCHECKED_GetComponent<T>(ref AllocToken allocToken)
+	protected internal static ref T _UNCHECKED_GetComponent<T>(ref PageAccessToken pageToken)
 	{
 		var atomId = Atom.GetId<T>();
-		var chunk = _GLOBAL_LOOKUP.Span[allocToken.allocatorId]._GetColumnsSpan()[atomId]._AsSpan_Unsafe()[allocToken.allocSlot.chunkIndex] as Chunk<T>;
-		return ref chunk.UnsafeArray[allocToken.allocSlot.rowSlotIndex];
+		var chunk = _GLOBAL_LOOKUP.Span[pageToken.pageId]._GetColumnsSpan()[atomId]._AsSpan_Unsafe()[pageToken.slotRef.chunkIndex] as Chunk<T>;
+		return ref chunk.UnsafeArray[pageToken.slotRef.chunkSlotIndex];
 	}
 	/// <summary>
 	/// INTERNAL USE ONLY.  doesn't do checks to ensure token is valid.
 	/// returns false if the slot is not allocated.  if it's allocated but free, it still returns whatever data is contained.
 	/// </summary>
-	protected internal ref T _UNCHECKED_GetComponent<T>(ref AllocSlot slot, out bool exists)
+	protected internal ref T _UNCHECKED_GetComponent<T>(ref SlotRef slot, out bool exists)
 	{
 		//var atomId = Atom.GetId<T>();
 		var column = GetColumn<T>();
@@ -784,18 +779,22 @@ public partial class Allocator : IDisposable //init logic
 			return ref Unsafe.NullRef<T>();
 		}
 		exists = true;
-		return ref chunk.UnsafeArray[slot.rowSlotIndex];
+		return ref chunk.UnsafeArray[slot.chunkSlotIndex];
 	}
 	/// <summary>
 	/// INTERNAL USE ONLY.  doesn't do checks to ensure token is valid.
 	/// </summary>
-	protected internal ref T _UNCHECKED_GetComponent<T>(ref AllocSlot slot)
+	protected internal ref T _UNCHECKED_GetComponent<T>(ref SlotRef slot)
 	{
 		//var atomId = Atom.GetId<T>();
-		return ref (GetColumn<T>()._AsSpan_Unsafe()[slot.chunkIndex] as Chunk<T>).UnsafeArray[slot.rowSlotIndex];
+		return ref (GetColumn<T>()._AsSpan_Unsafe()[slot.chunkIndex] as Chunk<T>).UnsafeArray[slot.chunkSlotIndex];
 	}
 
-
+	/// <summary>
+	/// check if this Page is assigned the specified Type
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
+	/// <returns></returns>
 	public bool HasComponentType<T>()
 	{
 		//return _componentColumns.ContainsKey(typeof(T));
@@ -804,13 +803,14 @@ public partial class Allocator : IDisposable //init logic
 		return columns.Length > atomId && columns[atomId] != null;
 	}
 
+
 	public void Initialize()
 	{
 		//add self to global lookup
-		__ERROR.Throw(_allocatorId == -1, "why already set?");
-		_allocatorId = _GLOBAL_LOOKUP.AllocSlot();
+		__ERROR.Throw(_pageId == -1, "why already set?");
+		_pageId = _GLOBAL_LOOKUP.AllocSlot();
 
-		//__DEBUG.AssertOnce(_allocatorId < 10, "//TODO: change allocatorId to use a pool, not increment, otherwise risk of collisions with long-running programs");
+		//__DEBUG.AssertOnce(_pageId < 10, "//TODO: change pageId to use a pool, not increment, otherwise risk of collisions with long-running programs");
 		__DEBUG.Throw(ComponentTypes != null, "need to set properties before init");
 		//generate hash for fast matching of archetypes
 		foreach (var type in ComponentTypes)
@@ -840,7 +840,7 @@ public partial class Allocator : IDisposable //init logic
 			_AllocColumnsHelper(type);
 		}
 		//add our special metadata component column
-		__DEBUG.Throw(CustomMetaComponentTypes.Contains(typeof(AllocMetadata)), "we must have allocMetadata to store info on each entity added");
+		__DEBUG.Throw(CustomMetaComponentTypes.Contains(typeof(EntityMetadata)), "we must have entityMetadata to store info on each entity added");
 		foreach (var type in CustomMetaComponentTypes)
 		{
 			//_componentColumns.Add(type, new());	
@@ -854,7 +854,7 @@ public partial class Allocator : IDisposable //init logic
 		{
 			chunkSize = ChunkSize,
 			nextAvailable = new(0, 0),
-			allocator = this,
+			page = this,
 		};
 
 		//create the first (blank) chunk for each column
@@ -866,9 +866,9 @@ public partial class Allocator : IDisposable //init logic
 
 		//lock (_GLOBAL_LOOKUP)
 		//{
-		//	_GLOBAL_LOOKUP.Add(_allocatorId, this);
+		//	_GLOBAL_LOOKUP.Add(_pageId, this);
 		//}
-		_GLOBAL_LOOKUP.Span[_allocatorId] = this;
+		_GLOBAL_LOOKUP.Span[_pageId] = this;
 	}
 	public bool IsDisposed { get; private set; } = false;
 #if CHECKED
@@ -888,7 +888,7 @@ public partial class Allocator : IDisposable //init logic
 
 		//lock (_GLOBAL_LOOKUP)
 		//{
-		//	_GLOBAL_LOOKUP.Remove(_allocatorId);
+		//	_GLOBAL_LOOKUP.Remove(_pageId);
 		//}
 
 		var columns = _GetColumnsSpan();
@@ -917,23 +917,23 @@ public partial class Allocator : IDisposable //init logic
 		_free = null;
 		_lookup.Clear();
 		_lookup = null;
-		_GLOBAL_LOOKUP.FreeSlot(_allocatorId);
-		__ERROR.Throw(_GLOBAL_LOOKUP.Span.Length <= _allocatorId || _GLOBAL_LOOKUP.Span[_allocatorId] == null);
-		_allocatorId = -1;
+		_GLOBAL_LOOKUP.FreeSlot(_pageId);
+		__ERROR.Throw(_GLOBAL_LOOKUP.Span.Length <= _pageId || _GLOBAL_LOOKUP.Span[_pageId] == null);
+		_pageId = -1;
 	}
 #if DEBUG
-	~Allocator()
+	~Page()
 	{
 		if (IsDisposed == false)
 		{
-			__DEBUG.AssertOnce(false, "need to have parent archetype dispose allocator for proper cleanup");
+			__DEBUG.AssertOnce(false, "need to have parent page dispose page for proper cleanup");
 			Dispose();
 		}
 	}
 #endif
 }
 
-public partial class Allocator //chunk management logic
+public partial class Page //chunk management logic
 {
 
 	private void _AllocNextChunk() //TODO: preallocate extra chunks ahead of their need (always keep 1x extra chunk around)
@@ -944,7 +944,7 @@ public partial class Allocator //chunk management logic
 			var atomId = Atom.GetId(type);
 			var chunkType = typeof(Chunk<>).MakeGenericType(type);
 			var chunk = Activator.CreateInstance(chunkType) as Chunk;
-			//chunk.Initialize(_nextSlotTracker.chunkSize, _nextSlotTracker.nextAvailable.GetChunkLookupId(_allocatorId));
+			//chunk.Initialize(_nextSlotTracker.chunkSize, _nextSlotTracker.nextAvailable.GetChunkLookupId(_pageId));
 			chunk.Initialize(_nextSlotTracker.chunkSize, this, _nextSlotTracker.nextAvailable.chunkIndex);
 
 			__DEBUG.Assert(columns[atomId].Count == _nextSlotTracker.nextAvailable.chunkIndex, "somehow our column allocations is out of step with our next free tracking.");
@@ -986,26 +986,32 @@ public partial class Allocator //chunk management logic
 	}
 }
 
-public partial class Allocator  //alloc/free/pack logic
+public partial class Page  //alloc/free/pack logic
 {
 	/// <summary>
-	/// when we pack, we move entities around.  This is used to determine if a AllocToken is out of date.
+	/// when we pack, we move entities around.  This is used to determine if a PageAccessToken is out of date.
 	/// </summary>
 	public int _packVersion = 0;
 	/// <summary>
 	/// given an externalId, find current token.  this allows decoupling our internal storage location from external callers, allowing packing.
 	/// </summary>
-	public Dictionary<long, AllocToken> _lookup = new();
+	public Dictionary<long, PageAccessToken> _lookup = new();
 
 
 	/// <summary>
 	/// temp listing of free entities, we will pack and/or deallocate at a specific time each frame
 	/// </summary>
-	public List<AllocSlot> _free = new();
+	public List<SlotRef> _free = new();
 	public bool _isFreeSorted = true;
 
-
+	/// <summary>
+	/// How many Slots a Chunk should have. (how big the array is).
+	/// </summary>
 	public int ChunkSize { get; init; } = 1000;
+
+	/// <summary>
+	/// how many entities are stored in this Page
+	/// </summary>
 	public int Count { get => _lookup.Count; }
 	/// <summary>
 	/// the next slot we will allocate from, and logic informing us when to add/remove chunks
@@ -1022,12 +1028,12 @@ public partial class Allocator  //alloc/free/pack logic
 
 	/// <summary>
 	/// get a slot (recycling free if available)
-	/// make allocToken
+	/// make pageToken
 	/// add slot to columnList
-	/// set builtin allocMetadata component
+	/// set builtin entityMetadata component
 	/// verify
 	/// </summary>
-	public void Alloc(Span<long> externalIds, Span<AllocToken> output)
+	public void Alloc(Span<long> externalIds, Span<PageAccessToken> output)
 	{
 		if (_isFreeSorted != true)
 		{
@@ -1053,13 +1059,13 @@ public partial class Allocator  //alloc/free/pack logic
 					_AllocNextChunk();
 				}
 			}
-			ref var allocToken = ref output[i];
-			allocToken = _GenerateLiveAllocToken(externalId, slot);
+			ref var pageToken = ref output[i];
+			pageToken = _GenerateLivePageAccessToken(externalId, slot);
 			//new()  
 			//{
 			//	isInit = true,
-			//	allocatorId = _allocatorId,
-			//	allocSlot = slot,
+			//	pageId = _pageId,
+			//	slotRef = slot,
 			//	externalId = externalId,
 			//	packVersion = _packVersion,
 			//};
@@ -1070,80 +1076,88 @@ public partial class Allocator  //alloc/free/pack logic
 			//loop all components zeroing out data and informing chunk of added item
 			foreach (var atomId in _atomIdsUsed)
 			{
-				columns[atomId][slot.chunkIndex].OnAllocSlot(ref allocToken);
+				columns[atomId][slot.chunkIndex].OnAllocSlot(ref pageToken);
 			}
 
 
 
 
-			//set the allocMetadata builtin componenent
-			ref var allocMetadata = ref allocToken.GetContainingChunk<AllocMetadata>().UnsafeArray[allocToken.allocSlot.rowSlotIndex];
-			__CHECKED.Throw(allocMetadata == default(AllocMetadata), "expect this to be cleared out, why not?");
-			allocMetadata = new AllocMetadata()
+			//set the entityMetadata builtin componenent
+			ref var entityMetadata = ref pageToken.GetContainingChunk<EntityMetadata>().UnsafeArray[pageToken.slotRef.chunkSlotIndex];
+			__CHECKED.Throw(entityMetadata == default(EntityMetadata), "expect this to be cleared out, why not?");
+			entityMetadata = new EntityMetadata()
 			{
-				allocToken = allocToken,
+				pageToken = pageToken,
 				componentCount = _atomIdsUsed.Count,
 			};
 
 
 			//add to lookup
-			_lookup.Add(externalId, allocToken);
+			_lookup.Add(externalId, pageToken);
 
 
-			__CHECKED.Throw(allocMetadata == allocToken.GetComponentReadRef<AllocMetadata>(), "component reference verification failed.  why?");
+			__CHECKED.Throw(entityMetadata == pageToken.GetComponentReadRef<EntityMetadata>(), "component reference verification failed.  why?");
 
 #if CHECKED
-			var (result, reason) = CheckIsValid(ref allocToken);
+			var (result, reason) = CheckIsValid(ref pageToken);
 			__ERROR.Throw(result, reason);
 #endif
-			__CHECKED_INTERNAL_VerifyAllocToken(ref allocToken);
+			__CHECKED_INTERNAL_VerifyPageAccessToken(ref pageToken);
 		}
 
 
 	}
-	private AllocToken _GenerateLiveAllocToken(long externalId, AllocSlot slot)
+
+
+	private PageAccessToken _GenerateLivePageAccessToken(long externalId, SlotRef slot)
 	{
-		return new AllocToken
+		return new PageAccessToken
 		{
 			isAlive = true,
-			allocatorId = _allocatorId,
-			allocSlot = slot,
+			pageId = _pageId,
+			slotRef = slot,
 			externalId = externalId,
 			packVersion = _packVersion,
-			allocatorVersion = _fingerprint,
+			pageVersion = _fingerprint,
 		};
 	}
 
-	public (bool result, string reason) CheckIsValid(AllocToken allocToken)
+	/// <summary>
+	/// helper to determine if a token is valid, and if not, why.
+	/// </summary>
+	public (bool result, string reason) CheckIsValid(PageAccessToken pageToken)
 	{
 		unsafe
 		{
-			return CheckIsValid(ref *&allocToken);
+			return CheckIsValid(ref *&pageToken);
 		}
 	}
-	public (bool result, string reason) CheckIsValid(ref AllocToken allocToken)
+	/// <summary>
+	/// helper to determine if a token is valid, and if not, why.
+	/// </summary>
+	public (bool result, string reason) CheckIsValid(ref PageAccessToken pageToken)
 	{
 		var result = true;
 		string reason = null;
-		if (allocToken.isAlive == false)
+		if (pageToken.isAlive == false)
 		{
 			reason = "token is not alive";
 			result = false;
 		}
-		else if (!_lookup.TryGetValue(allocToken.externalId, out var lookupToken))
+		else if (!_lookup.TryGetValue(pageToken.externalId, out var lookupToken))
 		{
 			reason = "token does not have a matching entityId.  was it removed?";
 			result = false;
 		}
-		else if (lookupToken.packVersion != allocToken.packVersion)
+		else if (lookupToken.packVersion != pageToken.packVersion)
 		{
-			reason = "wrong packVersion.  aquire a new AllocToken every update from Archetype.GetAllocToken() with AutoPack=true. But for best performance over many entities, use Archetype.Query()";
+			reason = "wrong packVersion.  aquire a new PageAccessToken every update from Archetype.GetPageAccessToken() with AutoPack=true. But for best performance over many entities, use Archetype.Query()";
 			result = false;
 		}
 
 		if (result == true)
 		{
-			__CHECKED_INTERNAL_VerifyAllocToken(ref allocToken);
+			__CHECKED_INTERNAL_VerifyPageAccessToken(ref pageToken);
 		}
 
 		return (result, reason);
@@ -1153,14 +1167,14 @@ public partial class Allocator  //alloc/free/pack logic
 	/// <summary>
 	/// verify engine state internally.  Use `CheckIsValid()` to verify user input
 	/// </summary>
-	/// <param name="allocToken"></param>
+	/// <param name="pageToken"></param>
 	[Conditional("CHECKED")]
-	public void __CHECKED_INTERNAL_VerifyAllocToken(ref AllocToken allocToken)
+	public void __CHECKED_INTERNAL_VerifyPageAccessToken(ref PageAccessToken pageToken)
 	{
 
-		//__ERROR.Throw(_packVersion == allocToken.packVersion, "allocToken out of date.  a pack occured.  you need to reaquire the token every frame if AutoPack==true");
-		var storedToken = _lookup[allocToken.externalId];
-		__ERROR.Throw(storedToken == allocToken);
+		//__ERROR.Throw(_packVersion == pageToken.packVersion, "pageToken out of date.  a pack occured.  you need to reaquire the token every frame if AutoPack==true");
+		var storedToken = _lookup[pageToken.externalId];
+		__ERROR.Throw(storedToken == pageToken);
 
 		var columns = _GetColumnsSpan();
 
@@ -1168,29 +1182,29 @@ public partial class Allocator  //alloc/free/pack logic
 		//foreach (var (type, columnList) in _componentColumns)
 		foreach (var atomId in _atomIdsUsed)
 		{
-			var columnChunk = columns[atomId][allocToken.allocSlot.chunkIndex];
+			var columnChunk = columns[atomId][pageToken.slotRef.chunkIndex];
 
-			//__CHECKED.Throw(columnChunk._chunkLookupId == allocToken.GetChunkLookupId(), "lookup id mismatch");
-			__CHECKED.Throw(columnChunk.allocatorId == allocToken.allocatorId && columnChunk.allocatorVersion == allocToken.allocatorVersion, "lookup id mismatch");
+			//__CHECKED.Throw(columnChunk._chunkLookupId == pageToken.GetChunkLookupId(), "lookup id mismatch");
+			__CHECKED.Throw(columnChunk.pageId == pageToken.pageId && columnChunk.pageVersion == pageToken.pageVersion, "lookup id mismatch");
 
 		}
 
 
 		//verify chunk accessor workflows are correct
-		//var manualGetChunk = _componentColumns[typeof(AllocMetadata)][allocToken.allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
-		//var manualGetChunk = GetChunk<AllocMetadata>(ref allocToken);
-		var manualGetChunk = GetColumn<AllocMetadata>()._AsSpan_Unsafe()[allocToken.allocSlot.chunkIndex] as Chunk<AllocMetadata>;
+		//var manualGetChunk = _componentColumns[typeof(EntityMetadata)][pageToken.slotRef.columnChunkIndex] as Chunk<EntityMetadata>;
+		//var manualGetChunk = GetChunk<EntityMetadata>(ref pageToken);
+		var manualGetChunk = GetColumn<EntityMetadata>()._AsSpan_Unsafe()[pageToken.slotRef.chunkIndex] as Chunk<EntityMetadata>;
 
-		var autoGetChunk = allocToken.GetContainingChunk<AllocMetadata>();
+		var autoGetChunk = pageToken.GetContainingChunk<EntityMetadata>();
 		__CHECKED.Throw(manualGetChunk == autoGetChunk, "should match");
 
-		//verify allocMetadatas match
-		__ERROR.Throw(manualGetChunk.UnsafeArray[allocToken.allocSlot.rowSlotIndex].allocToken == allocToken);
+		//verify entityMetadatas match
+		__ERROR.Throw(manualGetChunk.UnsafeArray[pageToken.slotRef.chunkSlotIndex].pageToken == pageToken);
 
 
 
 		//verify access thru Chunk<T> works also
-		var chunkLookupChunk = Chunk<AllocMetadata>._LOOKUP[allocToken.allocatorId]._AsSpan_Unsafe()[allocToken.allocSlot.chunkIndex];
+		var chunkLookupChunk = Chunk<EntityMetadata>._LOOKUP[pageToken.pageId]._AsSpan_Unsafe()[pageToken.slotRef.chunkIndex];
 		__ERROR.Throw(chunkLookupChunk == manualGetChunk);
 
 	}
@@ -1199,7 +1213,7 @@ public partial class Allocator  //alloc/free/pack logic
 
 
 	/// <summary>
-	/// get the allocTokens to delete
+	/// get the pageTokens to delete
 	/// verify
 	/// delete from allocations lookup
 	/// free slot from columnList
@@ -1212,32 +1226,32 @@ public partial class Allocator  //alloc/free/pack logic
 		{
 			return;
 		}
-		using var so_AllocTokens = SpanPool<AllocToken>.Allocate(externalIds.Length);
-		var allocTokens = so_AllocTokens.Span;
+		using var so_PageAccessTokens = SpanPool<PageAccessToken>.Allocate(externalIds.Length);
+		var pageTokens = so_PageAccessTokens.Span;
 		//get tokens for freeing
 		for (var i = 0; i < externalIds.Length; i++)
 		{
-			allocTokens[i] = _lookup[externalIds[i]];
-			__CHECKED.Throw(allocTokens[i].externalId == externalIds[i]);
-			var (result, reason) = CheckIsValid(ref allocTokens[i]);
+			pageTokens[i] = _lookup[externalIds[i]];
+			__CHECKED.Throw(pageTokens[i].externalId == externalIds[i]);
+			var (result, reason) = CheckIsValid(ref pageTokens[i]);
 			__ERROR.Throw(result, reason);
 
-			__CHECKED_INTERNAL_VerifyAllocToken(ref allocTokens[i]);
+			__CHECKED_INTERNAL_VerifyPageAccessToken(ref pageTokens[i]);
 			//remove them now??  maybe will cause further issues with verification
 			_lookup.Remove(externalIds[i]);
 		}
 		//sort so that when we itterate through, they will have a higher chance of being in the same chunk
-		allocTokens.Sort();
+		pageTokens.Sort();
 
 
 		//parallel through all columns, deleting
-		var allocTokensArraySegment = so_AllocTokens.DangerousGetArray();
-		var allocArray = allocTokensArraySegment.Array;
+		var pageTokensArraySegment = so_PageAccessTokens.DangerousGetArray();
+		var allocArray = pageTokensArraySegment.Array;
 		////var workCount = 0;
 		ParallelFor.Range(0, _atomIdsUsed.Count, (start, end) =>
 		{
-			var count = allocTokensArraySegment.Count;
-			Span<AllocToken> span = allocArray;
+			var count = pageTokensArraySegment.Count;
+			Span<PageAccessToken> span = allocArray;
 			for (var aIndex = start; aIndex < end; aIndex++)
 			{
 				//Interlocked.Increment(ref workCount);
@@ -1250,8 +1264,8 @@ public partial class Allocator  //alloc/free/pack logic
 				//var (type, columnList) = pair;
 				for (var i = 0; i < count; i++)
 				{
-					ref var allocToken = ref span[i];
-					columnList[allocToken.allocSlot.chunkIndex].OnFreeSlot(ref allocToken);
+					ref var pageToken = ref span[i];
+					columnList[pageToken.slotRef.chunkIndex].OnFreeSlot(ref pageToken);
 				}
 			}
 		});
@@ -1264,10 +1278,10 @@ public partial class Allocator  //alloc/free/pack logic
 		//	var columns = _GetColumnsSpan();
 		//	var columnList = columns[atomId];
 		//	//var (type, columnList) = pair;
-		//	for (var i = 0; i < allocTokensArraySegment.Count; i++)
+		//	for (var i = 0; i < pageTokensArraySegment.Count; i++)
 		//	{
-		//		ref var allocToken = ref allocArray[i];
-		//		columnList[allocToken.allocSlot.chunkIndex].OnFreeSlot(ref allocToken);
+		//		ref var pageToken = ref allocArray[i];
+		//		columnList[pageToken.slotRef.chunkIndex].OnFreeSlot(ref pageToken);
 		//	}
 		//}
 		//);
@@ -1276,10 +1290,10 @@ public partial class Allocator  //alloc/free/pack logic
 
 
 		//add to free list
-		for (var i = 0; i < allocTokens.Length; i++)
+		for (var i = 0; i < pageTokens.Length; i++)
 		{
-			__CHECKED.Throw(_free.Contains(allocTokens[i].allocSlot) == false);
-			_free.Add(allocTokens[i].allocSlot);
+			__CHECKED.Throw(_free.Contains(pageTokens[i].slotRef) == false);
+			_free.Add(pageTokens[i].slotRef);
 
 		}
 		_isFreeSorted = false;
@@ -1296,20 +1310,20 @@ public partial class Allocator  //alloc/free/pack logic
 	}
 
 
-	private void _PackHelper_MoveSlotToFree(AllocToken highestAlive, AllocSlot lowestFree)
+	private void _PackHelper_MoveSlotToFree(PageAccessToken highestAlive, SlotRef lowestFree)
 	{
-		//verify freeSlot is free, and allocToken is valid
+		//verify freeSlot is free, and pageToken is valid
 #if CHECKED
-		__CHECKED_INTERNAL_VerifyAllocToken(ref highestAlive);
-		__CHECKED.Assert(highestAlive.allocSlot > lowestFree);
+		__CHECKED_INTERNAL_VerifyPageAccessToken(ref highestAlive);
+		__CHECKED.Assert(highestAlive.slotRef > lowestFree);
 		if (!__TryQueryMetadata(lowestFree, out var freeSlotMeta))
 		{
 			__CHECKED.Throw(false, "this should not happen.  returning false means no chunk exists.");
 		}
-		__CHECKED.Assert(freeSlotMeta.IsAlive == false && freeSlotMeta.allocToken.isAlive == false, "should be default value");
+		__CHECKED.Assert(freeSlotMeta.IsAlive == false && freeSlotMeta.pageToken.isAlive == false, "should be default value");
 #endif
-		//generate our newPos allocToken
-		var newSlotAllocToken = _GenerateLiveAllocToken(highestAlive.externalId, lowestFree);
+		//generate our newPos pageToken
+		var newSlotPageAccessToken = _GenerateLivePageAccessToken(highestAlive.externalId, lowestFree);
 
 		//do a single alloc for that freeSlot componentColumns
 		//foreach (var (type, columnList) in _componentColumns)
@@ -1323,28 +1337,28 @@ public partial class Allocator  //alloc/free/pack logic
 				continue;
 			}
 			//copy data from old while allocting the slot
-			columnList[lowestFree.chunkIndex].OnPackSlot(ref newSlotAllocToken, ref highestAlive);
+			columnList[lowestFree.chunkIndex].OnPackSlot(ref newSlotPageAccessToken, ref highestAlive);
 			//deallocate old slot componentColumns
-			columnList[highestAlive.allocSlot.chunkIndex].OnFreeSlot(ref highestAlive);
+			columnList[highestAlive.slotRef.chunkIndex].OnFreeSlot(ref highestAlive);
 		}
 		//update the metadata component with the new token (the other fields of metadata were coppied along with all other components in the above loop)
-		//var metadataChunk = _componentColumns[typeof(AllocMetadata)][newSlotAllocToken.allocSlot.columnChunkIndex] as Chunk<AllocMetadata>;
-		//var metadataChunk = GetChunk<AllocMetadata>(ref newSlotAllocToken);
-		//ref var metadataComponent = ref metadataChunk.Span[newSlotAllocToken.allocSlot.chunkRowIndex];
-		ref var metadataComponent = ref _UNCHECKED_GetComponent<AllocMetadata>(ref newSlotAllocToken);
-		metadataComponent.allocToken = newSlotAllocToken;
+		//var metadataChunk = _componentColumns[typeof(EntityMetadata)][newSlotPageAccessToken.slotRef.columnChunkIndex] as Chunk<EntityMetadata>;
+		//var metadataChunk = GetChunk<EntityMetadata>(ref newSlotPageAccessToken);
+		//ref var metadataComponent = ref metadataChunk.Span[newSlotPageAccessToken.slotRef.chunkChunkIndex];
+		ref var metadataComponent = ref _UNCHECKED_GetComponent<EntityMetadata>(ref newSlotPageAccessToken);
+		metadataComponent.pageToken = newSlotPageAccessToken;
 
 
 		//update our _lookup
-		_lookup[newSlotAllocToken.externalId] = newSlotAllocToken;
+		_lookup[newSlotPageAccessToken.externalId] = newSlotPageAccessToken;
 
 		//make sure our newly moved is all setup properly
-		__CHECKED_INTERNAL_VerifyAllocToken(ref newSlotAllocToken);
+		__CHECKED_INTERNAL_VerifyPageAccessToken(ref newSlotPageAccessToken);
 	}
 
 	/// <summary>
 	/// pack the page, so that there are no gaps between live entities.  The earliest free slots are filled by moving the ending entities up to fill it.  
-	/// Rows that become empty will be recycled.
+	/// Chunks that become empty will be recycled.
 	/// </summary>
 	/// <param name="maxCount"></param>
 	/// <returns></returns>
@@ -1353,11 +1367,11 @@ public partial class Allocator  //alloc/free/pack logic
 		//sor frees
 		//loop through all to free, lowest to highest
 		//if free is higher than highest active slot, done.
-		//take highest active allocSlot and swap it with the free
+		//take highest active slotRef and swap it with the free
 
 
 		///<summary>helper function to walk from our highest slot downward (deallocating any free) until it hits a live slot.</summary>
-		void _TryFreeAndGetNextAlive(out AllocSlot highestAllocatedSlot, out AllocMetadata highestAliveToken)
+		void _TryFreeAndGetNextAlive(out SlotRef highestAllocatedSlot, out EntityMetadata highestAliveToken)
 		{
 			while (true)
 			{
@@ -1365,7 +1379,7 @@ public partial class Allocator  //alloc/free/pack logic
 				if (result == false)
 				{
 					//  we are done
-					__ERROR.Assert(_lookup.Count == 0, "no more slots available.  we expect this to happen if the Allocator is totally empty.");
+					__ERROR.Assert(_lookup.Count == 0, "no more slots available.  we expect this to happen if the Page is totally empty.");
 					break;
 				}
 				result = __TryQueryMetadata(highestAllocatedSlot, out highestAliveToken);
@@ -1382,7 +1396,7 @@ public partial class Allocator  //alloc/free/pack logic
 				{
 #if CHECKED
 					//verify The highest slot is free.  
-					var foundMeta = _UNCHECKED_GetComponent<AllocMetadata>(ref highestAllocatedSlot);
+					var foundMeta = _UNCHECKED_GetComponent<EntityMetadata>(ref highestAllocatedSlot);
 					__ERROR.Throw(foundMeta.IsAlive == false);
 
 #endif
@@ -1392,7 +1406,7 @@ public partial class Allocator  //alloc/free/pack logic
 #if CHECKED
 					//verify next free is actually free
 					result = __TryQueryMetadata(_nextSlotTracker.nextAvailable, out var shouldBeFreeMetadata);
-					__ERROR.Throw(result && shouldBeFreeMetadata.IsAlive == false && shouldBeFreeMetadata.allocToken.isAlive == false);
+					__ERROR.Throw(result && shouldBeFreeMetadata.IsAlive == false && shouldBeFreeMetadata.pageToken.isAlive == false);
 #endif
 					if (shouldFreeChunk)
 					{
@@ -1414,7 +1428,7 @@ public partial class Allocator  //alloc/free/pack logic
 
 		var count = Math.Min(maxCount, _free.Count);
 
-		//sort our free list so that the ones closest to rowIndex zero will be swapped out with higher live ones
+		//sort our free list so that the ones closest to chunkIndex zero will be swapped out with higher live ones
 		if (_isFreeSorted != true)
 		{
 			_free.Sort();
@@ -1427,8 +1441,8 @@ public partial class Allocator  //alloc/free/pack logic
 			var firstFreeSlotToFill = _free[i];
 
 			//find the highestAliveToken, reducing our allocated until that occurs
-			AllocSlot highestAllocatedSlot;
-			AllocMetadata highestAliveToken;
+			SlotRef highestAllocatedSlot;
+			EntityMetadata highestAliveToken;
 			_TryFreeAndGetNextAlive(out highestAllocatedSlot, out highestAliveToken);
 			if (firstFreeSlotToFill >= highestAllocatedSlot)
 			{
@@ -1442,8 +1456,8 @@ public partial class Allocator  //alloc/free/pack logic
 			{
 				//swap out free and highest
 				__CHECKED.Throw(highestAliveToken.IsAlive == true);
-				__CHECKED_INTERNAL_VerifyAllocToken(ref highestAliveToken.allocToken);
-				_PackHelper_MoveSlotToFree(highestAliveToken.allocToken, firstFreeSlotToFill);
+				__CHECKED_INTERNAL_VerifyPageAccessToken(ref highestAliveToken.pageToken);
+				_PackHelper_MoveSlotToFree(highestAliveToken.pageToken, firstFreeSlotToFill);
 
 
 			}
@@ -1467,7 +1481,7 @@ public partial class Allocator  //alloc/free/pack logic
 			//////			if (highSlotResult == false || highestAliveToken.IsAlive == false)
 			//////			{
 			//////				//__ERROR.Throw(false, "if our highestAllocatedSlot is not alive, it should have been sorted ");
-			//////				var foundMeta = _UNCHECKED_GetComponent<AllocMetadata>(ref highestAllocatedSlot);
+			//////				var foundMeta = _UNCHECKED_GetComponent<EntityMetadata>(ref highestAllocatedSlot);
 			//////				__ERROR.Throw(foundMeta.IsAlive == false);
 			//////				//The highest slot is free.  
 			//////			}
@@ -1475,8 +1489,8 @@ public partial class Allocator  //alloc/free/pack logic
 			//////			{
 			//////				//swap out free and highest
 			//////				__CHECKED.Throw(highestAliveToken.IsAlive == true);
-			//////				__CHECKED_VerifyAllocToken(ref highestAliveToken.allocToken);
-			//////				_PackHelper_MoveSlotToFree(highestAliveToken.allocToken, firstFreeSlotToFill);
+			//////				__CHECKED_VerifyPageAccessToken(ref highestAliveToken.pageToken);
+			//////				_PackHelper_MoveSlotToFree(highestAliveToken.pageToken, firstFreeSlotToFill);
 			//////			}
 
 
@@ -1485,7 +1499,7 @@ public partial class Allocator  //alloc/free/pack logic
 			//////#if CHECKED
 			//////			//verify next free is actually free
 			//////			var result = __TryQueryMetadata(_nextSlotTracker.nextAvailable, out var shouldBeFreeMetadata);
-			//////			__ERROR.Throw(result && shouldBeFreeMetadata.IsAlive ==false && shouldBeFreeMetadata.allocToken.isAlive == false);
+			//////			__ERROR.Throw(result && shouldBeFreeMetadata.IsAlive ==false && shouldBeFreeMetadata.pageToken.isAlive == false);
 			//////#endif
 			//////			if (shouldFreeChunk)
 			//////			{
@@ -1519,22 +1533,22 @@ public partial class Allocator  //alloc/free/pack logic
 
 }
 /// <summary>
-/// data for a default chunk always applied to all allocators.
+/// data for a default chunk always applied to all pages.
 /// </summary>
-public record struct AllocMetadata : IComponent
+public record struct EntityMetadata
 {
-	public AllocToken allocToken;
+	public PageAccessToken pageToken;
 	public int componentCount;
 	/// <summary>
 	/// hint informing that a writeRef was aquired for one of the components.
-	/// <para>Important Note: writing to this fieldWrites is done internally, and does not increment the Chunk[AllocMetadata]._writeVersion.  This is so _writeVersion can be used to detect entity alloc/free </para>
+	/// <para>Important Note: writing to this fieldWrites is done internally, and does not increment the Chunk[EntityMetadata]._writeVersion.  This is so _writeVersion can be used to detect entity alloc/free </para>
 	/// </summary>
 	public int fieldWrites;
 
 	/// <summary>
 	/// If this slot is in use by an entity
 	/// </summary>
-	public bool IsAlive { get => allocToken.isAlive; }
+	public bool IsAlive { get => pageToken.isAlive; }
 }
 
 /// <summary>
@@ -1544,20 +1558,20 @@ public record struct AllocMetadata : IComponent
 public struct AllocPositionTracker
 {
 	public int chunkSize;
-	public AllocSlot nextAvailable;
-	public Allocator allocator;
+	public SlotRef nextAvailable;
+	public Page page;
 	/// <summary>
-	/// allocate a new slot for the Allocator object.   this slot is identical for all components in this allocator.  (together, it makes up a "row")
+	/// allocate a new slot for the Page object.   this slot is identical for all components in this page.  (together, it makes up a "chunk")
 	/// </summary>
 	/// <param name="newChunk"></param>
 	/// <returns></returns>
-	public AllocSlot AllocNext(out bool newChunk)
+	public SlotRef AllocNext(out bool newChunk)
 	{
 		var toReturn = nextAvailable;
-		nextAvailable.rowSlotIndex++;
-		if (nextAvailable.rowSlotIndex >= chunkSize)
+		nextAvailable.chunkSlotIndex++;
+		if (nextAvailable.chunkSlotIndex >= chunkSize)
 		{
-			nextAvailable.rowSlotIndex = 0;
+			nextAvailable.chunkSlotIndex = 0;
 			nextAvailable.chunkIndex++;
 			newChunk = true;
 		}
@@ -1570,7 +1584,7 @@ public struct AllocPositionTracker
 	}
 
 	/// <summary>
-	/// Free the last slot  (highest chunk+row index)
+	/// Free the last slot  (highest chunk+chunk index)
 	/// </summary>
 	/// <param name="freeChunk"></param>
 	public void FreeLast(out bool freeChunk)
@@ -1592,15 +1606,15 @@ public struct AllocPositionTracker
 		//ensure that slot we are going to free is actually free
 		var result = TryGetHighestAllocatedSlot(out var slotToCheck);
 		__ERROR.Throw(result, "shouldnt free if nothing left allocated");
-		ref var checkMeta = ref allocator._UNCHECKED_GetComponent<AllocMetadata>(ref slotToCheck);
+		ref var checkMeta = ref page._UNCHECKED_GetComponent<EntityMetadata>(ref slotToCheck);
 		__ERROR.Throw(checkMeta.IsAlive == false, "should be dead if we are about to free it");
 #endif
 
 
-		nextAvailable.rowSlotIndex--;
-		if (nextAvailable.rowSlotIndex < 0)
+		nextAvailable.chunkSlotIndex--;
+		if (nextAvailable.chunkSlotIndex < 0)
 		{
-			nextAvailable.rowSlotIndex = chunkSize - 1;
+			nextAvailable.chunkSlotIndex = chunkSize - 1;
 			nextAvailable.chunkIndex--;
 			freeChunk = true;
 			__DEBUG.Throw(nextAvailable.chunkIndex >= 0, "less than zero allocations");
@@ -1610,42 +1624,44 @@ public struct AllocPositionTracker
 			freeChunk = false;
 		}
 	}
-	private bool _TryGetPriorSlot(AllocSlot current, out AllocSlot prior)
+	private bool _TryGetPriorSlot(SlotRef current, out SlotRef prior)
 	{
-		if (nextAvailable.chunkIndex == 0 && nextAvailable.rowSlotIndex == 0)
+		if (nextAvailable.chunkIndex == 0 && nextAvailable.chunkSlotIndex == 0)
 		{
 			prior = default;
 			return false;
 		}
 		prior = current;
-		prior.rowSlotIndex--;
-		if (prior.rowSlotIndex < 0)
+		prior.chunkSlotIndex--;
+		if (prior.chunkSlotIndex < 0)
 		{
-			prior.rowSlotIndex = chunkSize - 1;
+			prior.chunkSlotIndex = chunkSize - 1;
 			prior.chunkIndex--;
 		}
 		return true;
 	}
 	/// <summary>
-	/// For our Allocator, get the highest slot currently allocated.
+	/// For our Page, get the highest slot currently allocated.
 	/// Note: while the slot may be allocated, it may also be freed.  
 	/// <para>returns false if no slots are allocated</para>
 	/// </summary>
 	/// <param name="slot"></param>
 	/// <returns></returns>
-	internal bool TryGetHighestAllocatedSlot(out AllocSlot slot)
+	internal bool TryGetHighestAllocatedSlot(out SlotRef slot)
 	{
 		return _TryGetPriorSlot(nextAvailable, out slot);
 	}
 }
 
 
-
+/// <summary>
+/// use the Generic version of this class.
+/// </summary>
 public abstract class Chunk : IDisposable
 {
 	//public long _chunkLookupId = -1;
-	public int allocatorId = -1;
-	public int allocatorVersion = -1;
+	public int pageId = -1;
+	public int pageVersion = -1;
 	public int columnIndex = -1;
 	public int _count;
 	public int _length = -1;
@@ -1663,13 +1679,13 @@ public abstract class Chunk : IDisposable
 	/// <summary>
 	/// using the given _chunkId, allocate self a slot on the global chunk store for Chunk[T]
 	/// </summary>
-	public abstract void Initialize(int length, Allocator allocator, int columnIndex);
-	internal abstract void OnAllocSlot(ref AllocToken allocToken);
+	public abstract void Initialize(int length, Page page, int columnIndex);
+	internal abstract void OnAllocSlot(ref PageAccessToken pageToken);
 	/// <summary>
 	/// overload used internally for packing
 	/// </summary>
-	internal abstract void OnPackSlot(ref AllocToken allocToken, ref AllocToken moveComponentDataFrom);
-	internal abstract void OnFreeSlot(ref AllocToken allocToken);
+	internal abstract void OnPackSlot(ref PageAccessToken pageToken, ref PageAccessToken moveComponentDataFrom);
+	internal abstract void OnFreeSlot(ref PageAccessToken pageToken);
 }
 [StructLayout(LayoutKind.Explicit)]
 public record struct ChunkLookupId
@@ -1680,9 +1696,12 @@ public record struct ChunkLookupId
 	[FieldOffset(0)]
 	public int columnChunkIndex;
 	[FieldOffset(4)]
-	public int allocatorId;
+	public int pageId;
 }
 
+/// <summary>
+/// contains the slots (storage array) used to contain the components.
+/// </summary>
 public class Chunk<TComponent> : Chunk
 {
 	//public static Dictionary<long, Chunk<TComponent>> _GLOBAL_LOOKUP = new(0);
@@ -1725,29 +1744,29 @@ public class Chunk<TComponent> : Chunk
 		//	var result = _GLOBAL_LOOKUP._TryRemove(_chunkLookupId, out _);
 		//	__ERROR.Throw(result);
 		//}
-		__CHECKED.Throw(_LOOKUP[allocatorId][columnIndex] == this, "ref mismatch");
-		_LOOKUP[allocatorId][columnIndex] = null;
+		__CHECKED.Throw(_LOOKUP[pageId][columnIndex] == this, "ref mismatch");
+		_LOOKUP[pageId][columnIndex] = null;
 
-		allocatorId = -1;
-		allocatorVersion = -1;
+		pageId = -1;
+		pageVersion = -1;
 		columnIndex = -1;
 
 
 
 
-		//our allocator.FreeLastChunk code checks count.   we don't want to check count here because of cases like game shutdown
+		//our page.FreeLastChunk code checks count.   we don't want to check count here because of cases like game shutdown
 		//__ERROR.Throw(_count == 0); 
 		UnsafeArray = null;
 		_storage.Dispose();
 		_storage = null;
 	}
 
-	public override void Initialize(int length, Allocator allocator, int columnIndex)
+	public override void Initialize(int length, Page page, int columnIndex)
 	{
 		//	_chunkLookupId = chunkLookupId;
-		__DEBUG.Throw(this.allocatorId == -1, "already init");
-		allocatorId = allocator._allocatorId;
-		allocatorVersion = allocator._fingerprint;
+		__DEBUG.Throw(this.pageId == -1, "already init");
+		pageId = page._pageId;
+		pageVersion = page._fingerprint;
 		this.columnIndex = columnIndex;
 
 
@@ -1760,28 +1779,28 @@ public class Chunk<TComponent> : Chunk
 		//	var result = _GLOBAL_LOOKUP.TryAdd(_chunkLookupId, this);
 		//	__ERROR.Throw(result);
 		//}
-		var column = _LOOKUP.GetOrSet(allocatorId, () => new());
+		var column = _LOOKUP.GetOrSet(pageId, () => new());
 		__CHECKED.Throw(column.Count <= columnIndex || column[columnIndex] == null);
 		column._ExpandAndSet(columnIndex, this);
 
 		_storage = MemoryOwner<TComponent>.Allocate(_length, AllocationMode.Clear); //TODO: maybe no need to clear?
 		UnsafeArray = _storage.DangerousGetArray().Array;
 	}
-	internal override void OnAllocSlot(ref AllocToken allocToken)
+	internal override void OnAllocSlot(ref PageAccessToken pageToken)
 	{
 		_count++;
 #if DEBUG
 		//clear the slot
-		UnsafeArray[allocToken.allocSlot.rowSlotIndex] = default(TComponent);
+		UnsafeArray[pageToken.slotRef.chunkSlotIndex] = default(TComponent);
 #endif
 	}
 	/// <summary>
 	/// overload used internally for packing
 	/// </summary>
-	internal override void OnPackSlot(ref AllocToken allocToken, ref AllocToken moveComponentDataFrom)
+	internal override void OnPackSlot(ref PageAccessToken pageToken, ref PageAccessToken moveComponentDataFrom)
 	{
 		_count++;
-		UnsafeArray[allocToken.allocSlot.rowSlotIndex] = moveComponentDataFrom.GetComponentReadRef<TComponent>();
+		UnsafeArray[pageToken.slotRef.chunkSlotIndex] = moveComponentDataFrom.GetComponentReadRef<TComponent>();
 #if DEBUG
 		//lock (_GLOBAL_LOOKUP)
 		{
@@ -1790,178 +1809,82 @@ public class Chunk<TComponent> : Chunk
 			//var result = _GLOBAL_LOOKUP.TryGetValue(chunkLookupId, out var chunk);
 			//__ERROR.Throw(result);
 
-			var chunk = _LOOKUP[moveComponentDataFrom.allocatorId]._AsSpan_Unsafe()[moveComponentDataFrom.allocSlot.chunkIndex];
+			var chunk = _LOOKUP[moveComponentDataFrom.pageId]._AsSpan_Unsafe()[moveComponentDataFrom.slotRef.chunkIndex];
 
-			chunk.UnsafeArray[moveComponentDataFrom.allocSlot.rowSlotIndex] = default(TComponent);
+			chunk.UnsafeArray[moveComponentDataFrom.slotRef.chunkSlotIndex] = default(TComponent);
 		}
 #endif
 
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
-	internal override void OnFreeSlot(ref AllocToken allocToken)
+	internal override void OnFreeSlot(ref PageAccessToken pageToken)
 	{
 		_count--;
 
-		//if (allocToken.GetAllocator().AutoPack)
+		//if (pageToken.GetPage().AutoPack)
 		//{
 		//	//no need to clear, as we will pack over this!
 		//	return;
 		//}
 
 		//clear the slot
-		UnsafeArray[allocToken.allocSlot.rowSlotIndex] = default(TComponent);
+		UnsafeArray[pageToken.slotRef.chunkSlotIndex] = default(TComponent);
 	}
-	public unsafe ref TComponent GetWriteRef(AllocToken allocToken)
+	public unsafe ref TComponent GetWriteRef(PageAccessToken pageToken)
 	{
-		return ref GetWriteRef(ref *&allocToken); //cast to ptr using *& to circumvent return ref safety check
+		return ref GetWriteRef(ref *&pageToken); //cast to ptr using *& to circumvent return ref safety check
 	}
-	public ref TComponent GetWriteRef(ref AllocToken allocToken)
+	public ref TComponent GetWriteRef(ref PageAccessToken pageToken)
 	{
-		//lock (Chunk<AllocMetadata>._GLOBAL_LOOKUP)
+		//lock (Chunk<EntityMetadata>._GLOBAL_LOOKUP)
 		{
-			_CHECKED_VerifyIntegrity(ref allocToken);
-			var rowIndex = allocToken.allocSlot.rowSlotIndex;
+			_CHECKED_VerifyIntegrity(ref pageToken);
+			var chunkIndex = pageToken.slotRef.chunkSlotIndex;
 			//inform metadata that a write is occuring.  //TODO: is this needed?  If not, remove it to reduce random memory access
-			//var result = Chunk<AllocMetadata>._GLOBAL_LOOKUP.TryGetValue(_chunkLookupId, out var chunk);
+			//var result = Chunk<EntityMetadata>._GLOBAL_LOOKUP.TryGetValue(_chunkLookupId, out var chunk);
 			//__ERROR.Throw(result);
-			var allocMetadataChunk = Chunk<AllocMetadata>._LOOKUP[allocToken.allocatorId]._AsSpan_Unsafe()[allocToken.allocSlot.chunkIndex];
-			ref var allocMetadata = ref allocMetadataChunk.UnsafeArray[rowIndex];
-			allocMetadata.fieldWrites++;
+			var entityMetadataChunk = Chunk<EntityMetadata>._LOOKUP[pageToken.pageId]._AsSpan_Unsafe()[pageToken.slotRef.chunkIndex];
+			ref var entityMetadata = ref entityMetadataChunk.UnsafeArray[chunkIndex];
+			entityMetadata.fieldWrites++;
 
 			_writeVersion++;
-			return ref UnsafeArray[rowIndex];
+			return ref UnsafeArray[chunkIndex];
 		}
 	}
-	public unsafe ref readonly TComponent GetReadRef(AllocToken allocToken)
+	public unsafe ref readonly TComponent GetReadRef(PageAccessToken pageToken)
 	{
-		return ref GetReadRef(ref *&allocToken); //cast to ptr using *& to circumvent return ref safety check
+		return ref GetReadRef(ref *&pageToken); //cast to ptr using *& to circumvent return ref safety check
 	}
-	public ref readonly TComponent GetReadRef(ref AllocToken allocToken)
+	public ref readonly TComponent GetReadRef(ref PageAccessToken pageToken)
 	{
-		_CHECKED_VerifyIntegrity(ref allocToken);
-		var rowIndex = allocToken.allocSlot.rowSlotIndex;
-		return ref UnsafeArray[rowIndex];
+		_CHECKED_VerifyIntegrity(ref pageToken);
+		var chunkIndex = pageToken.slotRef.chunkSlotIndex;
+		return ref UnsafeArray[chunkIndex];
 
 	}
 
 	[Conditional("CHECKED")]
-	private void _CHECKED_VerifyIntegrity(ref AllocToken allocToken)
+	private void _CHECKED_VerifyIntegrity(ref PageAccessToken pageToken)
 	{
 		//lock (_GLOBAL_LOOKUP)
 		{
-			allocToken.GetAllocator().__CHECKED_INTERNAL_VerifyAllocToken(ref allocToken);
-			//__DEBUG.Throw(allocToken.GetChunkLookupId() == _chunkLookupId, "allocToken does not belong to this chunk");
-			__DEBUG.Throw(allocToken.allocatorId == allocatorId && allocToken.allocatorVersion == allocatorVersion && allocToken.allocSlot.chunkIndex == columnIndex, "allocToken does not belong to this chunk");
+			pageToken.GetPage().__CHECKED_INTERNAL_VerifyPageAccessToken(ref pageToken);
+			//__DEBUG.Throw(pageToken.GetChunkLookupId() == _chunkLookupId, "pageToken does not belong to this chunk");
+			__DEBUG.Throw(pageToken.pageId == pageId && pageToken.pageVersion == pageVersion && pageToken.slotRef.chunkIndex == columnIndex, "pageToken does not belong to this chunk");
 
 			//var result = Chunk<TComponent>._GLOBAL_LOOKUP.TryGetValue(_chunkLookupId, out var chunk);
 			//__ERROR.Throw(result);
-			var chunk = _LOOKUP[allocToken.allocatorId]._AsSpan_Unsafe()[allocToken.allocSlot.chunkIndex];
+			var chunk = _LOOKUP[pageToken.pageId]._AsSpan_Unsafe()[pageToken.slotRef.chunkIndex];
 			__CHECKED.Throw(chunk == this, "alloc system internal integrity failure");
 			__CHECKED.Throw(!IsDisposed, "use after dispose");
 
-			var rowIndex = allocToken.allocSlot.rowSlotIndex;
-			//result = Chunk<AllocMetadata>._GLOBAL_LOOKUP.TryGetValue(_chunkLookupId, out var allocMetadataChunk);
+			var chunkIndex = pageToken.slotRef.chunkSlotIndex;
+			//result = Chunk<EntityMetadata>._GLOBAL_LOOKUP.TryGetValue(_chunkLookupId, out var entityMetadataChunk);
 			//__ERROR.Throw(result);
-			var allocMetadataChunk = Chunk<AllocMetadata>._LOOKUP[allocToken.allocatorId]._AsSpan_Unsafe()[allocToken.allocSlot.chunkIndex];
-			ref var allocMetadata = ref allocMetadataChunk.UnsafeArray[rowIndex];
-			__DEBUG.Throw(allocMetadata.allocToken == allocToken, "invalid alloc token.   why?");
+			var entityMetadataChunk = Chunk<EntityMetadata>._LOOKUP[pageToken.pageId]._AsSpan_Unsafe()[pageToken.slotRef.chunkIndex];
+			ref var entityMetadata = ref entityMetadataChunk.UnsafeArray[chunkIndex];
+			__DEBUG.Throw(entityMetadata.pageToken == pageToken, "invalid alloc token.   why?");
 		}
-	}
-}
-
-
-public class AllocSlotList<T> : IDisposable where T : class
-{
-	private List<T> _storage = new();
-	public int _count;
-
-	/// <summary>
-	/// get storage as a span.  reads are safe with AllocSlot() as long as slots being added are not access via this Span.
-	/// </summary>
-	public Span<T> Span
-	{
-		get => System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_storage);
-	}
-
-	private List<int> _freeSlots = new();
-
-	public int AllocSlot()
-	{
-		int slot;
-		bool result;
-		lock (_freeSlots)
-		{
-			result = _freeSlots._TryTakeLast(out slot);
-		}
-		if (!result)
-		{
-			lock (_storage)
-			{
-				slot = _storage.Count;
-				_storage.Add(default(T));
-				_count++;
-			}
-		}
-		__DEBUG.Throw(_storage[slot] == default(T));
-		return slot;
-	}
-
-	/// <summary>
-	/// This will null the slot, no need to do so manually
-	/// </summary>
-	/// <param name="slot"></param>
-	public void FreeSlot(int slot)
-	{
-		lock (_freeSlots)
-		{
-			_freeSlots.Add(slot);
-
-			lock (_storage)
-			{
-				_count--;
-				_storage[slot] = default(T);
-
-
-				__DEBUG.Throw(_storage[slot] == default(T));
-				//try to pack if possible
-				if (slot == _storage.Count - 1)
-				{
-					//the slot we are freeing is the last slot in the _storage array.    
-					lock (_freeSlots)
-					{
-						//now have exclusive lock on _freeSlots and _storage
-
-						//sort free so highest at end
-						_freeSlots.Sort();
-
-						//while the last free slot is the last slot in storage, remove both
-						while (_freeSlots.Count > 0 && _freeSlots[_freeSlots.Count - 1] == _storage.Count - 1)
-						{
-
-							var result = _freeSlots._TryTakeLast(out var removedFreeSlot);
-							__DEBUG.Throw(result && removedFreeSlot == _storage.Count - 1);
-							_storage._RemoveLast();
-						}
-					}
-				}
-			}
-		}
-	}
-
-	public bool IsDisposed { get; private set; }
-	public void Dispose()
-	{
-		if (IsDisposed)
-		{
-			__DEBUG.Assert(false, "why already disposed?");
-			return;
-		}
-		IsDisposed = true;
-		_storage.Clear();
-		_storage = null;
-		_freeSlots.Clear();
-		_freeSlots = null;
-		_count = -1;
 	}
 }

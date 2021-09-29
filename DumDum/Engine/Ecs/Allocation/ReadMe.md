@@ -22,18 +22,18 @@ To do this, the Allocation system was created.  It is comprised of the following
 
 ## Layout
 
-### Row
-A row holds a "chunk" of the components of a specific type for a given Page (for a given Archetype).   
-Effectively a `TComponent[]` array.
+### Chunk
+A chunk holds a "chunk" of the components of a specific type for a given Page (for a given Archetype).   
+Effectively `Chunk == TComponent[]` array.
 
 
 ### Column
-A Column is a collection of all rows for the given TComponent for the Page.  
-Effectively a `List<TComponent[]>`.
+A Column is a collection of all chunks for the given TComponent for the Page.  
+Effectively a `Column == List<Chunk>`.
 
 ### Page 
 Is a class that holds a collection of columns, one per `TComponent`.  
-Effectively a `Dictionary<typeof(TComponent),Column<TComponent>>`
+Effectively a `Page == Dictionary<typeof(TComponent),Column>`
 
 ### Slot
 Is a single component for a single entity.  These can reverse-lookup their owner entity by inspecting a special `PageMeta` component that is added to each
@@ -47,11 +47,11 @@ Here is an example showing how thigs are laid out logically in memory:
  │                                                                                 │
  │    ┌───COLUMN<T1>────────────────────┐  ┌───COLUMN<T2>────────────────────┐     │
  │    │                                 │  │                                 │     │
- │    │  ┌────ROW0─────┬──────┬──────┐  │  │  ┌────ROW0─────┬──────┬──────┐  │     │
+ │    │  ┌──CHUNK0─────┬──────┬──────┐  │  │  ┌──CHUNK0─────┬──────┬──────┐  │     │
  │    │  │ Slot0│ Slot1│ Slot2│ Slot3│  │  │  │ Slot0│ Slot1│ Slot2│ Slot3│  │     │
  │    │  └──────┴──────┴──────┴──────┘  │  │  └──────┴──────┴──────┴──────┘  │     │
  │    │                                 │  │                                 │     │
- │    │  ┌────ROW1─────┬──────┬──────┐  │  │  ┌────ROW1─────┬──────┬──────┐  │     │
+ │    │  ┌──CHUNK1─────┬──────┬──────┐  │  │  ┌──CHUNK1─────┬──────┬──────┐  │     │
  │    │  │ Slot0│ Slot1│ Slot2│ Slot3│  │  │  │ Slot0│ Slot1│ Slot2│ Slot3│  │     │
  │    │  └──────┴──────┴──────┴──────┘  │  │  └──────┴──────┴──────┴──────┘  │     │
  │    │                                 │  │                                 │     │
@@ -63,7 +63,7 @@ Here is an example showing how thigs are laid out logically in memory:
  │                                                                                 │
  │                                         ┌───COLUMN<T2>────────────────────┐     │
  │                                         │                                 │     │
- │                                         │  ┌────ROW0─────┬──────┐         │     │
+ │                                         │  ┌──CHUNK0─────┬──────┐         │     │
  │                                         │  │ Slot0│ Slot1│ Slot2│         │     │
  │                                         │  └──────┴──────┴──────┘         │     │
  │                                         │                                 │     │
@@ -76,17 +76,8 @@ Here is an example showing how thigs are laid out logically in memory:
  └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-In the above, Page01 has two types of `TComponent` assigned to it.  Each TComponent has it's own column, and each row is set to have 4 slots each.   (The Page sets how long each row it contains will be).
+In the above, Page01 has two types of `TComponent` assigned to it.  Each TComponent has it's own column, and each chunk is set to have 4 slots each.   (The Page sets how long each chunk it contains will be).
 
-Page2 only has one component assigned to it, and it's row size is 3.  Regardless of how many entities each Page tracks, the row size will be the same.   As more entities are added/removed, more rows will be added/removed
-
-
+Page2 only has one component assigned to it, and it's chunk size is 3.  Regardless of how many entities each Page tracks, the chunk size will be the same.   As more entities are added/removed, more chunks will be added/removed
 
 
-
-
-
-## Remarks
-
-- drawings created using https://asciiflow.com/#/
-- 

@@ -121,12 +121,12 @@ public class AllocatorBenchmark
 //	[Benchmark]
 	public async Task Sequential_CreateEditDelete()
 	{
-		Allocator.__TEST_Unit_SingleAllocator_AndEdit(AutoPack, ChunkSize, externalIdsOwner, evenSet, oddSet);
+		Page.__TEST_Unit_SinglePage_AndEdit(AutoPack, ChunkSize, externalIdsOwner, evenSet, oddSet);
 	}
 	[Benchmark]
 	public async Task Parallel_CreateEditDelete()
 	{
-		await Allocator.__TEST_Unit_ParallelAllocators(AutoPack, ChunkSize, externalIdsOwner, PBatchX, Allocators, evenSet, oddSet);
+		await Page.__TEST_Unit_ParallelPages(AutoPack, ChunkSize, externalIdsOwner, PBatchX, Allocators, evenSet, oddSet);
 	}
 
 }

@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 using DumDum.Bcl._internal;
-using DumDum.Bcl.Diagnostics;
-using Microsoft.Toolkit.HighPerformance;
 
 namespace DumDum.Bcl.Collections._unused
 {

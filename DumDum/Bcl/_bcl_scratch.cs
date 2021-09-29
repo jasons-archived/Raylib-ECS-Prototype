@@ -687,7 +687,7 @@ public unsafe struct CacheLineRef<T>
 	//[FieldOffset(0)]
 	public T value;
 	//[FieldOffset(0)]
-	private fixed byte _size[60];
+	//private fixed byte _size[60];
 }
 
 /// <summary>
