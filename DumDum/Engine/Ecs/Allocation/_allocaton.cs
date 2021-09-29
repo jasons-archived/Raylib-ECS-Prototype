@@ -14,7 +14,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DumDum.Engine.Allocation;
+namespace DumDum.Engine.Ecs.Allocation;
 
 
 

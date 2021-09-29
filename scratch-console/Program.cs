@@ -5,7 +5,7 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 using DumDum.Bcl;
 using DumDum.Bcl.Diagnostics;
-using DumDum.Engine.Allocation;
+using DumDum.Engine.Ecs.Allocation;
 using Microsoft.Toolkit.HighPerformance.Buffers;
 using Microsoft.Toolkit.HighPerformance.Helpers;
 

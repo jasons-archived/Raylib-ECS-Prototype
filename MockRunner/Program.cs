@@ -9,7 +9,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using DumDum.Bcl;
 using DumDum.Bcl.Diagnostics;
-using DumDum.Engine.Allocation;
+using DumDum.Engine.Ecs.Allocation;
 using DumDum.Engine.Ecs;
 using DumDum.Engine.Sim;
 using Microsoft.Toolkit.HighPerformance.Buffers;
