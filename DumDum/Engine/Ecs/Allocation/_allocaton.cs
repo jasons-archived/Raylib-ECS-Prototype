@@ -16,10 +16,97 @@ using System.Threading.Tasks;
 
 namespace DumDum.Engine.Ecs.Allocation;
 
+[StructLayout(LayoutKind.Explicit)]
+public readonly record struct EntityHandle
+{
+	/// <summary>
+	/// this entityHandle stored as a long
+	/// </summary>
+	[FieldOffset(0)]
+	public readonly long _packValue;
+	/// <summary>
+	/// 
+	/// </summary>
+	[FieldOffset(0)]
+	public readonly int version;
+	/// <summary>
+	/// can be used to access slot into the entityRegistry
+	/// </summary>
+	[FieldOffset(4)]
+	public readonly int id;
+
+	public EntityHandle(long packValue) : this()
+	{
+		_packValue = packValue;
+	}
+	public EntityHandle(int id, int version) : this()
+	{
+		this.id = id;
+		this.version = version;
+	}
+
+}
+public record struct EntityData
+{
+	public EntityHandle handle;
+	public AccessToken pageAccessToken;
+	public bool IsAlive { get => pageAccessToken.isAlive; }
+
+}
+
+
+public class EntityRegistry
+{
+	public StructSlotArray<EntityData> _storage = new(1000000); //TODO: 1 million items = 232mb at current size of access token (needs size optimizations)
+
+	private int _allocationVersion;
+
+	public MemoryOwner<EntityHandle> Alloc(int count)
+	{
+		var version = _allocationVersion++;
+		var toReturn = MemoryOwner<EntityHandle>.Allocate(count);
+		using var allocSpanOwner = SpanGuard<int>.Allocate(count);
+		var allocIndicies = allocSpanOwner.Span;
+		var entityHandles = toReturn.Span;
+		_storage.Alloc(allocIndicies);
+		
+
+		for(var i = 0; i < count; i++)
+		{
+			var index = allocIndicies[i];
+			var handle = new EntityHandle(index, version);
+			entityHandles[i] = handle;
+		}
+
+		return toReturn;
+	}
+
+	public void Free(Span<EntityHandle> handles)
+	{
+		using var freeSpanOwner = SpanGuard<int>.Allocate(handles.Length);
+		var freeSpan = freeSpanOwner.Span;
+		for(var i=0; i < handles.Length; i++)
+		{
+			var handle = handles[i];
+			freeSpan[i] = handle.id;			
+		}
+		_storage.Free(freeSpan);
+	}
+
+
+	public ref EntityData this[EntityHandle handle]
+	{
+		 get {
+			ref var toReturn= ref _storage[handle.id];
+			__DEBUG.Assert(toReturn.handle == handle, "handle is invalid.  do you have a stale handle?  (use after dispose?)");
+			return ref toReturn;
+		}
+	}
 
 
 
 
+}
 
 
 
@@ -299,7 +386,7 @@ public partial class Page //unit test
 	public static unsafe void __TEST_Unit_SeriallPages(bool autoPack, int chunkSize, MemoryOwner<long> externalIds, int pageCount, HashSet<long> evenSet, HashSet<long> oddSet)
 	{
 		var count = pageCount;
-		using var allocOwner = SpanPool<Page>.Allocate(count);
+		using var allocOwner = SpanGuard<Page>.Allocate(count);
 		var allocs = allocOwner.Span;
 		for (var i = 0; i < count; i++)
 		{
@@ -345,7 +432,7 @@ public partial class Page //unit test
 		};
 		page.Initialize();
 
-		using var externalIdsOwner = SpanPool<long>.Allocate(__.Rand.Next(0, 1000));
+		using var externalIdsOwner = SpanGuard<long>.Allocate(__.Rand.Next(0, 1000));
 		var set = new HashSet<long>();
 		var externalIds = externalIdsOwner.Span;
 		while (set.Count < externalIds.Length)
@@ -359,7 +446,7 @@ public partial class Page //unit test
 			count++;
 		}
 		//Span<long> externalIds = stackalloc long[] { 2, 4, 8, 7, -2 };
-		using var tokensOwner = SpanPool<AccessToken>.Allocate(externalIds.Length);
+		using var tokensOwner = SpanGuard<AccessToken>.Allocate(externalIds.Length);
 		var tokens = tokensOwner.Span;
 		page.Alloc(externalIds, tokens);
 		return page;
@@ -395,7 +482,7 @@ public partial class Page //unit test
 		var externalIds = externalIdsOwner.Span;
 
 		//Span<long> externalIds = stackalloc long[] { 2, 4, 8, 7, -2 };
-		using var tokensOwner = SpanPool<AccessToken>.Allocate(externalIds.Length);
+		using var tokensOwner = SpanGuard<AccessToken>.Allocate(externalIds.Length);
 		var tokens = tokensOwner.Span;
 		page.Alloc(externalIds, tokens);
 
@@ -460,7 +547,7 @@ public partial class Page //unit test
 			__ERROR.Throw(pageToken.GetComponentReadRef<string>().StartsWith("hello"));
 		}
 		//add odds
-		using var oddTokens = SpanPool<AccessToken>.Allocate(oddSet.Count);
+		using var oddTokens = SpanGuard<AccessToken>.Allocate(oddSet.Count);
 		var oddSpan = oddTokens.Span;
 		page.Alloc(oddSet.ToArray(), oddSpan);
 
@@ -655,7 +742,7 @@ public partial class Page : IDisposable //init logic
 	/// <summary>
 	/// this page instance can be looked up via the static Page._GLOBAL_LOOKUP[_pageId]
 	/// </summary>
-	public int _pageId = -1;
+	public short _pageId = -1;
 	private static int _fingerprintCounter;
 	/// <summary>
 	/// tracker so that every page has a different "fingerprint".  needed because pageId is reused when an page is disposed.
@@ -808,7 +895,9 @@ public partial class Page : IDisposable //init logic
 	{
 		//add self to global lookup
 		__ERROR.Throw(_pageId == -1, "why already set?");
-		_pageId = _GLOBAL_LOOKUP.AllocSlot();
+		var tempId = _GLOBAL_LOOKUP.AllocSlot();
+		__DEBUG.Throw(tempId < short.MaxValue, "pageId is set to be of size short.   this is too long");
+		_pageId = (short)tempId;
 
 		//__DEBUG.AssertOnce(_pageId < 10, "//TODO: change pageId to use a pool, not increment, otherwise risk of collisions with long-running programs");
 		__DEBUG.Throw(ComponentTypes != null, "need to set properties before init");
@@ -872,7 +961,7 @@ public partial class Page : IDisposable //init logic
 	}
 	public bool IsDisposed { get; private set; } = false;
 #if CHECKED
-	private DisposeSentinel _disposeCheck = new();
+	private DisposeGuard _disposeCheck = new();
 #endif
 	public void Dispose()
 	{
@@ -1159,7 +1248,7 @@ public partial class Page  //alloc/free/pack logic
 		if (result == true)
 		{
 			__CHECKED_INTERNAL_VerifyPageAccessToken(ref pageToken);
-			
+
 		}
 
 		return (result, reason);
@@ -1228,7 +1317,7 @@ public partial class Page  //alloc/free/pack logic
 		{
 			return;
 		}
-		using var so_PageAccessTokens = SpanPool<AccessToken>.Allocate(externalIds.Length);
+		using var so_PageAccessTokens = SpanGuard<AccessToken>.Allocate(externalIds.Length);
 		var pageTokens = so_PageAccessTokens.Span;
 		//get tokens for freeing
 		for (var i = 0; i < externalIds.Length; i++)
@@ -1729,7 +1818,7 @@ public class Chunk<TComponent> : Chunk
 	public TComponent[] UnsafeArray;
 
 #if CHECKED
-	private DisposeSentinel _disposeCheck = new();
+	private DisposeGuard _disposeCheck = new();
 #endif
 	public bool IsDisposed { get; private set; } = false;
 	public override void Dispose()

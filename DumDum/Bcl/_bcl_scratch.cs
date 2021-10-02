@@ -472,7 +472,7 @@ public unsafe struct StructArray100<T> where T : unmanaged
 public static class ParallelFor
 {
 
-	private static SpanPool<(int startInclusive, int endExclusive)> _Range_ComputeBatches(int start, int length, float batchSizeMultipler)
+	private static SpanGuard<(int startInclusive, int endExclusive)> _Range_ComputeBatches(int start, int length, float batchSizeMultipler)
 	{
 		__ERROR.Throw(batchSizeMultipler >= 0, $"{nameof(batchSizeMultipler)} should be greater or equal to than zero");
 		var endExclusive = start + length;
@@ -499,7 +499,7 @@ public static class ParallelFor
 		}
 
 
-		var owner = SpanPool<(int startInclusive, int endExclusive)>.Allocate(batchCount);
+		var owner = SpanGuard<(int startInclusive, int endExclusive)>.Allocate(batchCount);
 		var span = owner.Span;
 
 		//calculate batches and put into span
@@ -611,19 +611,22 @@ public static class ParallelFor
 
 }
 
-
-public ref struct SpanPool<T>
+/// <summary>
+/// use this instead of <see cref="SpanOwner{T}"/>.  This will alert you if you do not dispose properly.  
+/// </summary>
+/// <typeparam name="T"></typeparam>
+public ref struct SpanGuard<T>
 {
-	public static SpanPool<T> Allocate(int size)
+	public static SpanGuard<T> Allocate(int size)
 	{
-		return new SpanPool<T>(SpanOwner<T>.Allocate(size));
+		return new SpanGuard<T>(SpanOwner<T>.Allocate(size));
 	}
 
-	public SpanPool(SpanOwner<T> owner)
+	public SpanGuard(SpanOwner<T> owner)
 	{
 		_owner = owner;
 #if CHECKED
-		_disposeCheck = new();
+		_disposeGuard = new();
 #endif
 	}
 
@@ -637,24 +640,22 @@ public ref struct SpanPool<T>
 
 
 #if CHECKED
-	private DisposeSentinel _disposeCheck;
+	private DisposeGuard _disposeGuard;
 #endif
 	public void Dispose()
 	{
 		_owner.Dispose();
 
 #if CHECKED
-		_disposeCheck.Dispose();
+		_disposeGuard.Dispose();
 #endif
 	}
-
-
 }
 
 /// <summary>
 /// helper to ensure object gets disposed properly.   can either be used as a base class, or as a member.
 /// </summary>
-public class DisposeSentinel : IDisposable
+public class DisposeGuard : IDisposable
 {
 
 	public bool IsDisposed { get; private set; }
@@ -677,14 +678,14 @@ public class DisposeSentinel : IDisposable
 
 
 	private string CtorStackTrace { get; set; } = "Callstack is only set in #DEBUG";
-	public DisposeSentinel()
+	public DisposeGuard()
 	{
 #if DEBUG
 		CtorStackTrace = System.Environment.StackTrace;
 #endif
 	}
 
-	~DisposeSentinel()
+	~DisposeGuard()
 	{
 		if (!IsDisposed)
 		{

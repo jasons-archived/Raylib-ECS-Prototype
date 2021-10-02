@@ -244,7 +244,7 @@ Logical object structure is
       - Gameplay systems
     - RenderingSystem
     - 
-### feature notes
+## feature notes
 - networking using either Steamworks or Epic Services
 - messaging system: try out https://github.com/Cysharp/MessagePipe
 - utils:  
@@ -267,8 +267,41 @@ Logical object structure is
 - - dotnet API browser: https://source.dot.net/#System.Private.CoreLib/List.cs,39
 - shaders
    - https://github.com/lettier/3d-game-shaders-for-beginners	  
-### other private notes/scratch
+## other private notes/scratch
 
 - ecs system example
    - flecs https://github.com/SanderMertens/flecs
       - https://ajmmertens.medium.com/building-an-ecs-2-archetypes-and-vectorization-fe21690805f9
+	  
+	  
+	  
+## oss community notes
+
+- blog
+- discord
+- Q&A / KB site  (stack exchange like)
+- docs
+- internal planning sites
+
+- use github orgs (OSS)
+- use contribution agreement like netfoundation
+
+- SLA for contributions
+
+
+### funding
+- donations
+	- patreon
+	- github
+	- https://www.oscollective.org/
+	- dotnet foundation?
+	- epic megagrant?
+	- coinbase crypto
+- free credits
+	- azure: https://cloudblogs.microsoft.com/opensource/2021/09/28/announcing-azure-credits-for-open-source-projects/
+	
+### important feature needs:
+	- gizmos
+	- plugin system (gizmo example)
+	- asset store
+

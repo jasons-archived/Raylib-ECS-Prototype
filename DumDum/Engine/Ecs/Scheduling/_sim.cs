@@ -359,7 +359,7 @@ public abstract partial class SimNode //update logic
 }
 
 
-public abstract partial class SimNode : DisposeSentinel, IComparable<SimNode> //frame blocking / update order
+public abstract partial class SimNode : DisposeGuard, IComparable<SimNode> //frame blocking / update order
 {
 	public int _executionPriority = 0;
 	public int CompareTo(SimNode other)

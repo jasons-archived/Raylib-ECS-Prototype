@@ -35,7 +35,7 @@ public enum ThreadSituation
 	/// This is applicable for structs only, as modifying a struct changes the state of the containing object.
 	/// If you modify an object, the reference is still the same so the containing object state doesn't change.
 	/// </summary>
-	ModifyStruct,
+	RefModify,
 	/// <summary>
 	/// given a key that is known to exist, read it's value.
 	/// </summary>

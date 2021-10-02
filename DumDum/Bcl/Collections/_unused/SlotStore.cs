@@ -8,7 +8,7 @@ namespace DumDum.Bcl.Collections._unused
 	/// <para>thread safe writes and non-blocking reads if not using `ref return` accessors</para>
 	/// </summary>
 	/// <typeparam name="T"></typeparam>
-	public class SlotStore<T> where T : class
+	public class SlotStore<T>
 	{
 
 
@@ -73,6 +73,13 @@ namespace DumDum.Bcl.Collections._unused
 #endif
 				return _storage[slot];
 			}
+			set
+			{
+				lock (this._lock)
+				{
+					_storage.Set(slot, value);
+				}
+			}
 		}
 
 
@@ -127,7 +134,7 @@ namespace DumDum.Bcl.Collections._unused
 				__CHECKED.Throw(this._CHECKED_allocationTracker.TryRemove(slot, out var temp), "slot is not allocated but trying to remove");
 #endif
 				this._freeSlots.Push(slot);
-				_storage.Set(slot, null);
+				_storage.Set(slot, default(T));
 			}
 		}
 
