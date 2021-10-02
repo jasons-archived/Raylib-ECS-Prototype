@@ -84,8 +84,61 @@ public static class zz__Extensions_List
 				target[swapIndex] = value;
 			}
 		}
+	}
+
+
+	public static bool _IsIdentical<T>(this List<T> target, List<T> other)
+	{
+		if(other == null || target.Count != other.Count)
+		{
+			return false;
+		}
+
+		var span1 = target._AsSpan_Unsafe();
+		var span2 = other._AsSpan_Unsafe();
+
+
+		//look through all span1 for all matches
+		for (var i = 0; i < span1.Length; i++)
+		{
+			var found = false;
+			for (var j = 0; j < span2.Length; j++)
+			{
+				if (Object.Equals(span1[j], other[j]))
+				{
+					found = true;
+					break;
+				}
+			}
+			if (found == false)
+			{
+				return false;
+			}
+		}
+
+
+		//look through all span2 for all matches
+		for (var i = 0; i < span2.Length; i++)
+		{
+			var found = false;
+			for (var j = 0; j < span1.Length; j++)
+			{
+				if (Object.Equals(span1[j], other[j]))
+				{
+					found = true;
+					break;
+				}
+			}
+			if (found == false)
+			{
+				return false;
+			}
+		}
+		return true;
 
 	}
+
+
 
 	/// <summary>
 	/// warning: do not modify list while enumerating span

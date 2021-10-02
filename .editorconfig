@@ -5,3 +5,9 @@ dotnet_diagnostic.CS4014.severity = error
 
 # CA2012: Use ValueTasks correctly
 dotnet_diagnostic.CA2012.severity = error
+
+# CS8619: Nullability of reference types in value doesn't match target type.
+dotnet_diagnostic.CS8619.severity = error
+
+# IDE0055: Fix formatting
+dotnet_diagnostic.IDE0055.severity = none

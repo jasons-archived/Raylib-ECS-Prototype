@@ -604,7 +604,7 @@ public static class ParallelFor
 		var span = owner.Span;
 		var array = owner.DangerousGetArray().Array;
 
-		Parallel.For(0, span.Length, (index) =>Unsafe.AsRef(in action).Invoke(array[index].startInclusive, array[index].endExclusive));
+		Parallel.For(0, span.Length, (index) => Unsafe.AsRef(in action).Invoke(array[index].startInclusive, array[index].endExclusive));
 
 	}
 
@@ -651,7 +651,9 @@ public ref struct SpanPool<T>
 
 }
 
-
+/// <summary>
+/// helper to ensure object gets disposed properly.   can either be used as a base class, or as a member.
+/// </summary>
 public class DisposeSentinel : IDisposable
 {
 
@@ -661,14 +663,25 @@ public class DisposeSentinel : IDisposable
 	{
 		if (IsDisposed)
 		{
+			__ERROR.Assert(false, "why is dipose called twice?");
 			return;
 		}
 		IsDisposed = true;
+		OnDispose();
 	}
-	public string CtorStackTrace { get; private set; }
+
+	protected virtual void OnDispose()
+	{
+
+	}
+
+
+	private string CtorStackTrace { get; set; } = "Callstack is only set in #DEBUG";
 	public DisposeSentinel()
 	{
+#if DEBUG
 		CtorStackTrace = System.Environment.StackTrace;
+#endif
 	}
 
 	~DisposeSentinel()
@@ -681,7 +694,7 @@ public class DisposeSentinel : IDisposable
 }
 
 
-[StructLayout(LayoutKind.Auto,Size =64)]
+[StructLayout(LayoutKind.Auto, Size = 64)]
 public unsafe struct CacheLineRef<T>
 {
 	//[FieldOffset(0)]
@@ -716,3 +729,65 @@ public sealed class __UNSAFE_ArrayData<T>
 		}
 	}
 }
+
+
+
+/// <summary>
+/// efficiently get/set a value for a given type. 
+/// <para>similar use as a <see cref="ThreadLocal{T}"/></para>
+/// </summary>
+/// <remarks>because of implementation, should only be used for a max of about 100 types, otherwise storage gets large</remarks>
+/// <typeparam name="TValue"></typeparam>
+
+public struct TypeLocal<TValue>
+{
+	private static volatile int _typeCounter = -1;
+
+
+	private static class TypeSlot<TType>
+	{
+		internal static readonly int _index = Interlocked.Increment(ref _typeCounter);
+	}
+
+	/// <summary>
+	/// A small inefficiency:  will have 1 slot for each TType ever used for a TypeLocal call, regardless of if it's used in this instance or not
+	/// </summary>
+	private TValue[] _storage;
+
+	public TypeLocal()
+	{
+		_storage = new TValue[Math.Max(10, _typeCounter + 1)];
+	}
+
+	private TValue[] EnsureStorageCapacity<TType>()
+	{
+		if (TypeSlot<TType>._index >= _storage.Length)
+		{
+			Array.Resize(ref _storage, (_typeCounter + 1) * 2);
+		}
+		return _storage;
+	}
+
+	public void Set<TType>(TValue value)
+	{
+		//Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(EnsureStorageCapacity<T>()), TypeSlot<T>.Index) = value;
+		var storage = EnsureStorageCapacity<TType>();
+		storage[TypeSlot<TType>._index] = value;
+	}
+
+	public TValue Get<TType>()
+	{
+		//return Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(EnsureStorageCapacity<T>()), TypeSlot<T>.Index);
+		//return Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(_storage), TypeSlot<T>.Index);
+		return _storage[TypeSlot<TType>._index];
+	}
+
+	public ref TValue GetRef<TType>()
+	{
+		//return ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(_storage), TypeSlot<T>.Index);
+		//return ref _storage[TypeSlot<TType>._index].value;
+
+		return ref _storage[TypeSlot<TType>._index];
+	}
+}
+

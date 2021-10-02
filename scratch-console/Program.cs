@@ -132,14 +132,18 @@ public class AllocatorBenchmark
 }
 
 
+
+
+
+
 public class Program
 {
 	public static async Task Main(string[] args)
 	{
 #if DEBUG
-		var bm = new AllocatorBenchmark();
-		bm.Setup();
-		await bm.Sequential_CreateEditDelete();
+		//var bm = new AllocatorBenchmark();
+		//bm.Setup();
+		//await bm.Sequential_CreateEditDelete();
 		//run in debug mode (can hit breakpoints in VS)
 		//var summary = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, new BenchmarkDotNet.Configs.DebugInProcessConfig());		
 //run a specific benchmark

@@ -195,40 +195,6 @@ any work done to unsafe code should be verified by using GC Hole stress, as defi
 
 
 
-# notes / scratch stuff below...
-
-
-
-
-Logical object structure is
-
-- SomeExternalTickPump
-  - ExecManager
-    - World
-      - Gameplay systems
-    - RenderingSystem
-    - 
-### feature notes
-- networking using either Steamworks or Epic Services
-- messaging system: try out https://github.com/Cysharp/MessagePipe
-- utils:  
-  - DotNext?
-  - Windows Community Toolkit, High Performance package: https://docs.microsoft.com/en-us/windows/communitytoolkit/high-performance/introduction
-    - https://github.com/CommunityToolkit/WindowsCommunityToolkit
-    - https://docs.microsoft.com/en-us/windows/communitytoolkit/nuget-packages
-- physics: https://github.com/bepu/bepuphysics2
-- math helper libs: Silk.net
-- input and other platform libs: Silk.net
-- kitbash:  https://kenney.nl/tools/assetforge and https://kenney.itch.io/kenshape
-- map editor: https://trenchbroom.github.io/
-- benchmarking: https://benchmarkdotnet.org/
-- online codepen:
-  - https://sharplab.io/
-- linq: https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/linq/
-- plinq: https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/introduction-to-plinq
-- ascii drawing tools: https://asciiflow.com/#/
-- github contributions CLA assistant:  https://github.com/cla-assistant/cla-assistant
-- - dotnet API browser: https://source.dot.net/#System.Private.CoreLib/List.cs,39
 - 
 ### c# tricks/notes/perf
 - use record structs for comparison/lookups: https://nietras.com/2021/06/14/csharp-10-record-struct/
@@ -263,3 +229,46 @@ Logical object structure is
       - Frequently
       - At least one is a writer
       - 
+	  
+	  
+# notes / scratch stuff below...
+
+
+
+
+Logical object structure is
+
+- SomeExternalTickPump
+  - ExecManager
+    - World
+      - Gameplay systems
+    - RenderingSystem
+    - 
+### feature notes
+- networking using either Steamworks or Epic Services
+- messaging system: try out https://github.com/Cysharp/MessagePipe
+- utils:  
+  - DotNext?
+  - Windows Community Toolkit, High Performance package: https://docs.microsoft.com/en-us/windows/communitytoolkit/high-performance/introduction
+    - https://github.com/CommunityToolkit/WindowsCommunityToolkit
+    - https://docs.microsoft.com/en-us/windows/communitytoolkit/nuget-packages
+- physics: https://github.com/bepu/bepuphysics2
+- math helper libs: Silk.net
+- input and other platform libs: Silk.net
+- kitbash:  https://kenney.nl/tools/assetforge and https://kenney.itch.io/kenshape
+- map editor: https://trenchbroom.github.io/
+- benchmarking: https://benchmarkdotnet.org/
+- online codepen:
+  - https://sharplab.io/
+- linq: https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/linq/
+- plinq: https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/introduction-to-plinq
+- ascii drawing tools: https://asciiflow.com/#/
+- github contributions CLA assistant:  https://github.com/cla-assistant/cla-assistant
+- - dotnet API browser: https://source.dot.net/#System.Private.CoreLib/List.cs,39
+- shaders
+   - https://github.com/lettier/3d-game-shaders-for-beginners	  
+### other private notes/scratch
+
+- ecs system example
+   - flecs https://github.com/SanderMertens/flecs
+      - https://ajmmertens.medium.com/building-an-ecs-2-archetypes-and-vectorization-fe21690805f9
