@@ -50,9 +50,10 @@ namespace MyBenchmarks;
 public class AllocatorBenchmark
 {
 
-	public MemoryOwner<long> externalIdsOwner;
-	public HashSet<long> evenSet = new HashSet<long>();
-	public HashSet<long> oddSet = new HashSet<long>();
+	//public MemoryOwner<EntityHandle> externalIdsOwner;
+	//public HashSet<EntityHandle> evenSet =new();
+	//public HashSet<EntityHandle> oddSet = new();
+	public EntityRegistry entityRegistry = new();
 
 	[Params(100000)]
 	public int EntityCount { get; set; } = 100000;
@@ -63,7 +64,7 @@ public class AllocatorBenchmark
 	[Params(100
 		//,1000,10000
 		)]
-	public int ChunkSize { get; set; } = 1;
+	public int ChunkSize { get; set; } = 100;
 
 	[Params(1f
 		//,4f
@@ -84,49 +85,50 @@ public class AllocatorBenchmark
 	[GlobalSetup]
 	public void Setup()
 	{
-		externalIdsOwner = MemoryOwner<long>.Allocate(EntityCount);
-		var externalIds = externalIdsOwner.Span;
-		var set = new HashSet<long>();
-		while (set.Count < externalIds.Length)
-		{
-			set.Add(__.Rand.NextInt64());
-		}
-		var count = 0;
-		foreach (var id in set)
-		{
-			externalIds[count] = id;
-			count++;
-		}
-		__ERROR.Throw(count == EntityCount);
+		//externalIdsOwner = MemoryOwner<EntityHandle>.Allocate(EntityCount);
+		//var externalIds = externalIdsOwner.Span;
+		//var set = new HashSet<EntityHandle>();
+		//while (set.Count < externalIds.Length)
+		//{
+		//	set.Add(new(__.Rand.NextInt64()));
+		//}
+		//var count = 0;
+		//foreach (var id in set)
+		//{
+		//	externalIds[count] = id;
+		//	count++;
+		//}
+		//__ERROR.Throw(count == EntityCount);
 
 
 
-		//split into 2 groups
-		foreach (var externalId in externalIds)
-		{
-			if (externalId % 2 == 0)
-			{
-				evenSet.Add(externalId);
-			}
-			else
-			{
-				oddSet.Add(externalId);
-			}
-		}
+		////split into 2 groups
+		//foreach (var externalId in externalIds)
+		//{
+		//	if (externalId.id % 2 == 0)
+		//	{
+		//		evenSet.Add(externalId);
+		//	}
+		//	else
+		//	{
+		//		oddSet.Add(externalId);
+		//	}
+		//}
 
 
 
 	}
 
-//	[Benchmark]
+	
+	//	[Benchmark]
 	public async Task Sequential_CreateEditDelete()
 	{
-		Page.__TEST_Unit_SinglePage_AndEdit(AutoPack, ChunkSize, externalIdsOwner, evenSet, oddSet);
+		Page.__TEST_Unit_SinglePage_AndEdit(entityRegistry, AutoPack, ChunkSize, EntityCount);
 	}
 	[Benchmark]
 	public async Task Parallel_CreateEditDelete()
 	{
-		await Page.__TEST_Unit_ParallelPages(AutoPack, ChunkSize, externalIdsOwner, PBatchX, Allocators, evenSet, oddSet);
+		await Page.__TEST_Unit_ParallelPages(entityRegistry, AutoPack, ChunkSize, EntityCount, Allocators, PBatchX);
 	}
 
 }
@@ -141,9 +143,9 @@ public class Program
 	public static async Task Main(string[] args)
 	{
 #if DEBUG
-		//var bm = new AllocatorBenchmark();
-		//bm.Setup();
-		//await bm.Sequential_CreateEditDelete();
+		var bm = new AllocatorBenchmark();
+		bm.Setup();
+		await bm.Sequential_CreateEditDelete();
 		//run in debug mode (can hit breakpoints in VS)
 		//var summary = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, new BenchmarkDotNet.Configs.DebugInProcessConfig());		
 //run a specific benchmark

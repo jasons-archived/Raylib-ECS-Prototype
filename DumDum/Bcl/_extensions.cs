@@ -63,7 +63,7 @@ public static class zz__Extensions_List
 	/// </summary>
 	/// <typeparam name="T"></typeparam>
 	/// <param name="target"></param>
-	public static void _ExpandAndSet<T>(this IList<T> target, int index,T value)
+	public static void _ExpandAndSet<T>(this IList<T> target, int index, T value)
 	{
 		while (target.Count <= index)
 		{
@@ -89,7 +89,7 @@ public static class zz__Extensions_List
 
 	public static bool _IsIdentical<T>(this List<T> target, List<T> other)
 	{
-		if(other == null || target.Count != other.Count)
+		if (other == null || target.Count != other.Count)
 		{
 			return false;
 		}
@@ -640,6 +640,8 @@ public static class zz_Extensions_Span
 	[ThreadStatic]
 	static Random _rand = new();
 
+
+
 	public static void _Randomize<T>(this Span<T> target)
 	{
 		//lock (_rand)
@@ -653,6 +655,42 @@ public static class zz_Extensions_Span
 			}
 		}
 	}
+
+	public static bool _IsSorted<T>(this Span<T> target) where T : IComparable<T>
+	{
+
+		if (target.Length < 2)
+		{
+			return true;
+		}
+		var isSorted = true;
+
+		ref var previous = ref target[0]!;
+		for (var i = 1; i < target.Length; i++)
+		{
+			if (previous.CompareTo(target[i]) > 0) //ex: 1.CompareTo(2) == -1
+			{
+				return false;
+			}
+			previous = ref target[i]!;
+		}
+		return true;
+
+
+		//using var temp= SpanGuard<T>.Allocate(target.Length);
+		//var tempSpan = temp.Span;
+		//tempSpan.Sort(target, (first, second) => {
+		//	var result = first.CompareTo(second);
+		//	if(result < 0)
+		//	{
+		//		isSorted = false;
+		//	}
+		//	return result;
+		//});
+		//return isSorted;		
+	}
+
+
 
 	/// <summary>
 	/// returns true if both spans starting address in memory is the same.  Different length and/or type is ignored.
@@ -708,13 +746,13 @@ public static class zz_Extensions_Span
 			Unsafe.AsRef(parallelAction).Invoke(ref pSpan[index], ref index);
 		}
 	}
-	private unsafe readonly struct _ParallelForEach_ActionHelper_OutputSpan<TData,TOutput> : IAction where TData : unmanaged where TOutput : unmanaged
+	private unsafe readonly struct _ParallelForEach_ActionHelper_OutputSpan<TData, TOutput> : IAction where TData : unmanaged where TOutput : unmanaged
 	{
 		public readonly TData* pSpan;
 		public readonly TOutput* pOutput;
-		public readonly Action_Ref<TData,TOutput, int> parallelAction;
+		public readonly Action_Ref<TData, TOutput, int> parallelAction;
 
-		public _ParallelForEach_ActionHelper_OutputSpan(TData* pSpan,TOutput* pOutput, Action_Ref<TData,TOutput, int> parallelAction)
+		public _ParallelForEach_ActionHelper_OutputSpan(TData* pSpan, TOutput* pOutput, Action_Ref<TData, TOutput, int> parallelAction)
 		{
 			this.pSpan = pSpan;
 			this.pOutput = pOutput;
@@ -726,7 +764,7 @@ public static class zz_Extensions_Span
 			//Using delegate pointer invoke, Because action is a readonly field,
 			//but Invoke is an interface method where the compiler can't see it's actually readonly in all implementing types,
 			//so it emits a defensive copies. This skips that 
-			Unsafe.AsRef(parallelAction).Invoke(ref pSpan[index],ref pOutput[index], ref index);
+			Unsafe.AsRef(parallelAction).Invoke(ref pSpan[index], ref pOutput[index], ref index);
 		}
 	}
 	private unsafe readonly struct _ParallelForEach_ActionHelper_FunctionPtr<TData> : IAction where TData : unmanaged
@@ -759,7 +797,7 @@ public static class zz_Extensions_Span
 		}
 	}
 
-	public static unsafe void _ParallelForEach<TData>(this Span<TData> inputSpan, delegate*<ref TData,ref int,void> parallelAction) where TData : unmanaged
+	public static unsafe void _ParallelForEach<TData>(this Span<TData> inputSpan, delegate*<ref TData, ref int, void> parallelAction) where TData : unmanaged
 	{
 		fixed (TData* pSpan = inputSpan)
 		{
@@ -768,13 +806,13 @@ public static class zz_Extensions_Span
 		}
 	}
 
-	public static unsafe void _ParallelForEach<TData, TOutput>(this Span<TData> inputSpan, Span<TOutput> outputSpan, Action_Ref<TData,TOutput, int> parallelAction) where TData : unmanaged where TOutput : unmanaged
+	public static unsafe void _ParallelForEach<TData, TOutput>(this Span<TData> inputSpan, Span<TOutput> outputSpan, Action_Ref<TData, TOutput, int> parallelAction) where TData : unmanaged where TOutput : unmanaged
 	{
 		fixed (TData* pSpan = inputSpan)
 		{
 			fixed (TOutput* pOutput = outputSpan)
 			{
-				var actionStruct = new _ParallelForEach_ActionHelper_OutputSpan<TData,TOutput>(pSpan, pOutput ,parallelAction);
+				var actionStruct = new _ParallelForEach_ActionHelper_OutputSpan<TData, TOutput>(pSpan, pOutput, parallelAction);
 				ParallelHelper.For(0, inputSpan.Length, in actionStruct);
 			}
 		}
@@ -961,6 +999,13 @@ public static class zz_Extensions_IntLong
 	{
 		return Interlocked.Increment(ref value);
 	}
+
+	//public static void _Unpack(this long value, out int first, out int second)
+	//{
+	///////doesn't quite work with 2nd value.   need to look at bitmasking code
+	//	first =(int)(value >> 32);
+	//	second =(int)(value);
+	//}
 }
 
 
@@ -1009,7 +1054,7 @@ public static class zz__Extensions_Random
 		{
 			while (true)
 			{
-				var c = (char)random.Next(0,ushort.MaxValue);
+				var c = (char)random.Next(0, ushort.MaxValue);
 				if (symbolsOrWhitespace)
 				{
 					if (char.IsLetterOrDigit(c) || char.IsPunctuation(c) || char.IsSymbol(c) || char.IsWhiteSpace(c))
@@ -1031,7 +1076,7 @@ public static class zz__Extensions_Random
 			//ascii only
 			while (true)
 			{
-				var c = (char)random.Next(0,127);
+				var c = (char)random.Next(0, 127);
 				if (symbolsOrWhitespace)
 				{
 					if (char.IsLetterOrDigit(c) || char.IsPunctuation(c) || char.IsSymbol(c) || char.IsWhiteSpace(c))
@@ -1048,7 +1093,7 @@ public static class zz__Extensions_Random
 				}
 			}
 		}
-		
+
 	}
 
 	/// <summary>
@@ -1265,7 +1310,7 @@ public static class zz__Extensions_Boolean
 
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1050:DeclareTypesInNamespaces")]
-public  static partial class zz__Extensions_Object
+public static partial class zz__Extensions_Object
 {
 
 
@@ -2680,7 +2725,7 @@ public static class zz__Extensions_String
 	{
 		var result = value;
 		if (!string.IsNullOrEmpty(result) && charactersToRemove != null)
-			Array.ForEach(charactersToRemove,(c) => result = result._Remove(c.ToString()));
+			Array.ForEach(charactersToRemove, (c) => result = result._Remove(c.ToString()));
 
 		return result;
 	}
@@ -3148,7 +3193,7 @@ public static class zz__Extensions_String
 		if (withPreamble)
 		{
 			var preamble = encoding.GetPreamble();
-			var stringBytes = encoding.GetBytes(value);			
+			var stringBytes = encoding.GetBytes(value);
 			var bytes = preamble._Join(stringBytes);
 			__ERROR.Assert(bytes._Compare(preamble) == 0);
 			return bytes;
@@ -3634,175 +3679,175 @@ public static class zz__Extensions_ByteArray
 	//////}
 
 
-//	/// <summary>
-//	/// decompress bytes that were compressed using our <see cref="Compress"/> method.   
-//	/// if fails (data corruption, etc), the returning false and <see cref="outputLength"/> -1
-//	/// </summary>
-//	/// <param name="inputCompressed"></param>
-//	/// <param name="offset"></param>
-//	/// <param name="count"></param>
-//	/// <param name="updateState"></param>
-//	/// <param name="outputUncompressed_TEMP_SCRATCH"></param>
-//	/// <param name="outputLength"></param>
-//	public static bool TryDecompress(this byte[] inputCompressed, ref byte[] resizableOutputTarget, out int outputLength)
-//	{
-//		return inputCompressed.TryDecompress(0, inputCompressed.Length, ref resizableOutputTarget, out outputLength);
-//	}
+	//	/// <summary>
+	//	/// decompress bytes that were compressed using our <see cref="Compress"/> method.   
+	//	/// if fails (data corruption, etc), the returning false and <see cref="outputLength"/> -1
+	//	/// </summary>
+	//	/// <param name="inputCompressed"></param>
+	//	/// <param name="offset"></param>
+	//	/// <param name="count"></param>
+	//	/// <param name="updateState"></param>
+	//	/// <param name="outputUncompressed_TEMP_SCRATCH"></param>
+	//	/// <param name="outputLength"></param>
+	//	public static bool TryDecompress(this byte[] inputCompressed, ref byte[] resizableOutputTarget, out int outputLength)
+	//	{
+	//		return inputCompressed.TryDecompress(0, inputCompressed.Length, ref resizableOutputTarget, out outputLength);
+	//	}
 
 
-//	/// <summary>
-//	/// decompress bytes that were compressed using our <see cref="Compress"/> method.   
-//	/// if fails (data corruption, etc), the returning false and <see cref="outputLength"/> -1
-//	/// </summary>
-//	/// <param name="inputCompressed"></param>
-//	/// <param name="offset"></param>
-//	/// <param name="count"></param>
-//	/// <param name="updateState"></param>
-//	/// <param name="outputUncompressed_TEMP_SCRATCH"></param>
-//	/// <param name="outputLength"></param>
-//	[System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "offset"), System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "count"),]
-//	[System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2202:Do not dispose objects multiple times")]
-//	//[Placeholder("need snappy instead of this low perf zip stuff")]
-//	public static bool TryDecompress(this byte[] inputCompressed, int offset, int count, ref byte[] resizableOutputTarget, out int outputLength)
-//	{
-//		//stupid Ionic.Zlib way, very object and performance wastefull
-//		{
-//			using (var input = new MemoryStream(inputCompressed))
-//			{
-//				Stream decompressor =
-//					new ZlibStream(input, CompressionMode.Decompress);
+	//	/// <summary>
+	//	/// decompress bytes that were compressed using our <see cref="Compress"/> method.   
+	//	/// if fails (data corruption, etc), the returning false and <see cref="outputLength"/> -1
+	//	/// </summary>
+	//	/// <param name="inputCompressed"></param>
+	//	/// <param name="offset"></param>
+	//	/// <param name="count"></param>
+	//	/// <param name="updateState"></param>
+	//	/// <param name="outputUncompressed_TEMP_SCRATCH"></param>
+	//	/// <param name="outputLength"></param>
+	//	[System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "offset"), System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA1801:ReviewUnusedParameters", MessageId = "count"),]
+	//	[System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2202:Do not dispose objects multiple times")]
+	//	//[Placeholder("need snappy instead of this low perf zip stuff")]
+	//	public static bool TryDecompress(this byte[] inputCompressed, int offset, int count, ref byte[] resizableOutputTarget, out int outputLength)
+	//	{
+	//		//stupid Ionic.Zlib way, very object and performance wastefull
+	//		{
+	//			using (var input = new MemoryStream(inputCompressed))
+	//			{
+	//				Stream decompressor =
+	//					new ZlibStream(input, CompressionMode.Decompress);
 
-//				// workitem 8460
-//				byte[] working = new byte[1024];
-//				using (var output = new MemoryStream())
-//				{
-//					using (decompressor)
-//					{
-//						int n;
-//						while ((n = decompressor.Read(working, 0, working.Length)) != 0)
-//						{
-//							if (n == ZlibConstants.Z_DATA_ERROR)
-//							{
-//								//error with output
-//#if DEBUG
-//								if (resizableOutputTarget != null)
-//								{
-//									resizableOutputTarget.Clear();
-//								}
-//#endif
-//								outputLength = -1;
-//								return false;
-//							}
-//							output.Write(working, 0, n);
-//						}
-//					}
+	//				// workitem 8460
+	//				byte[] working = new byte[1024];
+	//				using (var output = new MemoryStream())
+	//				{
+	//					using (decompressor)
+	//					{
+	//						int n;
+	//						while ((n = decompressor.Read(working, 0, working.Length)) != 0)
+	//						{
+	//							if (n == ZlibConstants.Z_DATA_ERROR)
+	//							{
+	//								//error with output
+	//#if DEBUG
+	//								if (resizableOutputTarget != null)
+	//								{
+	//									resizableOutputTarget.Clear();
+	//								}
+	//#endif
+	//								outputLength = -1;
+	//								return false;
+	//							}
+	//							output.Write(working, 0, n);
+	//						}
+	//					}
 
-//					resizableOutputTarget = output.ToArray();
-//					outputLength = resizableOutputTarget.Length;
-//					return true;
-//				}
-//			}
-//		}
-//		//below should work, but doesn't because of stupid implementation of Ionic.Zlib not allowing object reuse
-//		{
+	//					resizableOutputTarget = output.ToArray();
+	//					outputLength = resizableOutputTarget.Length;
+	//					return true;
+	//				}
+	//			}
+	//		}
+	//		//below should work, but doesn't because of stupid implementation of Ionic.Zlib not allowing object reuse
+	//		{
 
-//			//object obj;
-//			//if (!updateState.Tags.TryGetValue("Novaleaf.Byte[].Decompress", out obj))
-//			//{
-//			//   obj = new Ionic.Zlib.ZlibStream(new MemoryStream(), Ionic.Zlib.CompressionMode.Decompress);
+	//			//object obj;
+	//			//if (!updateState.Tags.TryGetValue("Novaleaf.Byte[].Decompress", out obj))
+	//			//{
+	//			//   obj = new Ionic.Zlib.ZlibStream(new MemoryStream(), Ionic.Zlib.CompressionMode.Decompress);
 
-//			//   updateState.Tags.Add("Novaleaf.Byte[].Decompress", obj);
-//			//}
-//			//var decompressor = obj as Ionic.Zlib.ZlibStream;
+	//			//   updateState.Tags.Add("Novaleaf.Byte[].Decompress", obj);
+	//			//}
+	//			//var decompressor = obj as Ionic.Zlib.ZlibStream;
 
-//			//decompressor._baseStream.SetLength(0);
-//			//decompressor.Write(inputCompressed, offset, count);
+	//			//decompressor._baseStream.SetLength(0);
+	//			//decompressor.Write(inputCompressed, offset, count);
 
-//			//decompressor.Flush();
+	//			//decompressor.Flush();
 
-//			//var memoryStream = decompressor._baseStream._stream as MemoryStream;
-//			//__ERROR.Assert(memoryStream.Length < int.MaxValue / 2, "output too big!");
-
-
-//			//outputLength = (int)memoryStream.Length;
-//			//outputUncompressed_TEMP_SCRATCH = memoryStream.GetBuffer();
-//		}
-
-//	}
+	//			//var memoryStream = decompressor._baseStream._stream as MemoryStream;
+	//			//__ERROR.Assert(memoryStream.Length < int.MaxValue / 2, "output too big!");
 
 
+	//			//outputLength = (int)memoryStream.Length;
+	//			//outputUncompressed_TEMP_SCRATCH = memoryStream.GetBuffer();
+	//		}
 
-//	///// <summary>
-//	///// decompress bytes that were compressed using our <see cref="Compress"/> method.   
-//	///// if fails (data corruption, etc), the returning <see cref="outputUncompressed_TEMP_SCRATCH"/> will be null and <see cref="outputLength"/> -1
-//	///// </summary>
-//	///// <param name="inputCompressed"></param>
-//	///// <param name="offset"></param>
-//	///// <param name="count"></param>
-//	///// <param name="updateState"></param>
-//	///// <param name="outputUncompressed_TEMP_SCRATCH"></param>
-//	///// <param name="outputLength"></param>
-//	//public static void Decompress(this byte[] inputCompressed, int offset, int count, FrameState updateState, out byte[] outputUncompressed_TEMP_SCRATCH, out int outputLength)
-//	//{
-//	//   updateState.AssertIsAlive();
-
-//	//   //stupid Ionic.Zlib way, very object and performance wastefull
-//	//   {
-//	//      using (var input = new MemoryStream(inputCompressed))
-//	//      {
-//	//         Stream decompressor =
-//	//            new Ionic.Zlib.ZlibStream(input, Ionic.Zlib.CompressionMode.Decompress);
-
-//	//         // workitem 8460
-//	//         byte[] working = new byte[1024];
-//	//         using (var output = new MemoryStream())
-//	//         {
-//	//            using (decompressor)
-//	//            {
-//	//               int n;
-//	//               while ((n = decompressor.Read(working, 0, working.Length)) != 0)
-//	//               {
-//	//                  if (n == Ionic.Zlib.ZlibConstants.Z_DATA_ERROR)
-//	//                  {
-//	//                     //error with output
-//	//                     outputUncompressed_TEMP_SCRATCH = null;
-//	//                     outputLength = -1;
-//	//                  }
-//	//                  output.Write(working, 0, n);
-//	//               }
-//	//            }
-//	//            outputUncompressed_TEMP_SCRATCH = output.GetBuffer();
-//	//            outputLength = (int)output.Length;
-//	//         }
-
-//	//      }
-//	//   }
-//	//   //below should work, but doesn't because of stupid implementation of Ionic.Zlib not allowing object reuse
-//	//   {
-
-//	//      //object obj;
-//	//      //if (!updateState.Tags.TryGetValue("Novaleaf.Byte[].Decompress", out obj))
-//	//      //{
-//	//      //   obj = new Ionic.Zlib.ZlibStream(new MemoryStream(), Ionic.Zlib.CompressionMode.Decompress);
-
-//	//      //   updateState.Tags.Add("Novaleaf.Byte[].Decompress", obj);
-//	//      //}
-//	//      //var decompressor = obj as Ionic.Zlib.ZlibStream;
-
-//	//      //decompressor._baseStream.SetLength(0);
-//	//      //decompressor.Write(inputCompressed, offset, count);
-
-//	//      //decompressor.Flush();
-
-//	//      //var memoryStream = decompressor._baseStream._stream as MemoryStream;
-//	//      //__ERROR.Assert(memoryStream.Length < int.MaxValue / 2, "output too big!");
+	//	}
 
 
-//	//      //outputLength = (int)memoryStream.Length;
-//	//      //outputUncompressed_TEMP_SCRATCH = memoryStream.GetBuffer();
-//	//   }
 
-//	//}
+	//	///// <summary>
+	//	///// decompress bytes that were compressed using our <see cref="Compress"/> method.   
+	//	///// if fails (data corruption, etc), the returning <see cref="outputUncompressed_TEMP_SCRATCH"/> will be null and <see cref="outputLength"/> -1
+	//	///// </summary>
+	//	///// <param name="inputCompressed"></param>
+	//	///// <param name="offset"></param>
+	//	///// <param name="count"></param>
+	//	///// <param name="updateState"></param>
+	//	///// <param name="outputUncompressed_TEMP_SCRATCH"></param>
+	//	///// <param name="outputLength"></param>
+	//	//public static void Decompress(this byte[] inputCompressed, int offset, int count, FrameState updateState, out byte[] outputUncompressed_TEMP_SCRATCH, out int outputLength)
+	//	//{
+	//	//   updateState.AssertIsAlive();
+
+	//	//   //stupid Ionic.Zlib way, very object and performance wastefull
+	//	//   {
+	//	//      using (var input = new MemoryStream(inputCompressed))
+	//	//      {
+	//	//         Stream decompressor =
+	//	//            new Ionic.Zlib.ZlibStream(input, Ionic.Zlib.CompressionMode.Decompress);
+
+	//	//         // workitem 8460
+	//	//         byte[] working = new byte[1024];
+	//	//         using (var output = new MemoryStream())
+	//	//         {
+	//	//            using (decompressor)
+	//	//            {
+	//	//               int n;
+	//	//               while ((n = decompressor.Read(working, 0, working.Length)) != 0)
+	//	//               {
+	//	//                  if (n == Ionic.Zlib.ZlibConstants.Z_DATA_ERROR)
+	//	//                  {
+	//	//                     //error with output
+	//	//                     outputUncompressed_TEMP_SCRATCH = null;
+	//	//                     outputLength = -1;
+	//	//                  }
+	//	//                  output.Write(working, 0, n);
+	//	//               }
+	//	//            }
+	//	//            outputUncompressed_TEMP_SCRATCH = output.GetBuffer();
+	//	//            outputLength = (int)output.Length;
+	//	//         }
+
+	//	//      }
+	//	//   }
+	//	//   //below should work, but doesn't because of stupid implementation of Ionic.Zlib not allowing object reuse
+	//	//   {
+
+	//	//      //object obj;
+	//	//      //if (!updateState.Tags.TryGetValue("Novaleaf.Byte[].Decompress", out obj))
+	//	//      //{
+	//	//      //   obj = new Ionic.Zlib.ZlibStream(new MemoryStream(), Ionic.Zlib.CompressionMode.Decompress);
+
+	//	//      //   updateState.Tags.Add("Novaleaf.Byte[].Decompress", obj);
+	//	//      //}
+	//	//      //var decompressor = obj as Ionic.Zlib.ZlibStream;
+
+	//	//      //decompressor._baseStream.SetLength(0);
+	//	//      //decompressor.Write(inputCompressed, offset, count);
+
+	//	//      //decompressor.Flush();
+
+	//	//      //var memoryStream = decompressor._baseStream._stream as MemoryStream;
+	//	//      //__ERROR.Assert(memoryStream.Length < int.MaxValue / 2, "output too big!");
+
+
+	//	//      //outputLength = (int)memoryStream.Length;
+	//	//      //outputUncompressed_TEMP_SCRATCH = memoryStream.GetBuffer();
+	//	//   }
+
+	//	//}
 }
 
 

@@ -297,6 +297,7 @@ Logical object structure is
 	- dotnet foundation?
 	- epic megagrant?
 	- coinbase crypto
+	- https://www.buymeacoffee.com/
 - free credits
 	- azure: https://cloudblogs.microsoft.com/opensource/2021/09/28/announcing-azure-credits-for-open-source-projects/
 	

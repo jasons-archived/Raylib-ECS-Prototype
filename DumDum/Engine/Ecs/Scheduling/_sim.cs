@@ -53,10 +53,7 @@ public partial class SimManager //tree management
 			__ERROR.Throw(result);
 			__ERROR.Throw(node == foundNode, "should ref equal");
 		}
-
-
 	}
-
 }
 public partial class SimManager //thread execution
 {

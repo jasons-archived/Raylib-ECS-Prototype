@@ -33,13 +33,15 @@ namespace DumDum.Bcl.Collections._unused
 		public TData[] _storage;
 		private readonly Stack<int> _freeSlots;
 
+		//private readonly MinHeap _freeSlots2 = new()
+
 		private readonly object _lock = new();
 
 
 		public StructSlotArray(int capacity)
 		{
 			this._storage = new TData[capacity];
-			this._freeSlots = new(capacity);
+			this._freeSlots = new(capacity);			
 #if CHECKED
 			this._CHECKED_allocationTracker = new();
 #endif
@@ -145,3 +147,7 @@ namespace DumDum.Bcl.Collections._unused
 		}
 	}
 }
+//
+
+
+//If I need to write it myself, I am thinking I need to use a normal `List<int>` that's sorted, and wrap it in a stack-like class.   When a item is pulled off the top I decrement a `int topIndex`  and when items are put back on, they go above that, incrementing a `int addCount` parameter..   Next time an item is pulled off I just sort from `topIndex` to `topIndex+addedCount` before I give an item back.  I

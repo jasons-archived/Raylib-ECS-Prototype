@@ -17,23 +17,25 @@ using System.Threading.Tasks;
 namespace DumDum.Engine.Ecs.Allocation;
 
 [StructLayout(LayoutKind.Explicit)]
-public readonly record struct EntityHandle
+public readonly record struct EntityHandle : IComparable<EntityHandle>
 {
 	/// <summary>
 	/// this entityHandle stored as a long
 	/// </summary>
 	[FieldOffset(0)]
 	public readonly long _packValue;
-	/// <summary>
-	/// 
-	/// </summary>
-	[FieldOffset(0)]
-	public readonly int version;
+	
 	/// <summary>
 	/// can be used to access slot into the entityRegistry
 	/// </summary>
-	[FieldOffset(4)]
+	[FieldOffset(0)]
 	public readonly int id;
+
+	/// <summary>
+	/// 
+	/// </summary>
+	[FieldOffset(4)]
+	public readonly int version;
 
 	public EntityHandle(long packValue) : this()
 	{
@@ -45,6 +47,10 @@ public readonly record struct EntityHandle
 		this.version = version;
 	}
 
+	public int CompareTo(EntityHandle other)
+	{
+		return id.CompareTo(other.id);
+	}
 }
 public record struct EntityData
 {
@@ -55,51 +61,90 @@ public record struct EntityData
 }
 
 
+/// <summary>
+/// tracks all entities for the World.This is a central registry for all archetype pages of the world.
+/// </summary>
+/// <remarks><para>allocation/free is coordinated deeply with <see cref="Page"/> workflows.  </para>.
+/// </remarks>
 public class EntityRegistry
 {
 	public StructSlotArray<EntityData> _storage = new(1000000); //TODO: 1 million items = 232mb at current size of access token (needs size optimizations)
 
-	private int _allocationVersion;
+	private volatile int _allocationVersion;
+
+	public int Count { get => _storage.Count; }
+
 
 	public MemoryOwner<EntityHandle> Alloc(int count)
 	{
-		var version = _allocationVersion++;
 		var toReturn = MemoryOwner<EntityHandle>.Allocate(count);
-		using var allocSpanOwner = SpanGuard<int>.Allocate(count);
-		var allocIndicies = allocSpanOwner.Span;
-		var entityHandles = toReturn.Span;
-		_storage.Alloc(allocIndicies);
-		
-
-		for(var i = 0; i < count; i++)
-		{
-			var index = allocIndicies[i];
-			var handle = new EntityHandle(index, version);
-			entityHandles[i] = handle;
-		}
-
+		Alloc(toReturn.Span);
 		return toReturn;
 	}
 
+	public void Alloc(Span<EntityHandle> output)
+	{
+		using var allocSpanOwner = SpanGuard<int>.Allocate(output.Length);
+		var allocIndicies = allocSpanOwner.Span;
+		_storage.Alloc(allocIndicies);
+		var storageArray = _storage._storage;
+
+		var version = _allocationVersion++;
+		for (var i = 0; i < output.Length; i++)
+		{
+			var index = allocIndicies[i];
+			var handle = new EntityHandle(index, version);
+			output[i] = handle;
+			storageArray[index].handle = handle;
+		}
+		//__CHECKED.Assert(output._IsSorted(), "why not sorted?");
+		__DEBUG.Throw(_storage._storage == storageArray, "MULTITHREADING CORRUPTION DETECTED: storageArray is different.  writes can not be done at the same time as resizes");
+	}
+
+
 	public void Free(Span<EntityHandle> handles)
 	{
+		__CHECKED.AssertOnce(handles._IsSorted(), "sort first");
 		using var freeSpanOwner = SpanGuard<int>.Allocate(handles.Length);
 		var freeSpan = freeSpanOwner.Span;
-		for(var i=0; i < handles.Length; i++)
+		for (var i = 0; i < handles.Length; i++)
 		{
 			var handle = handles[i];
-			freeSpan[i] = handle.id;			
+			freeSpan[i] = handle.id;
 		}
+		_storage.Free(freeSpan);
+	}
+
+	public void Free(Span<AccessToken> tokens)
+	{
+		//__CHECKED.AssertOnce(tokens._IsSorted(), "sort first"); //accessTokens are sorted differently
+		using var freeSpanOwner = SpanGuard<int>.Allocate(tokens.Length);
+		var freeSpan = freeSpanOwner.Span;
+		for (var i = 0; i < tokens.Length; i++)
+		{
+			var handle = tokens[i].entityHandle;
+			freeSpan[i] = handle.id;
+		}
+		//freeSpan._Sort();
 		_storage.Free(freeSpan);
 	}
 
 
 	public ref EntityData this[EntityHandle handle]
 	{
-		 get {
-			ref var toReturn= ref _storage[handle.id];
+		get
+		{
+			ref var toReturn = ref _storage[handle.id];
 			__DEBUG.Assert(toReturn.handle == handle, "handle is invalid.  do you have a stale handle?  (use after dispose?)");
 			return ref toReturn;
+		}
+	}
+	public ref EntityData this[long packedHandle]
+	{
+		get
+		{
+			EntityHandle handle = new(packedHandle);
+			return ref this[handle];
 		}
 	}
 
@@ -113,8 +158,9 @@ public class EntityRegistry
 
 
 /// <summary>
-/// only good for the current frame, unless chunk packing is disabled.  in that case it's good for lifetime of entity in the page.
+/// a "shortcut" providing direct (fast) access to an entities components.  
 /// </summary>
+/// <remarks>only good for the current frame, unless chunk packing is disabled.  in that case it's good for lifetime of entity in the page.</remarks>
 public readonly record struct AccessToken : IComparable<AccessToken>
 {
 	/// <summary>
@@ -124,7 +170,7 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 	/// <summary>
 	/// entityId
 	/// </summary>
-	public readonly long externalId { get; init; }
+	public readonly EntityHandle entityHandle { get; init; }
 
 
 	/// <summary>
@@ -359,8 +405,9 @@ public partial class Page //unit test
 {
 
 
-	public static async Task __TEST_Unit_ParallelPages(bool autoPack, int chunkSize, MemoryOwner<long> externalIds, float batchSizeMultipler, int pageCount, HashSet<long> evenSet, HashSet<long> oddSet)
+	public static async Task __TEST_Unit_ParallelPages(EntityRegistry entityRegistry,bool autoPack, int chunkSize, int entityCount, int pageCount, float batchSizeMultipler)
 	{
+		__ERROR.Throw(entityRegistry.Count == 0);
 		//Console.WriteLine("start parallel");
 		var PARALLEL_LOOPS = pageCount;
 		var execCount = 0;
@@ -369,7 +416,8 @@ public partial class Page //unit test
 			var tempCount = 0;
 			for (var i = start; i < endExclusive; i++)
 			{
-				__TEST_Unit_SinglePage_AndEdit(autoPack, chunkSize, externalIds, evenSet, oddSet);
+				var page = _TEST_HELPER_CreateAndEditPage(entityRegistry, autoPack, chunkSize, entityCount);
+				page.Dispose();
 				tempCount++;
 			}
 			Interlocked.Add(ref execCount, tempCount);
@@ -379,18 +427,21 @@ public partial class Page //unit test
 		});
 		__ERROR.Throw(execCount == PARALLEL_LOOPS);
 
+		__ERROR.Throw(entityRegistry.Count == 0);
+
 
 
 	}
 	[Conditional("TEST")]
-	public static unsafe void __TEST_Unit_SeriallPages(bool autoPack, int chunkSize, MemoryOwner<long> externalIds, int pageCount, HashSet<long> evenSet, HashSet<long> oddSet)
+	public static unsafe void __TEST_Unit_SeriallPages(EntityRegistry entityRegistry, bool autoPack, int chunkSize, int entityCount, int pageCount)
 	{
+		__ERROR.Throw(entityRegistry.Count == 0);
 		var count = pageCount;
 		using var allocOwner = SpanGuard<Page>.Allocate(count);
 		var allocs = allocOwner.Span;
 		for (var i = 0; i < count; i++)
 		{
-			allocs[i] = _TEST_HELPER_CreateAndEditPage(autoPack, chunkSize, externalIds, evenSet, oddSet);
+			allocs[i] = _TEST_HELPER_CreateAndEditPage(entityRegistry, autoPack, chunkSize, entityCount);
 		}
 		for (var i = 0; i < count; i++)
 		{
@@ -400,74 +451,89 @@ public partial class Page //unit test
 		//var result = Parallel.For(0, 10000, (index) => __TEST_Unit_SinglePage());
 		//__ERROR.Throw(result.IsCompleted);
 
+		__ERROR.Throw(entityRegistry.Count == 0);
 	}
 
 	[Conditional("TEST")]
 	public static unsafe void __TEST_Unit_SinglePage()
 	{
-		var page = _TEST_HELPER_CreatePage();
-
+		EntityRegistry entityRegistry = new();
+		var page = _TEST_HELPER_CreatePage(entityRegistry);
 		page.Dispose();
+
 	}
 
 
 	[Conditional("TEST")]
-	public static unsafe void __TEST_Unit_SinglePage_AndEdit(bool autoPack, int chunkSize, MemoryOwner<long> externalIds, HashSet<long> evenSet, HashSet<long> oddSet)
+	public static unsafe void __TEST_Unit_SinglePage_AndEdit(EntityRegistry entityRegistry, bool autoPack, int chunkSize, int entityCount)
 	{
+		__ERROR.Throw(entityRegistry.Count == 0);
 		//Console.WriteLine("start single");
-		var page = _TEST_HELPER_CreateAndEditPage(autoPack, chunkSize, externalIds, evenSet, oddSet);
+		var page = _TEST_HELPER_CreateAndEditPage(entityRegistry, autoPack, chunkSize, entityCount);
 
 		page.Dispose();
+
+		__ERROR.Throw(entityRegistry.Count == 0);
 	}
 
-	private static unsafe Page _TEST_HELPER_CreatePage()
+	private static unsafe Page _TEST_HELPER_CreatePage(EntityRegistry entityRegistry)
 	{
-		var page = new Page()
-		{
-			AutoPack = __.Rand._NextBoolean(),
-			ChunkSize = __.Rand.Next(1, 100),
-			ComponentTypes = new() { typeof(int), typeof(string) },
+		var page = new Page(entityRegistry, __.Rand._NextBoolean(), __.Rand.Next(1, 100), new() { typeof(int), typeof(string) });
+		//{
+		//	AutoPack = __.Rand._NextBoolean(),
+		//	ChunkSize = __.Rand.Next(1, 100),
+		//	ComponentTypes = new() { typeof(int), typeof(string) },
 
 
-		};
+		//};
 		page.Initialize();
 
-		using var externalIdsOwner = SpanGuard<long>.Allocate(__.Rand.Next(0, 1000));
-		var set = new HashSet<long>();
-		var externalIds = externalIdsOwner.Span;
-		while (set.Count < externalIds.Length)
-		{
-			set.Add(__.Rand.NextInt64());
-		}
-		var count = 0;
-		foreach (var id in set)
-		{
-			externalIds[count] = id;
-			count++;
-		}
-		//Span<long> externalIds = stackalloc long[] { 2, 4, 8, 7, -2 };
-		using var tokensOwner = SpanGuard<AccessToken>.Allocate(externalIds.Length);
+
+		var entityCount = __.Rand.Next(0, 1000);
+		//using var entityHandlesOwner = SpanGuard<EntityHandle>.Allocate(__.Rand.Next(0, 1000));
+		//var set = new HashSet<long>();
+		//var entityHandles = entityHandlesOwner.Span;
+		//while (set.Count < entityHandles.Length)
+		//{
+		//	set.Add(__.Rand.NextInt64());
+		//}
+		//var count = 0;
+		//foreach (var id in set)
+		//{
+		//	entityHandles[count] = new EntityHandle(id);
+		//	count++;
+		//}
+		//Span<long> entityHandles = stackalloc long[] { 2, 4, 8, 7, -2 };
+		using var tokensOwner = SpanGuard<AccessToken>.Allocate(entityCount);
 		var tokens = tokensOwner.Span;
-		page.Alloc(externalIds, tokens);
+		using var entitiesOwner = SpanGuard<EntityHandle>.Allocate(entityCount);
+		var entities = entitiesOwner.Span;
+		page.AllocEntityNew(tokens,entities);
 		return page;
 	}
 
-	private static unsafe Page _TEST_HELPER_CreateAndEditPage(bool autoPack, int chunkSize, MemoryOwner<long> externalIdsOwner, HashSet<long> evenSet, HashSet<long> oddSet)
+	private static unsafe Page _TEST_HELPER_CreateAndEditPage(EntityRegistry entityRegistry , bool autoPack, int chunkSize, int entityCount)
 	{
-		var page = new Page()
-		{
-			AutoPack = autoPack,
-			ChunkSize = chunkSize,
-			ComponentTypes = new() { typeof(int), typeof(string) },
+
+		//MemoryOwner<EntityHandle> entityHandlesOwner;
+		//HashSet<EntityHandle> evenSet;
+		//HashSet<EntityHandle> oddSet;
 
 
-		};
+		var page = new Page(entityRegistry, autoPack, chunkSize, new() { typeof(int), typeof(string), typeof(bool) });
+		//{
+		//	AutoPack = autoPack,
+		//	ChunkSize = chunkSize,
+		//	ComponentTypes = new() { typeof(int), typeof(string) },
+
+
+		//};
 		page.Initialize();
 
-		//using var externalIdsOwner = SpanPool<long>.Allocate(__.Rand.Next(0, 1000));
+		//using var entityHandlesOwner = SpanPool<long>.Allocate(__.Rand.Next(0, 1000));
 		//var set = new HashSet<long>();
-		//var externalIds = externalIdsOwner.Span;
-		//while (set.Count < externalIds.Length)
+		//var entityHandles = entityHandlesOwner.Span;
+		//while (set.Count < entityHandles.Length)
 		//{
 		//	set.Add(__.Rand.NextInt64());
 		//}
@@ -475,16 +541,19 @@ public partial class Page //unit test
 		//var count = 0;
 		//foreach (var id in set)
 		//{
-		//	externalIds[count] = id;
+		//	entityHandles[count] = id;
 		//	count++;
 		//}
 
-		var externalIds = externalIdsOwner.Span;
+		//var entityHandles = entityHandlesOwner.Span;
 
-		//Span<long> externalIds = stackalloc long[] { 2, 4, 8, 7, -2 };
-		using var tokensOwner = SpanGuard<AccessToken>.Allocate(externalIds.Length);
+		//Span<long> entityHandles = stackalloc long[] { 2, 4, 8, 7, -2 };
+		using var tokensOwner = SpanGuard<AccessToken>.Allocate(entityCount);
 		var tokens = tokensOwner.Span;
-		page.Alloc(externalIds, tokens);
+		using var entitiesOwner = SpanGuard<EntityHandle>.Allocate(entityCount);
+		var entities = entitiesOwner.Span;
+		page.AllocEntityNew(tokens,entities);
+
 
 
 		//test edits
@@ -512,63 +581,113 @@ public partial class Page //unit test
 
 			ref var numExId = ref token.GetComponentWriteRef<int>();
 			__ERROR.Throw(num == numExId);
-			numExId = (int)token.externalId;
+			numExId = (int)token.entityHandle.id;
 			__ERROR.Throw(num == numExId);
 
 		}
 
-
-		//delete odds
-		page.Free(oddSet.ToArray());
-
-		//verify that evens still here
+		var first = entities.Slice(0, entities.Length / 2);
+		var second = entities.Slice(entities.Length / 2);
+		//mark first group
+		for(var i=0;i<first.Length;i++)
 		{
-			var i = 0;
-			foreach (var (externalId, pageToken) in page._lookup)
-			{
-				if (pageToken.externalId % 2 != 0)
-				{
-					__ERROR.Throw(false, "only even should exist");
-				}
 
-				var num = pageToken.GetComponentReadRef<int>();
-				__ERROR.Throw(num == (int)pageToken.externalId);
-				__ERROR.Throw(pageToken.GetComponentReadRef<string>().StartsWith("hello"));
+			ref var isFirst = ref tokens[i].GetComponentWriteRef<bool>();
+			isFirst = true;
+		}
+
+		//delete second
+		page.Free(second);
+
+
+		//verify that first still here
+		//{
+
+		//	var i = 0;
+		//	foreach (var (entityHandle, pageToken) in page._entityLookup)
+		//	{
+		//		if (pageToken.entityHandle.id % 2 != 0)
+		//		{
+		//			__ERROR.Throw(false, "only even should exist");
+		//		}
+
+		//		var num = pageToken.GetComponentReadRef<int>();
+		//		__ERROR.Throw(num == (int)pageToken.entityHandle.id);
+		//		__ERROR.Throw(pageToken.GetComponentReadRef<string>().StartsWith("hello"));
+		//		i++;
+
+		//	}
+		//}
+		////same verify only evens,
+		//foreach (var (entityHandle, pageToken) in page._entityLookup)
+		//{
+		//	ref var numExId = ref pageToken.GetComponentWriteRef<int>();
+		//	__ERROR.Throw(numExId % 2 == 0);
+		//	__ERROR.Throw(pageToken.entityHandle.id % 2 == 0);
+		//	__ERROR.Throw(pageToken.GetComponentReadRef<string>().StartsWith("hello"));
+		//}
+		__ERROR.Throw(page.Count == first.Length);
+		{
+
+			var i = 0;
+			foreach (var entityHandle in first)
+			{
+				var refreshedToken = page._entityLookup[entityHandle._packValue];
+				var (result, reason) = page.CheckIsValid(refreshedToken);
+				__ERROR.Throw(result, reason);
+
+
+				var num = refreshedToken.GetComponentReadRef<int>();
+				__ERROR.Throw(num == (int)refreshedToken.entityHandle.id);
+				__ERROR.Throw(refreshedToken.GetComponentReadRef<string>().StartsWith("hello"));
 				i++;
+
+
+				var isFirst = refreshedToken.GetComponentReadRef<bool>();
+				__ERROR.Throw(isFirst == true);
 
 			}
 		}
-		//same verify only evens,
-		foreach (var (externalId, pageToken) in page._lookup)
-		{
-			ref var numExId = ref pageToken.GetComponentWriteRef<int>();
-			__ERROR.Throw(numExId % 2 == 0);
-			__ERROR.Throw(pageToken.externalId % 2 == 0);
-			__ERROR.Throw(pageToken.GetComponentReadRef<string>().StartsWith("hello"));
-		}
-		//add odds
-		using var oddTokens = SpanGuard<AccessToken>.Allocate(oddSet.Count);
-		var oddSpan = oddTokens.Span;
-		page.Alloc(oddSet.ToArray(), oddSpan);
 
-		//delete evens
-		page.Free(evenSet.ToArray());
 
-		//verify only odds
-		foreach (var (externalId, pageToken) in page._lookup)
+
+
+		//add second again
+		using var secondAgainSO = SpanGuard<AccessToken>.Allocate(second.Length);
+		//var oddSpan = oddTokens.Span;
+		//page.Alloc(oddSet.ToArray(), oddSpan);
+		page.AllocEntityNew(secondAgainSO.Span, second);
+		__ERROR.Throw(page.Count == second.Length + first.Length);
+
+
+
+
+
+
+		//delete first
+
+		page.Free(first);
+
+		//verify only second
+		foreach (var (entityHandle, pageToken) in page._entityLookup)
 		{
 			ref var numExId = ref pageToken.GetComponentWriteRef<int>();
 			__ERROR.Throw(numExId == 0, "we just wrote a new entity, old data should be blown away");
-			__ERROR.Throw(pageToken.externalId % 2 == 1);
+			//__ERROR.Throw(pageToken.entityHandle.id % 2 == 1);
 			__ERROR.Throw(pageToken.GetComponentReadRef<string>() == null);
+
+			var isFirst = pageToken.GetComponentReadRef<bool>();
+			__ERROR.Throw(isFirst == false);
 		}
 
-		//delete odds again
-		page.Free(oddSet.ToArray());
+
+
+		//delete second again
+		page.Free(second);
 
 
 		//verify empty
-		__ERROR.Throw(page._lookup.Count == 0);
+		__ERROR.Throw(page._entityLookup.Count == 0);
 
 
 		foreach (var column in page._columnStorage)
@@ -735,6 +854,8 @@ public partial class Page  //ATOM logic
 public partial class Page : IDisposable //init logic
 {
 
+	public EntityRegistry _entityRegistry;
+
 	//public static int _pageId_GlobalCounter;
 	//public static Dictionary<int, Page> _GLOBAL_LOOKUP = new();
 	//public int _pageId = _pageId_GlobalCounter._InterlockedIncrement();
@@ -784,112 +905,22 @@ public partial class Page : IDisposable //init logic
 	/// </summary>
 	public List<int> _atomIdsUsed = new();
 
-	public List<Chunk> GetColumn<T>()
-	{
-		var atomId = Atom.GetId<T>();
-		return _GetColumnsSpan()[atomId];
-	}
-	public Chunk<T> GetChunk<T>(ref AccessToken pageToken)
-	{
-		var (result, reason) = CheckIsValid(ref pageToken);
-		__ERROR.Throw(result, reason);
-
-		__CHECKED_INTERNAL_VerifyPageAccessToken(ref pageToken);
-		var column = GetColumn<T>();
-		return column[pageToken.slotRef.chunkIndex] as Chunk<T>;
-	}
-	public ref T GetComponentRef<T>(ref AccessToken pageToken)
-	{
-		var chunk = GetChunk<T>(ref pageToken);
-		return ref chunk.UnsafeArray[pageToken.slotRef.slotIndex];
-	}
-
-	public static ref T GetComponent<T>(ref AccessToken pageToken)
-	{
-		return ref _GLOBAL_LOOKUP.Span[pageToken.pageId].GetComponentRef<T>(ref pageToken);
-		//var atomId = Atom.GetId<T>();
-		//var chunk = _GLOBAL_LOOKUP.Span[pageToken.pageId]._GetColumnsSpan()[atomId]._AsSpan_Unsafe()[pageToken.slotRef.columnChunkIndex] as Chunk<T>;
-		//return ref chunk.Span[pageToken.slotRef.chunkChunkIndex];
-	}
-
+	/// <summary>
+	/// How many Slots a Chunk should have. (how big the array is).
+	/// </summary>
+	public int ChunkSize { get; init; } = 1000;
 
 	/// <summary>
-	/// will only return false if the slot is not present.  so check .IsAlive
+	/// how many entities are stored in this Page
 	/// </summary>
-	private bool __TryQueryMetadata(SlotRef slot, out EntityMetadata metadata)
+	public int Count { get => _entityLookup.Count; }
+	public Page(EntityRegistry entityRegistry, bool autoPack, int chunkSize, List<Type> componentTypes)
 	{
-		//var columns = _GetColumnsSpan();
-		//var atomId = Atom.GetId<EntityMetadata>();
-		//var columnList = columns[atomId];//  _componentColumns[typeof(EntityMetadata)];
-		var column = GetColumn<EntityMetadata>();
-		if (column == null || column.Count < slot.chunkIndex)
-		{
-			metadata = default;
-			return false;
-		}
-		var chunk = column[slot.chunkIndex] as Chunk<EntityMetadata>;
-		metadata = chunk.UnsafeArray[slot.slotIndex];
-		return true;
+		AutoPack = autoPack;
+		_entityRegistry = entityRegistry;
+		ChunkSize = chunkSize;
+		ComponentTypes = componentTypes;
 	}
-
-
-	protected internal static ref T _UNCHECKED_GetComponent<T>(ref AccessToken pageToken)
-	{
-		var atomId = Atom.GetId<T>();
-		var chunk = _GLOBAL_LOOKUP.Span[pageToken.pageId]._GetColumnsSpan()[atomId]._AsSpan_Unsafe()[pageToken.slotRef.chunkIndex] as Chunk<T>;
-		return ref chunk.UnsafeArray[pageToken.slotRef.slotIndex];
-	}
-	/// <summary>
-	/// INTERNAL USE ONLY.  doesn't do checks to ensure token is valid.
-	/// returns false if the slot is not allocated.  if it's allocated but free, it still returns whatever data is contained.
-	/// </summary>
-	protected internal ref T _UNCHECKED_GetComponent<T>(ref SlotRef slot, out bool exists)
-	{
-		//var atomId = Atom.GetId<T>();
-		var column = GetColumn<T>();
-		if (column == null)
-		{
-			exists = false;
-			return ref Unsafe.NullRef<T>();
-		}
-		var columnSpan = column._AsSpan_Unsafe();
-		if (columnSpan.Length <= slot.chunkIndex || columnSpan[slot.chunkIndex] == null)
-		{
-
-			exists = false;
-			return ref Unsafe.NullRef<T>();
-		}
-		var chunk = columnSpan[slot.chunkIndex] as Chunk<T>;
-		if (chunk == null)
-		{
-			exists = false;
-			return ref Unsafe.NullRef<T>();
-		}
-		exists = true;
-		return ref chunk.UnsafeArray[slot.slotIndex];
-	}
-	/// <summary>
-	/// INTERNAL USE ONLY.  doesn't do checks to ensure token is valid.
-	/// </summary>
-	protected internal ref T _UNCHECKED_GetComponent<T>(ref SlotRef slot)
-	{
-		//var atomId = Atom.GetId<T>();
-		return ref (GetColumn<T>()._AsSpan_Unsafe()[slot.chunkIndex] as Chunk<T>).UnsafeArray[slot.slotIndex];
-	}
-
-	/// <summary>
-	/// check if this Page is assigned the specified Type
-	/// </summary>
-	/// <typeparam name="T"></typeparam>
-	/// <returns></returns>
-	public bool HasComponentType<T>()
-	{
-		//return _componentColumns.ContainsKey(typeof(T));
-		var atomId = Atom.GetId<T>();
-		var columns = _GetColumnsSpan();
-		return columns.Length > atomId && columns[atomId] != null;
-	}
-
 
 	public void Initialize()
 	{
@@ -1004,8 +1035,9 @@ public partial class Page : IDisposable //init logic
 		_columnStorage = null;
 		_free.Clear();
 		_free = null;
-		_lookup.Clear();
-		_lookup = null;
+		_entityLookup.Clear();
+		_entityLookup = null;
+		_entityRegistry = null;
 		_GLOBAL_LOOKUP.FreeSlot(_pageId);
 		__ERROR.Throw(_GLOBAL_LOOKUP.Span.Length <= _pageId || _GLOBAL_LOOKUP.Span[_pageId] == null);
 		_pageId = -1;
@@ -1020,6 +1052,118 @@ public partial class Page : IDisposable //init logic
 		}
 	}
 #endif
+}
+
+public partial class Page //column / component type management
+{
+
+	public List<Chunk> GetColumn<T>()
+	{
+		var atomId = Atom.GetId<T>();
+		return _GetColumnsSpan()[atomId];
+	}
+	public Chunk<T> GetChunk<T>(ref AccessToken pageToken)
+	{
+		var (result, reason) = CheckIsValid(ref pageToken);
+		__ERROR.Throw(result, reason);
+
+		__CHECKED_INTERNAL_VerifyPageAccessToken(ref pageToken);
+		var column = GetColumn<T>();
+		return column[pageToken.slotRef.chunkIndex] as Chunk<T>;
+	}
+	public ref T GetComponentRef<T>(ref AccessToken pageToken)
+	{
+		var chunk = GetChunk<T>(ref pageToken);
+		return ref chunk.UnsafeArray[pageToken.slotRef.slotIndex];
+	}
+
+	public static ref T GetComponent<T>(ref AccessToken pageToken)
+	{
+		return ref _GLOBAL_LOOKUP.Span[pageToken.pageId].GetComponentRef<T>(ref pageToken);
+		//var atomId = Atom.GetId<T>();
+		//var chunk = _GLOBAL_LOOKUP.Span[pageToken.pageId]._GetColumnsSpan()[atomId]._AsSpan_Unsafe()[pageToken.slotRef.columnChunkIndex] as Chunk<T>;
+		//return ref chunk.Span[pageToken.slotRef.chunkChunkIndex];
+	}
+
+
+	/// <summary>
+	/// will only return false if the slot is not present.  so check .IsAlive
+	/// </summary>
+	private bool __TryQueryMetadata(SlotRef slot, out EntityMetadata metadata)
+	{
+		//var columns = _GetColumnsSpan();
+		//var atomId = Atom.GetId<EntityMetadata>();
+		//var columnList = columns[atomId];//  _componentColumns[typeof(EntityMetadata)];
+		var column = GetColumn<EntityMetadata>();
+		if (column == null || column.Count < slot.chunkIndex)
+		{
+			metadata = default;
+			return false;
+		}
+		var chunk = column[slot.chunkIndex] as Chunk<EntityMetadata>;
+		metadata = chunk.UnsafeArray[slot.slotIndex];
+		return true;
+	}
+
+
+	protected internal static ref T _UNCHECKED_GetComponent<T>(ref AccessToken pageToken)
+	{
+		var atomId = Atom.GetId<T>();
+		var chunk = _GLOBAL_LOOKUP.Span[pageToken.pageId]._GetColumnsSpan()[atomId]._AsSpan_Unsafe()[pageToken.slotRef.chunkIndex] as Chunk<T>;
+		return ref chunk.UnsafeArray[pageToken.slotRef.slotIndex];
+	}
+	/// <summary>
+	/// INTERNAL USE ONLY.  doesn't do checks to ensure token is valid.
+	/// returns false if the slot is not allocated.  if it's allocated but free, it still returns whatever data is contained.
+	/// </summary>
+	protected internal ref T _UNCHECKED_GetComponent<T>(ref SlotRef slot, out bool exists)
+	{
+		//var atomId = Atom.GetId<T>();
+		var column = GetColumn<T>();
+		if (column == null)
+		{
+			exists = false;
+			return ref Unsafe.NullRef<T>();
+		}
+		var columnSpan = column._AsSpan_Unsafe();
+		if (columnSpan.Length <= slot.chunkIndex || columnSpan[slot.chunkIndex] == null)
+		{
+
+			exists = false;
+			return ref Unsafe.NullRef<T>();
+		}
+		var chunk = columnSpan[slot.chunkIndex] as Chunk<T>;
+		if (chunk == null)
+		{
+			exists = false;
+			return ref Unsafe.NullRef<T>();
+		}
+		exists = true;
+		return ref chunk.UnsafeArray[slot.slotIndex];
+	}
+	/// <summary>
+	/// INTERNAL USE ONLY.  doesn't do checks to ensure token is valid.
+	/// </summary>
+	protected internal ref T _UNCHECKED_GetComponent<T>(ref SlotRef slot)
+	{
+		//var atomId = Atom.GetId<T>();
+		return ref (GetColumn<T>()._AsSpan_Unsafe()[slot.chunkIndex] as Chunk<T>).UnsafeArray[slot.slotIndex];
+	}
+
+	/// <summary>
+	/// check if this Page is assigned the specified Type
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
+	/// <returns></returns>
+	public bool HasComponentType<T>()
+	{
+		//return _componentColumns.ContainsKey(typeof(T));
+		var atomId = Atom.GetId<T>();
+		var columns = _GetColumnsSpan();
+		return columns.Length > atomId && columns[atomId] != null;
+	}
+
+
 }
 
 public partial class Page //chunk management logic
@@ -1082,10 +1226,12 @@ public partial class Page  //alloc/free/pack logic
 	/// </summary>
 	public int _packVersion = 0;
 	/// <summary>
-	/// given an externalId, find current token.  this allows decoupling our internal storage location from external callers, allowing packing.
+	/// entities registered with this page.  
+	/// <para>OBSOLETE: kind of expensive any maybe not so helpful?   can access all entities via entityManager, or all this page entitites by enumerating it's Column{EntityMeta}</para>
 	/// </summary>
-	public Dictionary<long, AccessToken> _lookup = new();
-
+	/// <remarks><para>given an entityHandle, find current token.  this allows decoupling our internal storage location from external callers, allowing packing.</para></remarks>
+	[Obsolete("kind of expensive any maybe not so helpful?   can access all entities via entityManager, or all this page entitites by enumerating it's Column<EntityMeta>")]
+	public Dictionary<long, AccessToken> _entityLookup = new();
 
 	/// <summary>
 	/// temp listing of free entities, we will pack and/or deallocate at a specific time each frame
@@ -1093,15 +1239,6 @@ public partial class Page  //alloc/free/pack logic
 	public List<SlotRef> _free = new();
 	public bool _isFreeSorted = true;
 
-	/// <summary>
-	/// How many Slots a Chunk should have. (how big the array is).
-	/// </summary>
-	public int ChunkSize { get; init; } = 1000;
-
-	/// <summary>
-	/// how many entities are stored in this Page
-	/// </summary>
-	public int Count { get => _lookup.Count; }
 	/// <summary>
 	/// the next slot we will allocate from, and logic informing us when to add/remove chunks
 	/// </summary>
@@ -1116,28 +1253,51 @@ public partial class Page  //alloc/free/pack logic
 
 
 	/// <summary>
-	/// get a slot (recycling free if available)
-	/// make pageToken
-	/// add slot to columnList
-	/// set builtin entityMetadata component
-	/// verify
+	/// using this Page, allocate the number of entities given the output length
 	/// </summary>
-	public void Alloc(Span<long> externalIds, Span<AccessToken> output)
+	/// <param name="output"></param>
+	public void AllocEntityNew(Span<AccessToken> outputAccessTokens)
 	{
+		using var entitiesOwner = SpanGuard<EntityHandle>.Allocate(outputAccessTokens.Length);
+		var outputEntityHandles = entitiesOwner.Span;
+		AllocEntityNew(outputAccessTokens, outputEntityHandles);
+
+	}
+	/// <summary>
+	/// using this Page, allocate the number of entities given the output length
+	/// </summary>
+	/// <param name="output"></param>
+	public void AllocEntityNew(Span<AccessToken> outputAccessTokens, Span<EntityHandle> outputEntityHandles)
+	{
+		__DEBUG.Throw(outputAccessTokens.Length == outputEntityHandles.Length);
+		_entityRegistry.Alloc(outputEntityHandles);
+		_AllocEntityNew_Helper(outputEntityHandles, outputAccessTokens);
+
+	}
+	/// <summary>
+	/// given already allocated (but not live) entityHandles, alloc on this page.
+	/// </summary>
+	public void _AllocEntityNew_Helper(Span<EntityHandle> inputEntityHandles, Span<AccessToken> outputAccessTokens)
+	{
+		/// get a slot (recycling free if available)
+		/// make pageToken
+		/// add slot to columnList
+		/// set builtin entityMetadata component
+		/// verify
 		if (_isFreeSorted != true)
 		{
 			_free.Sort();
 			_isFreeSorted = true;
 		}
 
-		__DEBUG.Assert(output.Length == externalIds.Length);
+		__DEBUG.Assert(outputAccessTokens.Length == inputEntityHandles.Length);
 
 
 		var columns = _GetColumnsSpan();
 
-		for (var i = 0; i < externalIds.Length; i++)
+		for (var i = 0; i < inputEntityHandles.Length; i++)
 		{
-			var externalId = externalIds[i];
+			var entityHandle = inputEntityHandles[i];
 			//get next free.
 			if (!_free._TryTakeLast(out var slot))
 			{
@@ -1148,14 +1308,14 @@ public partial class Page  //alloc/free/pack logic
 					_AllocNextChunk();
 				}
 			}
-			ref var pageToken = ref output[i];
-			pageToken = _GenerateLivePageAccessToken(externalId, slot);
+			ref var pageToken = ref outputAccessTokens[i];
+			pageToken = _GenerateLivePageAccessToken(entityHandle, slot);
 			//new()  
 			//{
 			//	isInit = true,
 			//	pageId = _pageId,
 			//	slotRef = slot,
-			//	externalId = externalId,
+			//	entityHandle = entityHandle,
 			//	packVersion = _packVersion,
 			//};
 
@@ -1182,7 +1342,9 @@ public partial class Page  //alloc/free/pack logic
 
 
 			//add to lookup
-			_lookup.Add(externalId, pageToken);
+			_entityLookup.Add(entityHandle._packValue, pageToken);
+			__CHECKED.Throw(_entityRegistry[entityHandle].IsAlive == false, "already alive, why overwriting?");
+			_entityRegistry[entityHandle].pageAccessToken = pageToken;
 
 
 			__CHECKED.Throw(entityMetadata == pageToken.GetComponentReadRef<EntityMetadata>(), "component reference verification failed.  why?");
@@ -1198,14 +1360,14 @@ public partial class Page  //alloc/free/pack logic
 	}
 
 
-	private AccessToken _GenerateLivePageAccessToken(long externalId, SlotRef slot)
+	private AccessToken _GenerateLivePageAccessToken(EntityHandle entityHandle, SlotRef slot)
 	{
 		return new AccessToken
 		{
 			isAlive = true,
 			pageId = _pageId,
 			slotRef = slot,
-			externalId = externalId,
+			entityHandle = entityHandle,
 			packVersion = _packVersion,
 			pageVersion = _version,
 		};
@@ -1234,7 +1396,12 @@ public partial class Page  //alloc/free/pack logic
 			reason = "token is not alive";
 			result = false;
 		}
-		else if (!_lookup.TryGetValue(pageToken.externalId, out var lookupToken))
+		else if (pageToken.pageId != _pageId)
+		{
+			reason = "token not for this page";
+			result = false;
+		}
+		else if (!_entityLookup.TryGetValue(pageToken.entityHandle._packValue, out var lookupToken))
 		{
 			reason = "token does not have a matching entityId.  was it removed?";
 			result = false;
@@ -1264,8 +1431,12 @@ public partial class Page  //alloc/free/pack logic
 	{
 
 		//__ERROR.Throw(_packVersion == pageToken.packVersion, "pageToken out of date.  a pack occured.  you need to reaquire the token every frame if AutoPack==true");
-		var storedToken = _lookup[pageToken.externalId];
+		var storedToken = _entityLookup[pageToken.entityHandle._packValue];
 		__ERROR.Throw(storedToken == pageToken);
+
+		__ERROR.Throw(_entityRegistry[pageToken.entityHandle].pageAccessToken == pageToken);
+
+
 
 		var columns = _GetColumnsSpan();
 
@@ -1302,64 +1473,105 @@ public partial class Page  //alloc/free/pack logic
 
 
 
-
 	/// <summary>
-	/// get the pageTokens to delete
-	/// verify
-	/// delete from allocations lookup
-	/// free slot from columnList
-	/// add to free list
-	/// if AutoPack, do it now.
+	/// free the entity handle, both here and in the entityRegistry
 	/// </summary>
-	public unsafe void Free(Span<long> externalIds)
+	public unsafe void Free(Span<EntityHandle> entityHandles)
 	{
-		if (externalIds.Length == 0)
-		{
-			return;
-		}
-		using var so_PageAccessTokens = SpanGuard<AccessToken>.Allocate(externalIds.Length);
-		var pageTokens = so_PageAccessTokens.Span;
-		//get tokens for freeing
-		for (var i = 0; i < externalIds.Length; i++)
-		{
-			pageTokens[i] = _lookup[externalIds[i]];
-			__CHECKED.Throw(pageTokens[i].externalId == externalIds[i]);
-			var (result, reason) = CheckIsValid(ref pageTokens[i]);
-			__ERROR.Throw(result, reason);
+		__CHECKED.AssertOnce(entityHandles._IsSorted(), "should sort entityHandles before Free, for optimal performance");
 
-			__CHECKED_INTERNAL_VerifyPageAccessToken(ref pageTokens[i]);
-			//remove them now??  maybe will cause further issues with verification
-			_lookup.Remove(externalIds[i]);
+
+		using var so_PageAccessTokens = SpanGuard<AccessToken>.Allocate(entityHandles.Length);
+		var pageTokens = so_PageAccessTokens.Span;
+
+		//get tokens for freeing
+		for (var i = 0; i < entityHandles.Length; i++)
+		{
+			var entityHandle = entityHandles[i];
+			pageTokens[i] = _entityRegistry[entityHandle].pageAccessToken;
 		}
+
 		//sort so that when we itterate through, they will have a higher chance of being in the same chunk
 		pageTokens.Sort();
 
+		Free(pageTokens);
+	}
+
+	public unsafe void Free(Span<AccessToken> tokens)
+	{
+		/// get the pageTokens to delete
+		/// verify
+		/// delete from allocations lookup
+		/// free slot from columnList
+		/// add to free list
+		/// if AutoPack, do it now.
+		/// 
+		//__CHECKED.AssertOnce(tokens._IsSorted(), "should sort entityHandles before Free, for optimal performance");
+		if (tokens.Length == 0)
+		{
+			return;
+		}
+
+		//get tokens for freeing
+		for (var i = 0; i < tokens.Length; i++)
+		{
+			var entityHandle = tokens[i].entityHandle;
+
+#if DEBUG
+			var (result, reason) = CheckIsValid(ref tokens[i]);
+			__ERROR.Throw(result, reason);
+#endif
+
+			//remove them now??  maybe will cause further issues with verification
+			_entityLookup.Remove(entityHandle._packValue);
+		}
+		//remove from external registry
+		_entityRegistry.Free(tokens);
+
+
+
 
 		//parallel through all columns, deleting
-		var pageTokensArraySegment = so_PageAccessTokens.DangerousGetArray();
-		var allocArray = pageTokensArraySegment.Array;
-		////var workCount = 0;
-		ParallelFor.Range(0, _atomIdsUsed.Count, (start, end) =>
+
+
+		fixed (AccessToken* p = tokens)
 		{
-			var count = pageTokensArraySegment.Count;
-			Span<AccessToken> span = allocArray;
-			for (var aIndex = start; aIndex < end; aIndex++)
+			var pTokens = p;
+			var count = tokens.Length;// pageTokensArraySegment.Count;
+
+			//var allocArray = pageTokensArraySegment.Array;
+			////var workCount = 0;
+			ParallelFor.Range(0, _atomIdsUsed.Count, (start, end) =>
 			{
-				//Interlocked.Increment(ref workCount);
-				var atomId = _atomIdsUsed[aIndex];
 
-
-
-				var columns = _GetColumnsSpan();
-				var columnList = columns[atomId];
-				//var (type, columnList) = pair;
-				for (var i = 0; i < count; i++)
+				//Span<AccessToken> span = allocArray;
+				//var span = new Span<AccessToken>(pTokens, count);
+				for (var aIndex = start; aIndex < end; aIndex++)
 				{
-					ref var pageToken = ref span[i];
-					columnList[pageToken.slotRef.chunkIndex].OnFreeSlot(ref pageToken);
+					//Interlocked.Increment(ref workCount);
+					var atomId = _atomIdsUsed[aIndex];
+
+					var columns = _GetColumnsSpan();
+					var columnList = columns[atomId];
+					//var (type, columnList) = pair;
+					for (var i = 0; i < count; i++)
+					{
+						ref var pageToken = ref pTokens[i];
+						columnList[pageToken.slotRef.chunkIndex].OnFreeSlot(ref pageToken);
+					}
 				}
-			}
-		});
+			});
+
+
+		}
+
+
+		//var pageTokensArraySegment = so_PageAccessTokens.DangerousGetArray();
+
+
+
+
+
 		////__ERROR.Throw(workCount==_atomIdsUsed.Count,"parallel is missing work"); 
 
 		//Parallel.ForEach(_atomIdsUsed, (atomId, loopState) =>
@@ -1381,10 +1593,10 @@ public partial class Page  //alloc/free/pack logic
 
 
 		//add to free list
-		for (var i = 0; i < pageTokens.Length; i++)
+		for (var i = 0; i < tokens.Length; i++)
 		{
-			__CHECKED.Throw(_free.Contains(pageTokens[i].slotRef) == false);
-			_free.Add(pageTokens[i].slotRef);
+			__CHECKED.Throw(_free.Contains(tokens[i].slotRef) == false);
+			_free.Add(tokens[i].slotRef);
 
 		}
 		_isFreeSorted = false;
@@ -1393,8 +1605,8 @@ public partial class Page  //alloc/free/pack logic
 		if (AutoPack == true)
 		{
 			var priorPackVersion = _packVersion;
-			__DEBUG.Assert(externalIds.Length == _free.Count);
-			Pack(externalIds.Length);
+			__DEBUG.Assert(tokens.Length == _free.Count);
+			Pack(tokens.Length);
 			__DEBUG.Assert(priorPackVersion != _packVersion && _free.Count == 0, "autopack not working?");
 		}
 
@@ -1414,7 +1626,7 @@ public partial class Page  //alloc/free/pack logic
 		__CHECKED.Assert(freeSlotMeta.IsAlive == false && freeSlotMeta.pageToken.isAlive == false, "should be default value");
 #endif
 		//generate our newPos pageToken
-		var newSlotPageAccessToken = _GenerateLivePageAccessToken(highestAlive.externalId, lowestFree);
+		var newSlotPageAccessToken = _GenerateLivePageAccessToken(highestAlive.entityHandle, lowestFree);
 
 		//do a single alloc for that freeSlot componentColumns
 		//foreach (var (type, columnList) in _componentColumns)
@@ -1440,8 +1652,9 @@ public partial class Page  //alloc/free/pack logic
 		metadataComponent.pageToken = newSlotPageAccessToken;
 
 
-		//update our _lookup
-		_lookup[newSlotPageAccessToken.externalId] = newSlotPageAccessToken;
+		//update our _lookup and registry
+		_entityLookup[newSlotPageAccessToken.entityHandle._packValue] = newSlotPageAccessToken;
+		_entityRegistry[newSlotPageAccessToken.entityHandle].pageAccessToken = newSlotPageAccessToken;
 
 		//make sure our newly moved is all setup properly
 		__CHECKED_INTERNAL_VerifyPageAccessToken(ref newSlotPageAccessToken);
@@ -1470,7 +1683,7 @@ public partial class Page  //alloc/free/pack logic
 				if (result == false)
 				{
 					//  we are done
-					__ERROR.Assert(_lookup.Count == 0, "no more slots available.  we expect this to happen if the Page is totally empty.");
+					__ERROR.Assert(_entityLookup.Count == 0, "no more slots available.  we expect this to happen if the Page is totally empty.");
 					break;
 				}
 				result = __TryQueryMetadata(highestAllocatedSlot, out highestAliveToken);
@@ -1605,7 +1818,7 @@ public partial class Page  //alloc/free/pack logic
 		}
 #if CHECKED
 		//verify that our highest allocated is either free or init
-		if (_lookup.Count > 0)
+		if (_entityLookup.Count > 0)
 		{
 			var result = _nextSlotTracker.TryGetHighestAllocatedSlot(out var highestAllocated);
 			__ERROR.Throw(result);
