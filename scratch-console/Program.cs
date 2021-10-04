@@ -61,10 +61,10 @@ public class AllocatorBenchmark
 	[Params(true,false)]
 	public bool AutoPack { get; set; } = true;
 
-	[Params(100
+	[Params(1000
 		//,1000,10000
 		)]
-	public int ChunkSize { get; set; } = 100;
+	public int ChunkSize { get; set; } = 1000;
 
 	[Params(1f
 		//,4f
@@ -146,9 +146,10 @@ public class Program
 		var bm = new AllocatorBenchmark();
 		bm.Setup();
 		await bm.Sequential_CreateEditDelete();
+		await bm.Parallel_CreateEditDelete();
 		//run in debug mode (can hit breakpoints in VS)
 		//var summary = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, new BenchmarkDotNet.Configs.DebugInProcessConfig());		
-//run a specific benchmark
+		//run a specific benchmark
 		var summary = BenchmarkRunner.Run<AllocatorBenchmark>(new BenchmarkDotNet.Configs.DebugInProcessConfig());
 #else
 		var summary = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);

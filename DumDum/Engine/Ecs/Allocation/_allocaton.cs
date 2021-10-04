@@ -68,7 +68,7 @@ public record struct EntityData
 /// </remarks>
 public class EntityRegistry
 {
-	public StructSlotArray<EntityData> _storage = new(1000000); //TODO: 1 million items = 232mb at current size of access token (needs size optimizations)
+	public StructSlotArray<EntityData> _storage = new(2000000); //TODO: 1 million items = 232mb at current size of access token (needs size optimizations)
 
 	private volatile int _allocationVersion;
 

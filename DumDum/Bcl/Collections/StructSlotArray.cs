@@ -32,8 +32,7 @@ namespace DumDum.Bcl.Collections._unused
 		/// </summary>
 		public TData[] _storage;
 		private readonly Stack<int> _freeSlots;
-
-		//private readonly MinHeap _freeSlots2 = new()
+		//private readonly MinHeap _freeSlots;
 
 		private readonly object _lock = new();
 
@@ -41,13 +40,14 @@ namespace DumDum.Bcl.Collections._unused
 		public StructSlotArray(int capacity)
 		{
 			this._storage = new TData[capacity];
-			this._freeSlots = new(capacity);			
+			this._freeSlots = new();			
 #if CHECKED
 			this._CHECKED_allocationTracker = new();
 #endif
 			for (var i = 0; i < capacity; i++)
 			{
-				this._freeSlots.Push(capacity - i);
+				//this._freeSlots.Push(capacity - i);
+				this._freeSlots.Push(i);
 			}
 		}
 
@@ -74,6 +74,8 @@ namespace DumDum.Bcl.Collections._unused
 		{
 			lock (this._lock)
 			{
+				__DEBUG.Throw(FreeCount > 0,"no capacity remaining");
+
 				this.Version++;
 				var slot = this._freeSlots.Pop();
 #if CHECKED
@@ -88,6 +90,8 @@ namespace DumDum.Bcl.Collections._unused
 		{
 			lock (this._lock)
 			{
+				__DEBUG.Throw(FreeCount > 0, "no capacity remaining");
+
 				this.Version++;
 				var slot = this._freeSlots.Pop();
 #if CHECKED
@@ -98,8 +102,13 @@ namespace DumDum.Bcl.Collections._unused
 		}
 		public void Alloc(Span<int> toFill)
 		{
+#if CHECKED
+			toFill.Clear();
+#endif
 			lock (this._lock)
 			{
+				__DEBUG.Throw(FreeCount >= toFill.Length, "no capacity remaining");
+
 				this.Version++;
 
 				for(var i = 0; i < toFill.Length; i++)
