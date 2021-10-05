@@ -290,7 +290,9 @@ Logical object structure is
 
 - use github orgs (OSS)
 - use contribution agreement like netfoundation
-
+  - https://github.com/cla-assistant/github-action
+  - https://github.com/cla-assistant/cla-assistant
+  - https://github.com/Roblox/cla-signature-bot
 - SLA for contributions
 
 

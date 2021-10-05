@@ -32,7 +32,7 @@ public partial class SimManager //tree management
 		{
 			__ERROR.Throw(_nodeRegistry.TryAdd(node.Name, node), $"A node with the same name of '{node.Name}' is already registered");
 			var result = _nodeRegistry.TryGetValue(node.ParentName, out parent);
-			__ERROR.Throw(result,$"Node registration failed.  Node '{node.Name}' parent of '{node.ParentName}' is not registered.");
+			__ERROR.Throw(result, $"Node registration failed.  Node '{node.Name}' parent of '{node.ParentName}' is not registered.");
 		}
 
 		parent.OnChildRegister(node);
@@ -86,17 +86,17 @@ public partial class SimManager //thread execution
 		//		}
 
 		//	}
-			_stats.Update(_targetFrameElapsed);
-			_frame = Frame.FromPool(_stats, _frame, this);
+		_stats.Update(_targetFrameElapsed);
+		_frame = Frame.FromPool(_stats, _frame, this);
 
 
-			await _frame.InitializeNodeGraph(_root);
+		await _frame.InitializeNodeGraph(_root);
 
-			await _frame.ExecuteNodeGraph();
+		await _frame.ExecuteNodeGraph();
 		// }
 
 
-		
+
 
 
 	}
@@ -115,7 +115,7 @@ public interface IIgnoreUpdate { }
 /// </summary>
 public class RootNode : SimNode, IIgnoreUpdate
 {
-	protected override Task Update(Frame frame, NodeFrameState nodeState)
+	protected override Task OnUpdate(Frame frame, NodeFrameState nodeState)
 	{
 		throw new Exception("This exception will never be thrown because this implements IIgnoreUpdate");
 	}
@@ -199,13 +199,13 @@ public abstract partial class SimNode   //tree logic
 		node.OnUnregister();
 	}
 
-	private void OnRegister(SimNode parent, SimManager manager)
+	protected virtual void OnRegister(SimNode parent, SimManager manager)
 	{
 		_parent = parent;
 		_manager = manager;
 	}
 
-	private void OnUnregister()
+	protected virtual void OnUnregister()
 	{
 		_parent = null;
 		_manager = null;
@@ -260,7 +260,7 @@ public abstract class FixedTimestepNode : SimNode
 	//}
 	private TimeSpan _nextRunOffset { get => _targetUpdateInterval / TargetFps * FrameOffset; }
 
-	private TimeSpan _intervalOffset=TimeSpan.Zero;
+	private TimeSpan _intervalOffset = TimeSpan.Zero;
 
 	internal override void OnFrameStarting(Frame frame, ICollection<SimNode> allNodesToUpdateInFrame)
 	{
@@ -272,17 +272,17 @@ public abstract class FixedTimestepNode : SimNode
 			return;
 		}
 		//run our node at a fixed interval, based on the target frame rate.  
-		if(frame._stats._wallTime >= _nextRunTime)
+		if (frame._stats._wallTime >= _nextRunTime)
 		{
 			var offset = _nextRunOffset;
-			_nextRunTime = offset + _nextRunTime._IntervalNext(_targetUpdateInterval) ;
+			_nextRunTime = offset + _nextRunTime._IntervalNext(_targetUpdateInterval);
 			if (frame._stats._wallTime >= _nextRunTime)
 			{
 				//we are running behind our target framerate.
 
 				frame._slowRunningNodes.Add(this);
-				var nextCatchupRunTime =offset+ frame._stats._wallTime._IntervalNext(_targetUpdateInterval) - (_targetUpdateInterval*CatchUpMaxFrames);
-				if(nextCatchupRunTime > _nextRunTime)
+				var nextCatchupRunTime = offset + frame._stats._wallTime._IntervalNext(_targetUpdateInterval) - (_targetUpdateInterval * CatchUpMaxFrames);
+				if (nextCatchupRunTime > _nextRunTime)
 				{
 					//further behind than our CatchUpMaxFrames so ignore missing updates beyond that.
 					_nextRunTime = nextCatchupRunTime;
@@ -314,11 +314,28 @@ public abstract partial class SimNode //update logic
 		//TODO:  store last updateTime metric, use this+children to estimate node priority (costly things run first!)  add out TimeSpan hiearchyLastElapsed
 		//TODO:  when doing that, maybe take the average of executions.   store in nodeState
 
-		//add this node to be executed this frame
-		allNodesToUpdateInFrame.Add(this);  //TODO: node filtering logic here based on FPS limiting, etc
+		if (IsDisabled != _isDisableCached)
+		{
+			_isDisableCached = IsDisabled;
+			if (IsDisabled)
+			{
+				OnDisabled_Phase0(frame);
+			}
+			else
+			{
+				OnEnabled_Phase0(frame);
+			}
+		}
 
+
+		if (IsDisabled == false)
+		{
+			//add this node to be executed this frame
+			allNodesToUpdateInFrame.Add(this);  //TODO: node filtering logic here based on FPS limiting, etc
+		}
 		foreach (var child in _children)
 		{
+			child.IsDisabled = IsDisabled;
 			child.OnFrameStarting(frame, allNodesToUpdateInFrame);
 		}
 
@@ -337,22 +354,50 @@ public abstract partial class SimNode //update logic
 			{
 				Initialize();
 			}
-			return Update(frame, nodeState);
+			return OnUpdate(frame, nodeState);
 		}
 		finally
 		{
-			
+
 		}
 	}
 
-	protected abstract Task Update(Frame frame, NodeFrameState nodeState);
+	protected abstract Task OnUpdate(Frame frame, NodeFrameState nodeState);
 
 
 
 	/// <summary> frame is totally done.  clean up anything created/stored for this frame </summary>
-	internal void OnFrameFinished(Frame frame)
+	internal virtual void OnFrameFinished(Frame frame)
 	{
 		//_frameStates.Remove(frame);
+	}
+
+	/// <summary>
+	/// helper to detect when enable/disable occurs
+	/// </summary>
+	private bool _isDisableCached;
+	/// <summary>
+	/// setting this cascades to all children in the <see cref="OnFrameStarting"/> method.  
+	/// If Disabled <see cref="OnUpdate"/> will not run.  
+	/// Also when this occurs, <see cref="OnDisabled_Phase0"/> or <see cref="OnEnabled_Phase0"/> will be triggered.
+	/// </summary>
+	public bool IsDisabled { get; set; }
+
+	/// <summary>
+	/// the node and all children are becomming disabled.  OnUpdate will not be called anymore
+	/// </summary>
+	/// <param name="frame"></param>
+	protected virtual void OnDisabled_Phase0(Frame frame)
+	{
+
+	}
+	/// <summary>
+	/// the node and all children are becomming enabled.   OnUpdate will resume being called every frame
+	/// </summary>
+	/// <param name="frame"></param>
+	protected virtual void OnEnabled_Phase0(Frame frame)
+	{
+
 	}
 
 
@@ -408,17 +453,23 @@ public abstract partial class SimNode : DisposeGuard, IComparable<SimNode> //fra
 
 	public bool IsInitialized { get; private set; }
 
-	/// <summary>
-	/// if your node has initialization steps, override this method, but be sure to call it's base.Initialize();
-	/// <para>If Initialize is not called by the first call to .Update(), initialize will be called automatically.</para>
-	/// </summary>
-	public virtual void Initialize()
+
+	internal void Initialize()
 	{
 		if (IsInitialized == true)
 		{
 			return;
 		}
-		IsInitialized= true;
+		IsInitialized = true;
+		OnInitialize();
+	}
+	/// <summary>
+	/// if your node has initialization steps, override this method, but be sure to call it's base.OnInitialize();
+	/// <para>If Initialize is not called by the first call to .Update(), initialize will be called automatically.</para>
+	/// </summary>
+	protected virtual void OnInitialize()
+	{
+
 	}
 }
 
@@ -519,7 +570,7 @@ public partial class Frame ////node graph setup and execution
 			//updateAfter
 			foreach (var afterName in node._updateAfter)
 			{
-				
+
 				if (!node.FindNode(afterName, out var afterNode))
 				{
 					__DEBUG.AssertOnce(false, $"'{afterName}' node is listed as an updateAfter dependency in '{node.GetHierarchyName()}' node.  target node not registered");

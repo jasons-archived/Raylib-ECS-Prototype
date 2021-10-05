@@ -166,7 +166,7 @@ public class MyClass<T>
 public class DebugPrint : SimNode
 {
 	private long avgMs = 0;
-	protected override async Task Update(Frame frame, NodeFrameState nodeState)
+	protected override async Task OnUpdate(Frame frame, NodeFrameState nodeState)
 	{
 		//if (frame._stats._frameId % 200 == 0)
 		{
@@ -193,7 +193,7 @@ public class TimestepNodeTest : FixedTimestepNode
 public class DelayTest : SimNode
 {
 	private Random _rand = new();
-	protected override async Task Update(Frame frame, NodeFrameState nodeState)
+	protected override async Task OnUpdate(Frame frame, NodeFrameState nodeState)
 	{
 		if (Name == "C")
 		{
