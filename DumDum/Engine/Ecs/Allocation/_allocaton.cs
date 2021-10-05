@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Numerics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -24,7 +25,7 @@ public readonly record struct EntityHandle : IComparable<EntityHandle>
 	/// </summary>
 	[FieldOffset(0)]
 	public readonly long _packValue;
-	
+
 	/// <summary>
 	/// can be used to access slot into the entityRegistry
 	/// </summary>
@@ -148,9 +149,18 @@ public class EntityRegistry
 		}
 	}
 
+	public void Get(Span<EntityHandle> handles, Span<AccessToken> output)
+	{
+		__ERROR.Throw(handles.Length == output.Length);
 
+		var storageArray = _storage._storage;
 
-
+		for (var i = 0; i < output.Length; i++)
+		{
+			var handle = handles[i];
+			output[i] = storageArray[handle.id].pageAccessToken;			
+		}
+	}
 }
 
 
@@ -236,6 +246,12 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 		var chunk = GetContainingChunk<TComponent>();
 		return ref chunk.GetReadRef(this);
 	}
+
+	internal Archetype GetArchetype()
+	{
+		return GetPage()._archetype;
+	}
+
 	/// <summary>
 	/// internal helper.   get the chunk this pageToken is mapped to for the given type
 	/// </summary>
@@ -259,7 +275,7 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 		//	}
 		//	return chunk;
 		//}
-
+		__CHECKED.Throw(Chunk<T>._GLOBAL_LOOKUP.Length > pageId && Chunk<T>._GLOBAL_LOOKUP[pageId] != null, $"column does not exist.  are you sure the TComponent type `{typeof(T).Name}` is registered with the entities archetype?");
 		var column = Chunk<T>._GLOBAL_LOOKUP[pageId];
 		__DEBUG.Throw(column.Count > slotRef.chunkIndex, "chunk doesn't exist");
 		var chunk = column._AsSpan_Unsafe()[slotRef.chunkIndex];
@@ -308,7 +324,12 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 	/// <returns></returns>
 	public int CompareTo(AccessToken other)
 	{
-		return slotRef.CompareTo(other.slotRef);
+		var toReturn = pageId.CompareTo(other.pageId);
+		if (toReturn == 0)
+		{
+			return slotRef.CompareTo(other.slotRef);
+		}
+		return toReturn;
 	}
 
 
@@ -405,7 +426,7 @@ public partial class Page //unit test
 {
 
 
-	public static async Task __TEST_Unit_ParallelPages(EntityRegistry entityRegistry,bool autoPack, int chunkSize, int entityCount, int pageCount, float batchSizeMultipler)
+	public static async Task __TEST_Unit_ParallelPages(EntityRegistry entityRegistry, bool autoPack, int chunkSize, int entityCount, int pageCount, float batchSizeMultipler)
 	{
 		__ERROR.Throw(entityRegistry.Count == 0);
 		//Console.WriteLine("start parallel");
@@ -478,7 +499,7 @@ public partial class Page //unit test
 
 	private static unsafe Page _TEST_HELPER_CreatePage(EntityRegistry entityRegistry)
 	{
-		var page = new Page(entityRegistry, __.Rand._NextBoolean(), __.Rand.Next(1, 100), new() { typeof(int), typeof(string) });
+		var page = new Page(__.Rand._NextBoolean(), __.Rand.Next(1, 100), new() { typeof(int), typeof(string) });
 		//{
 		//	AutoPack = __.Rand._NextBoolean(),
 		//	ChunkSize = __.Rand.Next(1, 100),
@@ -486,7 +507,7 @@ public partial class Page //unit test
 
 
 		//};
-		page.Initialize();
+		page.Initialize(null,entityRegistry);
 
 
 		var entityCount = __.Rand.Next(0, 1000);
@@ -508,11 +529,11 @@ public partial class Page //unit test
 		var tokens = tokensOwner.Span;
 		using var entitiesOwner = SpanGuard<EntityHandle>.Allocate(entityCount);
 		var entities = entitiesOwner.Span;
-		page.AllocEntityNew(tokens,entities);
+		page.AllocEntityNew(tokens, entities);
 		return page;
 	}
 
-	private static unsafe Page _TEST_HELPER_CreateAndEditPage(EntityRegistry entityRegistry , bool autoPack, int chunkSize, int entityCount)
+	private static unsafe Page _TEST_HELPER_CreateAndEditPage(EntityRegistry entityRegistry, bool autoPack, int chunkSize, int entityCount)
 	{
 
 		//MemoryOwner<EntityHandle> entityHandlesOwner;
@@ -520,7 +541,7 @@ public partial class Page //unit test
 		//HashSet<EntityHandle> oddSet;
 
 
-		var page = new Page(entityRegistry, autoPack, chunkSize, new() { typeof(int), typeof(string), typeof(bool) });
+		var page = new Page(autoPack, chunkSize, new() { typeof(int), typeof(Vector3), typeof(bool) });
 		//{
 		//	AutoPack = autoPack,
 		//	ChunkSize = chunkSize,
@@ -528,7 +549,7 @@ public partial class Page //unit test
 
 
 		//};
-		page.Initialize();
+		page.Initialize(null, entityRegistry);
 
 		//using var entityHandlesOwner = SpanPool<long>.Allocate(__.Rand.Next(0, 1000));
 		//var set = new HashSet<long>();
@@ -552,7 +573,7 @@ public partial class Page //unit test
 		var tokens = tokensOwner.Span;
 		using var entitiesOwner = SpanGuard<EntityHandle>.Allocate(entityCount);
 		var entities = entitiesOwner.Span;
-		page.AllocEntityNew(tokens,entities);
+		page.AllocEntityNew(tokens, entities);
 
 
 
@@ -573,10 +594,10 @@ public partial class Page //unit test
 			__ERROR.Throw(numRead == i + 1);
 
 
-			ref var myStr = ref token.GetComponentWriteRef<string>();
-			__ERROR.Throw(myStr == null);
-			myStr = $"hello {i}";
-			__ERROR.Throw(token.GetComponentReadRef<string>() == myStr);
+			//ref var myStr = ref token.GetComponentWriteRef<string>();
+			//__ERROR.Throw(myStr == null);
+			//myStr = $"hello {i}";
+			//__ERROR.Throw(token.GetComponentReadRef<string>() == myStr);
 
 
 			ref var numExId = ref token.GetComponentWriteRef<int>();
@@ -589,7 +610,7 @@ public partial class Page //unit test
 		var first = entities.Slice(0, entities.Length / 2);
 		var second = entities.Slice(entities.Length / 2);
 		//mark first group
-		for(var i=0;i<first.Length;i++)
+		for (var i = 0; i < first.Length; i++)
 		{
 
 			ref var isFirst = ref tokens[i].GetComponentWriteRef<bool>();
@@ -639,13 +660,13 @@ public partial class Page //unit test
 
 				var num = refreshedToken.GetComponentReadRef<int>();
 				__ERROR.Throw(num == (int)refreshedToken.entityHandle.id);
-				__ERROR.Throw(refreshedToken.GetComponentReadRef<string>().StartsWith("hello"));
-				i++;
+				//__ERROR.Throw(refreshedToken.GetComponentReadRef<string>().StartsWith("hello"));
+
 
 
 				var isFirst = refreshedToken.GetComponentReadRef<bool>();
 				__ERROR.Throw(isFirst == true);
-
+				i++;
 			}
 		}
 
@@ -674,7 +695,7 @@ public partial class Page //unit test
 			ref var numExId = ref pageToken.GetComponentWriteRef<int>();
 			__ERROR.Throw(numExId == 0, "we just wrote a new entity, old data should be blown away");
 			//__ERROR.Throw(pageToken.entityHandle.id % 2 == 1);
-			__ERROR.Throw(pageToken.GetComponentReadRef<string>() == null);
+			//__ERROR.Throw(pageToken.GetComponentReadRef<string>() == null);
 
 			var isFirst = pageToken.GetComponentReadRef<bool>();
 			__ERROR.Throw(isFirst == false);
@@ -914,16 +935,20 @@ public partial class Page : IDisposable //init logic
 	/// how many entities are stored in this Page
 	/// </summary>
 	public int Count { get => _entityLookup.Count; }
-	public Page(EntityRegistry entityRegistry, bool autoPack, int chunkSize, List<Type> componentTypes)
+	public Page(bool autoPack, int chunkSize, List<Type> componentTypes)
 	{
 		AutoPack = autoPack;
-		_entityRegistry = entityRegistry;
+		//_entityRegistry = entityRegistry;
 		ChunkSize = chunkSize;
 		ComponentTypes = componentTypes;
 	}
 
-	public void Initialize()
+	public Archetype _archetype;
+	public void Initialize(Archetype archetype, EntityRegistry entityRegistry)
 	{
+		_archetype = archetype;
+
+		_entityRegistry = entityRegistry;
 		//add self to global lookup
 		__ERROR.Throw(_pageId == -1, "why already set?");
 		var tempId = _GLOBAL_LOOKUP.AllocSlot();
@@ -1227,10 +1252,10 @@ public partial class Page  //alloc/free/pack logic
 	public int _packVersion = 0;
 	/// <summary>
 	/// entities registered with this page.  
-	/// <para>OBSOLETE: kind of expensive any maybe not so helpful?   can access all entities via entityManager, or all this page entitites by enumerating it's Column{EntityMeta}</para>
+	/// <para>OBSOLETE: kind of expensive any maybe not so helpful?   can access all entities via entityRegistry, or all this page entitites by enumerating it's Column{EntityMeta}</para>
 	/// </summary>
 	/// <remarks><para>given an entityHandle, find current token.  this allows decoupling our internal storage location from external callers, allowing packing.</para></remarks>
-	[Obsolete("kind of expensive any maybe not so helpful?   can access all entities via entityManager, or all this page entitites by enumerating it's Column<EntityMeta>")]
+	[Obsolete("kind of expensive any maybe not so helpful?   can access all entities via entityRegistry, or all this page entitites by enumerating it's Column<EntityMeta>")]
 	public Dictionary<long, AccessToken> _entityLookup = new();
 
 	/// <summary>
@@ -1478,7 +1503,7 @@ public partial class Page  //alloc/free/pack logic
 	/// </summary>
 	public unsafe void Free(Span<EntityHandle> entityHandles)
 	{
-		__CHECKED.AssertOnce(entityHandles._IsSorted(), "should sort entityHandles before Free, for optimal performance");
+		//__CHECKED.AssertOnce(entityHandles._IsSorted(), "should sort entityHandles before Free, for optimal performance");
 
 
 		using var so_PageAccessTokens = SpanGuard<AccessToken>.Allocate(entityHandles.Length);

@@ -8,7 +8,8 @@ namespace DumDum.Bcl;
 
 public delegate ref T Func_Ref<T>();
 public delegate void Action_Span<T>(Span<T> span);
-public delegate void Action_RoSpan<T>(ReadOnlySpan<T> span);
+public delegate void Action_RoSpan<TSpan>(ReadOnlySpan<TSpan> span);
+public delegate void Action_RoSpan<TSpan,TArg>(ReadOnlySpan<TSpan> span, TArg arg);
 
 
 

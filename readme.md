@@ -20,11 +20,15 @@
   - [Git Repository](#git-repository)
 - [testing and verificaiton](#testing-and-verificaiton)
   - [unsafe code verification](#unsafe-code-verification)
-- [notes / scratch stuff below...](#notes--scratch-stuff-below)
-    - [feature notes](#feature-notes)
     - [c# tricks/notes/perf](#c-tricksnotesperf)
 - [TODO:](#todo)
 - [issues](#issues)
+- [notes / scratch stuff below...](#notes--scratch-stuff-below)
+  - [feature notes](#feature-notes)
+  - [other private notes/scratch](#other-private-notesscratch)
+  - [oss community notes](#oss-community-notes)
+    - [funding](#funding)
+    - [important feature needs:](#important-feature-needs)
 
 # DumDum?
 A codename?
@@ -261,12 +265,13 @@ Logical object structure is
 - online codepen:
   - https://sharplab.io/
 - linq: https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/linq/
+   - https://github.com/jackmott/LinqFaster
 - plinq: https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/introduction-to-plinq
 - ascii drawing tools: https://asciiflow.com/#/
 - github contributions CLA assistant:  https://github.com/cla-assistant/cla-assistant
 - - dotnet API browser: https://source.dot.net/#System.Private.CoreLib/List.cs,39
-- shaders
-   - https://github.com/lettier/3d-game-shaders-for-beginners	  
+- serialization: https://github.com/neuecc/MessagePack-CSharp
+- 
 ## other private notes/scratch
 
 - ecs system example

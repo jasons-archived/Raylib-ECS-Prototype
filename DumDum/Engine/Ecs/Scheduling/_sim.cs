@@ -37,7 +37,6 @@ public partial class SimManager //tree management
 
 		parent.OnChildRegister(node);
 
-
 	}
 
 
@@ -124,7 +123,7 @@ public class RootNode : SimNode, IIgnoreUpdate
 /// <summary>
 /// A node holds logic in it's <see cref="Update(Frame)"/> method that is executed in parallel with other Simnodes.  See <see cref="SimManager"/> for detail.
 /// </summary>
-public abstract partial class SimNode  //tree logic
+public abstract partial class SimNode   //tree logic
 {
 	public string Name { get; init; }
 	public string ParentName { get; init; }
@@ -334,6 +333,10 @@ public abstract partial class SimNode //update logic
 	{
 		try
 		{
+			if (IsInitialized == false)
+			{
+				Initialize();
+			}
 			return Update(frame, nodeState);
 		}
 		finally
@@ -389,6 +392,34 @@ public abstract partial class SimNode : DisposeGuard, IComparable<SimNode> //fra
 	/// <para>Nodes with write access to a key will run seperate from any other node using the same resource (Read or Write)</para>
 	/// </summary>
 	public List<object> _writeResources = new();
+
+
+	protected override void OnDispose()
+	{
+		foreach (var child in _children)
+		{
+			if (child.IsDisposed == false)
+			{
+				child.Dispose();
+			}
+		}
+		base.OnDispose();
+	}
+
+	public bool IsInitialized { get; private set; }
+
+	/// <summary>
+	/// if your node has initialization steps, override this method, but be sure to call it's base.Initialize();
+	/// <para>If Initialize is not called by the first call to .Update(), initialize will be called automatically.</para>
+	/// </summary>
+	public virtual void Initialize()
+	{
+		if (IsInitialized == true)
+		{
+			return;
+		}
+		IsInitialized= true;
+	}
 }
 
 
