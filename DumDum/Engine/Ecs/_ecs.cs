@@ -38,7 +38,7 @@ public delegate void EntityCreateCallback(Archetype archetype, ReadOnlySpan<Enti
 
 public abstract class SystemBase : Sim.FixedTimestepNode
 {
-	protected override Task Update(Frame frame, NodeFrameState nodeState)
+	protected override Task OnUpdate(Frame frame, NodeFrameState nodeState)
 	{
 		return Update();
 
@@ -71,7 +71,6 @@ public partial class EntityManager //archetype management
 	//TODO: make adding archetypes threadsafe
 	//TODO: make racecheck versions of all collections
 
-	public HashSet<Archetype> _archetypes = new();
 
 	//public Dictionary<long, List<Archetype>> _archetypeLookup = new();
 
@@ -80,7 +79,10 @@ public partial class EntityManager //archetype management
 	/// helper for finding archetypes by components
 	/// </summary>
 	public ArchetypeFinder _lookup = new();
-
+	/// <summary>
+	/// increments when archetypes are added/removed, signaling queries are invalidated.
+	/// </summary>
+	public int _version { get => _lookup._version; }
 
 	/// <summary>
 	/// helper for finding archetypes by components.   use via <see cref="_lookup"/>
@@ -88,9 +90,11 @@ public partial class EntityManager //archetype management
 	public class ArchetypeFinder
 	{
 		//public List<Archetype> _archetypes = new();
+		public HashSet<Archetype> _archetypes = new();
 
 		public Dictionary<long, List<Archetype>> _storage = new();
 
+		public int _version;
 
 		public void Add(Archetype archetype)
 		{
@@ -99,7 +103,7 @@ public partial class EntityManager //archetype management
 			if (!_storage.TryGetValue(checkHash, out var list))
 			{
 				list = new();
-				_storage.Add(checkHash, list);
+				_storage.Add(checkHash, list);				
 			}
 			__ERROR.Throw(list.Contains(archetype) == false, "already contains");
 			__DEBUG.Assert(list.Count == 0, "we have an archetype checkHash collision.  this is expected to be very rare so investigate.  the design supports this though");
@@ -111,6 +115,8 @@ public partial class EntityManager //archetype management
 			__ERROR.Throw(archetype.IsInitialized, "archetype should be initialized before adding to lookup.");
 
 			list.Add(archetype);
+			_archetypes.Add(archetype);
+			_version++;
 		}
 
 		public void Remove(Archetype archetype)
@@ -123,6 +129,7 @@ public partial class EntityManager //archetype management
 			{
 				_storage.Remove(hash);
 			}
+			_version++;
 		}
 
 		public long GetCheckHash(Archetype archetype)
@@ -164,6 +171,25 @@ public partial class EntityManager //archetype management
 			}
 			archetype = null;
 			return false;
+		}
+
+		[ThreadStatic]
+		private List<Archetype> _queryTemp = new();
+		public MemoryOwner<Archetype> Query<TC1>()
+		{
+			__DEBUG.Throw(_queryTemp.Count == 0);
+			foreach(var archetype in _archetypes)
+			{
+				if (archetype._componentTypes.Contains(typeof(TC1)))
+				{
+					_queryTemp.Add(archetype);
+				}
+			}
+			var toReturn = MemoryOwner<Archetype>.Allocate(_queryTemp.Count);
+			_queryTemp.CopyTo(toReturn.DangerousGetArray().Array);
+			_queryTemp.Clear();
+			return toReturn;
+			
 		}
 
 	}
@@ -316,6 +342,69 @@ public partial class EntityManager //entity creation
 	}
 }
 
+public partial class EntityManager //entity query
+{
+}
+public delegate void SelectCallback<TC1>(Span<AccessToken> tokens, Span<TC1> c1);
+public struct EntityQuery 
+{
+	private EntityManager _entityManager;
+	private int _entityManagerVersion;
+	public MemoryOwner<Archetype> _archetypesCache;
+
+	/// <summary>
+	/// archetypes have been added/removed from the EntityManager.  This query needs to be redone.
+	/// </summary>
+	public bool IsOutOfDate { get => _entityManagerVersion != _entityManager._version; }
+
+
+	public EntityQuery RefineQuery<TC1>(SelectCallback<TC1> callback)
+	{
+		return RefineQuery<TC1>();
+		
+	}
+
+	asdfasdfljalskjf
+		  //todo tomorrow:  allow easy EntityQuery workflow for single query, allow refined queries to avoid computorial explosion
+
+	[ThreadStatic]
+	private static List<Archetype> _queryTemp = new();
+	public EntityQuery RefineQuery<TC1>()
+	{
+		__ERROR.Throw(IsOutOfDate == false, "archetypes have been added/removed from the EntityManager.  This query needs to be redone.");
+
+		__DEBUG.Throw(_queryTemp.Count == 0);
+		foreach (var archetype in _archetypesCache.Span)
+		{
+			if (archetype._componentTypes.Contains(typeof(TC1)))
+			{
+				_queryTemp.Add(archetype);
+			}
+		}
+		var toReturn = MemoryOwner<Archetype>.Allocate(_queryTemp.Count);
+		_queryTemp.CopyTo(toReturn.DangerousGetArray().Array);
+		_queryTemp.Clear();
+
+		return this with { _archetypesCache = toReturn };
+
+
+
+	}
+
+
+
+	public async Task Select<TC1>(SelectCallback<TC1> callback)
+	{
+		if(_archetypesCache == null)
+		{
+			RefineQuery(callback);
+		}
+		//get all matching archetypes
+		_lookup.Query<TC1>()
+
+
+	}
+}
 
 public partial class Archetype : DisposeGuard //initialization
 {
