@@ -178,7 +178,7 @@ public class DebugPrint : SimNode
 public class TimestepNodeTest : FixedTimestepNode
 {
 
-	protected override async Task Update(Frame frame, NodeFrameState nodeState)
+	protected override async Task OnUpdate(Frame frame, NodeFrameState nodeState)
 	{
 		await Task.Delay(0);
 		//Console.WriteLine("WHUT");

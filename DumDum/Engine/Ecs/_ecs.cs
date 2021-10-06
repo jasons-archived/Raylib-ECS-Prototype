@@ -7,11 +7,14 @@ using Microsoft.Toolkit.HighPerformance.Buffers;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+
+
 
 namespace DumDum.Engine.Ecs;
 
@@ -50,15 +53,40 @@ public abstract class SystemBase : Sim.FixedTimestepNode
 
 }
 
+public class AccessGuard
+{
+	//TODO: Read/Write sentinels should just track when reads/writes are permitted.
+	//if they occur outside of those times, assert.   This way we don't need to track who does all writes.
+	private EntityManager _entityManager;
+
+	public AccessGuard(EntityManager entityManager)
+	{
+		this._entityManager = entityManager;
+	}
+	[Conditional("DEBUG")]
+	public void ReadNotify<TComponent>() { }
+	[Conditional("DEBUG")]
+	public void WriteNotify<TComponent>() { }
+
+
+
+}
 public partial class EntityManager : SystemBase //init / setup
 {
 	public EntityRegistry _entityRegistry = new();
+	public AccessGuard _accessGuard;
 
+	protected override void OnInitialize()
+	{
+		base.OnInitialize();
+		_accessGuard = new AccessGuard(this);
+	}
 	protected override void OnDispose()
 	{
+		_lookup.Dispose();
 		_lookup = null;
-		_archetypes.Clear();
-		_archetypes = null;
+		//_archetypes.Clear();
+		//_archetypes = null;
 		base.OnDispose();
 	}
 }
@@ -96,6 +124,18 @@ public partial class EntityManager //archetype management
 
 		public int _version;
 
+		public void Dispose()
+		{
+			_archetypes.Clear();
+			_archetypes = null;
+			foreach (var (hash, list) in _storage)
+			{
+				list.Clear();
+			}
+			_storage.Clear();
+			_storage = null;
+		}
+
 		public void Add(Archetype archetype)
 		{
 			//__CHECKED.Throw(_archetypes.Contains(archetype) == false, "why already added");
@@ -103,14 +143,14 @@ public partial class EntityManager //archetype management
 			if (!_storage.TryGetValue(checkHash, out var list))
 			{
 				list = new();
-				_storage.Add(checkHash, list);				
+				_storage.Add(checkHash, list);
 			}
 			__ERROR.Throw(list.Contains(archetype) == false, "already contains");
 			__DEBUG.Assert(list.Count == 0, "we have an archetype checkHash collision.  this is expected to be very rare so investigate.  the design supports this though");
 
 			foreach (var other in list)
 			{
-				__ERROR.Throw(other._componentTypes._IsIdentical(archetype._componentTypes) == false, "can not add archetype that manages identical components");
+				__ERROR.Throw(other._componentTypes.SetEquals(archetype._componentTypes) == false, "can not add archetype that manages identical components");
 			}
 			__ERROR.Throw(archetype.IsInitialized, "archetype should be initialized before adding to lookup.");
 
@@ -136,7 +176,7 @@ public partial class EntityManager //archetype management
 		{
 			return GetCheckHash(archetype._componentTypes);
 		}
-		public long GetCheckHash(List<Type> types)
+		public long GetCheckHash(IEnumerable<Type> types)
 		{
 			long checkHash = 0;
 			foreach (var type in types)
@@ -146,7 +186,7 @@ public partial class EntityManager //archetype management
 			return checkHash;
 		}
 
-		public bool TryGetArchetype(List<Type> componentTypes, out Archetype archetype)
+		public bool TryGetArchetype(HashSet<Type> componentTypes, out Archetype archetype)
 		{
 			__ERROR.AssertOnce(false, "todo: change List of componentTypes to something better performant");
 			var checkHash = GetCheckHash(componentTypes);
@@ -163,7 +203,7 @@ public partial class EntityManager //archetype management
 			//if here, there is a checkHash collision, so multiple items in list need to be picked from
 			foreach (var potential in list)
 			{
-				if (potential._componentTypes._IsIdentical(componentTypes))
+				if (potential._componentTypes.SetEquals(componentTypes))
 				{
 					archetype = potential;
 					return true;
@@ -173,34 +213,34 @@ public partial class EntityManager //archetype management
 			return false;
 		}
 
-		[ThreadStatic]
-		private List<Archetype> _queryTemp = new();
-		public MemoryOwner<Archetype> Query<TC1>()
-		{
-			__DEBUG.Throw(_queryTemp.Count == 0);
-			foreach(var archetype in _archetypes)
-			{
-				if (archetype._componentTypes.Contains(typeof(TC1)))
-				{
-					_queryTemp.Add(archetype);
-				}
-			}
-			var toReturn = MemoryOwner<Archetype>.Allocate(_queryTemp.Count);
-			_queryTemp.CopyTo(toReturn.DangerousGetArray().Array);
-			_queryTemp.Clear();
-			return toReturn;
-			
-		}
+		//[ThreadStatic]
+		//private List<Archetype> _queryTemp = new();
+		//public MemoryOwner<Archetype> Query<TC1>()
+		//{
+		//	__DEBUG.Throw(_queryTemp.Count == 0);
+		//	foreach (var archetype in _archetypes)
+		//	{
+		//		if (archetype._componentTypes.Contains(typeof(TC1)))
+		//		{
+		//			_queryTemp.Add(archetype);
+		//		}
+		//	}
+		//	var toReturn = MemoryOwner<Archetype>.Allocate(_queryTemp.Count);
+		//	_queryTemp.CopyTo(toReturn.DangerousGetArray().Array);
+		//	_queryTemp.Clear();
+		//	return toReturn;
+
+		//}
 
 	}
 
 
-	public Archetype GetOrCreateArchetype(string name, List<Type> componentTypes)
+	public Archetype GetOrCreateArchetype(string name, HashSet<Type> componentTypes)
 	{
 		if (!_lookup.TryGetArchetype(componentTypes, out var archetype))
 		{
 			archetype = new Archetype(name, componentTypes);
-			archetype.Initialize(_entityRegistry);
+			archetype.Initialize(this,_entityRegistry);
 			_lookup.Add(archetype);
 		}
 
@@ -218,7 +258,7 @@ public partial class EntityManager //archetype management
 		}
 		if (archetype.IsInitialized == false)
 		{
-			archetype.Initialize(_entityRegistry);
+			archetype.Initialize(this,_entityRegistry);
 		}
 		_lookup.Add(archetype);
 		return true;
@@ -344,67 +384,406 @@ public partial class EntityManager //entity creation
 
 public partial class EntityManager //entity query
 {
+	/// <summary>
+	/// create a query to efficiently loop through entities and their components
+	/// </summary>
+	/// <param name="options"></param>
+	/// <returns></returns>
+	public EntityQuery Query(QueryOptions options)
+	{
+		var toReturn = new EntityQuery(this, options);
+		toReturn.RefreshQuery();
+		return toReturn;
+	}
 }
-public delegate void SelectCallback<TC1>(Span<AccessToken> tokens, Span<TC1> c1);
-public struct EntityQuery 
+
+
+public delegate void SelectRangeCallback_R<TC1>(ReadMem<EntityMetadata> meta, ReadMem<TC1> c1);
+public delegate void SelectRangeCallback_W<TC1>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1);
+public delegate void SelectRangeCallback_RR<TC1, TC2>(ReadMem<EntityMetadata> meta, ReadMem<TC1> c1, ReadMem<TC2> c2);
+public delegate void SelectRangeCallback_WR<TC1, TC2>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1, ReadMem<TC2> c2);
+public delegate void SelectRangeCallback_WW<TC1, TC2>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1, WriteMem<TC2> c2);
+public delegate void SelectRangeCallback_RRR<TC1, TC2, TC3>(ReadMem<EntityMetadata> meta, ReadMem<TC1> c1, ReadMem<TC2> c2, ReadMem<TC3> c3);
+public delegate void SelectRangeCallback_WRR<TC1, TC2, TC3>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1, ReadMem<TC2> c2, ReadMem<TC3> c3);
+public delegate void SelectRangeCallback_WWR<TC1, TC2, TC3>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1, WriteMem<TC2> c2, ReadMem<TC3> c3);
+public delegate void SelectRangeCallback_WWW<TC1, TC2, TC3>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1, WriteMem<TC2> c2, WriteMem<TC3> c3);
+public delegate void SelectRangeCallback_RRRR<TC1, TC2, TC3, TC4>(ReadMem<EntityMetadata> meta, ReadMem<TC1> c1, ReadMem<TC2> c2, ReadMem<TC3> c3, ReadMem<TC4> c4);
+public delegate void SelectRangeCallback_WRRR<TC1, TC2, TC3, TC4>(ReadMem<EntityMetadata> meta, ReadMem<TC1> c1, ReadMem<TC2> c2, ReadMem<TC3> c3, ReadMem<TC4> c4);
+public delegate void SelectRangeCallback_WWRR<TC1, TC2, TC3, TC4>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1, ReadMem<TC2> c2, ReadMem<TC3> c3, ReadMem<TC4> c4);
+public delegate void SelectRangeCallback_WWWR<TC1, TC2, TC3, TC4>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1, ReadMem<TC2> c2, WriteMem<TC3> c3, ReadMem<TC4> c4);
+public delegate void SelectRangeCallback_WWWW<TC1, TC2, TC3, TC4>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1, ReadMem<TC2> c2, WriteMem<TC3> c3, WriteMem<TC4> c4);
+
+
+/// <summary>
+/// filtering criteria to narrow down an EntityQuery
+/// </summary>
+public class QueryOptions
 {
-	private EntityManager _entityManager;
-	private int _entityManagerVersion;
-	public MemoryOwner<Archetype> _archetypesCache;
+	/// <summary>
+	/// as long as one or more of these components exist on an archetype, it (all it's entities) are included in the query.  otherwise the archetype is rejected.
+	/// </summary>
+	public HashSet<Type> Any { get; set; } = new();
+	/// <summary>
+	/// all of these components must exist on an archetype, otherwise the archetype (all it's entities) are rejected from the query.
+	/// </summary>
+	public HashSet<Type> All { get; set; } = new();
+	/// <summary>
+	/// If any of the specified Component Types are included on an archetype, that archetype (all it's entities) are rejected from this query.
+	/// </summary>
+	public HashSet<Type> None { get; set; } = new();
+	/// <summary>
+	/// an optional delegate to let you add/remove archetypes from the query.
+	/// </summary>
+
+	public Action<List<Archetype>> custom;
+	/// <summary>
+	/// default is false.   Set to True to disable the automatic requery when archetypes are added/removed from the world.
+	/// Setting to false means that when archetypes are added that match your query, they won't be included until you Manually Refresh.
+	/// </summary>
+	public bool DisableAutoRefresh { get; set; }
+
+	public QueryOptions() { }
+	public QueryOptions(QueryOptions cloneFrom) {
+		Any.UnionWith(cloneFrom.Any);
+		All.UnionWith(cloneFrom.All);
+		None.UnionWith(cloneFrom.None);
+		custom = cloneFrom.custom;
+		DisableAutoRefresh = cloneFrom.DisableAutoRefresh;
+	}
+
+
+}
+
+public class EntityQuery
+{
+	internal EntityManager _entityManager;
+	internal int _entityManagerVersion = -1;
+	/// <summary>
+	/// archetypes matching our query
+	/// </summary>
+	public List<Archetype> archetypes;
 
 	/// <summary>
-	/// archetypes have been added/removed from the EntityManager.  This query needs to be redone.
+	/// archetypes have been added/removed from the EntityManager.  This query needs to be refreshed to pick up changes.
 	/// </summary>
 	public bool IsOutOfDate { get => _entityManagerVersion != _entityManager._version; }
 
 
-	public EntityQuery RefineQuery<TC1>(SelectCallback<TC1> callback)
+	public QueryOptions _options;
+
+	public EntityQuery(EntityManager entityManager, QueryOptions options)
 	{
-		return RefineQuery<TC1>();
-		
+		_entityManager = entityManager;
+		archetypes = new(entityManager._lookup._archetypes);
+		_options = options;
 	}
 
-	asdfasdfljalskjf
-		  //todo tomorrow:  allow easy EntityQuery workflow for single query, allow refined queries to avoid computorial explosion
-
-	[ThreadStatic]
-	private static List<Archetype> _queryTemp = new();
-	public EntityQuery RefineQuery<TC1>()
+	public EntityQuery(EntityQuery cloneFrom)
 	{
-		__ERROR.Throw(IsOutOfDate == false, "archetypes have been added/removed from the EntityManager.  This query needs to be redone.");
+		_entityManager = cloneFrom._entityManager;
+		archetypes = new(cloneFrom.archetypes);
+		_options = new(cloneFrom._options);
+	}
 
-		__DEBUG.Throw(_queryTemp.Count == 0);
-		foreach (var archetype in _archetypesCache.Span)
+
+
+	public void RefreshQuery()
+	{
+		archetypes.Clear();
+		archetypes.AddRange(_entityManager._lookup._archetypes);
+		_entityManagerVersion = _entityManager._version;
+
+
+		for (var i = archetypes.Count - 1; i >= 0; i--)
 		{
-			if (archetype._componentTypes.Contains(typeof(TC1)))
+			var archetype = archetypes[i];
+			var toRemove = false;
+			//apply option filters
+			if (_options.All != null && _options.All.Count > 0 && archetype._componentTypes.IsSupersetOf(_options.All) == false)
 			{
-				_queryTemp.Add(archetype);
+				toRemove = true;
+			}
+			else if (_options.None != null && _options.None.Count>0 && archetype._componentTypes.Overlaps(_options.None))
+			{
+				toRemove = true;
+			}
+			else if (_options.Any != null && _options.Any.Count>0 && archetype._componentTypes.Overlaps(_options.Any) != true)
+			{
+				toRemove = true;
+			}
+			if (toRemove)
+			{
+				archetypes.RemoveAt(i);
 			}
 		}
-		var toReturn = MemoryOwner<Archetype>.Allocate(_queryTemp.Count);
-		_queryTemp.CopyTo(toReturn.DangerousGetArray().Array);
-		_queryTemp.Clear();
-
-		return this with { _archetypesCache = toReturn };
-
-
-
-	}
-
-
-
-	public async Task Select<TC1>(SelectCallback<TC1> callback)
-	{
-		if(_archetypesCache == null)
+		//apply option custom callback
+		if (_options.custom != null)
 		{
-			RefineQuery(callback);
+			_options.custom(archetypes);
 		}
-		//get all matching archetypes
-		_lookup.Query<TC1>()
+	}
+	private void _TryAutoRefresh()
+	{
+		if (IsOutOfDate && _options.DisableAutoRefresh != true)
+		{
+			RefreshQuery();
+		}
+	}
 
+	public int Count()
+	{
+		_TryAutoRefresh();
+
+		var toReturn = 0;
+
+
+		//for all our archetypes, get the columns requested
+		foreach (var archetype in archetypes)
+		{
+			toReturn += archetype.Count;
+
+		}
+		return toReturn;
+	}
+
+	private void _ReadNotify<TC>()
+	{
+		_entityManager._accessGuard.ReadNotify<TC>();
+	}
+	private void _WriteNotify<TC>()
+	{
+		_entityManager._accessGuard.WriteNotify<TC>();
+	}
+
+	#region //////////////////    SelectQuery   ///////////////////////////////////////////////////////////
+
+	/// <summary>
+	/// helper to find chunks for the SelectRange methods
+	/// </summary>
+	private void _SelectRangeHelper<TC1>(Action<Chunk<EntityMetadata>, Chunk<TC1>> helperCallback)
+	{
+		_TryAutoRefresh();
+
+		//for all our archetypes, get the columns requested
+		foreach (var archetype in archetypes)
+		{
+			if (archetype.IsDisposed)
+			{
+				continue;
+			}
+			var page = archetype._page;
+			var entityMetaCol = page.GetColumn<EntityMetadata>();
+
+			for (var i = 0; i < entityMetaCol.Count; i++)
+			{
+				helperCallback(
+					entityMetaCol[i] as Chunk<EntityMetadata>
+					, page.GetColumn<TC1>()[i] as Chunk<TC1>
+					);
+			}
+		}
+	}
+
+	/// <summary>
+	/// helper to find chunks for the SelectRange methods
+	/// </summary>
+	private void _SelectRangeHelper<TC1, TC2>(Action<Chunk<EntityMetadata>, Chunk<TC1>, Chunk<TC2>> helperCallback)
+	{
+		_TryAutoRefresh();
+
+		//for all our archetypes, get the columns requested
+		foreach (var archetype in archetypes)
+		{
+			if (archetype.IsDisposed)
+			{
+				continue;
+			}
+			var page = archetype._page;
+			var entityMetaCol = page.GetColumn<EntityMetadata>();
+
+			for (var i = 0; i < entityMetaCol.Count; i++)
+			{
+				helperCallback(
+					entityMetaCol[i] as Chunk<EntityMetadata>
+					, page.GetColumn<TC1>()[i] as Chunk<TC1>
+					, page.GetColumn<TC2>()[i] as Chunk<TC2>
+					);
+			}
+		}
+	}
+	/// <summary>
+	/// helper to find chunks for the SelectRange methods
+	/// </summary>
+	private void _SelectRangeHelper<TC1, TC2, TC3>(Action<Chunk<EntityMetadata>, Chunk<TC1>, Chunk<TC2>, Chunk<TC3>> helperCallback)
+	{
+		_TryAutoRefresh();
+
+		//for all our archetypes, get the columns requested
+		foreach (var archetype in archetypes)
+		{
+			if (archetype.IsDisposed)
+			{
+				continue;
+			}
+			var page = archetype._page;
+			var entityMetaCol = page.GetColumn<EntityMetadata>();
+
+			for (var i = 0; i < entityMetaCol.Count; i++)
+			{
+				helperCallback(
+					entityMetaCol[i] as Chunk<EntityMetadata>
+					, page.GetColumn<TC1>()[i] as Chunk<TC1>
+					, page.GetColumn<TC2>()[i] as Chunk<TC2>
+					, page.GetColumn<TC3>()[i] as Chunk<TC3>
+					);
+			}
+		}
+	}
+	/// <summary>
+	/// helper to find chunks for the SelectRange methods
+	/// </summary>
+	private void _SelectRangeHelper<TC1, TC2, TC3, TC4>(Action<Chunk<EntityMetadata>, Chunk<TC1>, Chunk<TC2>, Chunk<TC3>, Chunk<TC4>> helperCallback)
+	{
+		_TryAutoRefresh();
+
+		//for all our archetypes, get the columns requested
+		foreach (var archetype in archetypes)
+		{
+			if (archetype.IsDisposed)
+			{
+				continue;
+			}
+			var page = archetype._page;
+			var entityMetaCol = page.GetColumn<EntityMetadata>();
+
+			for (var i = 0; i < entityMetaCol.Count; i++)
+			{
+				helperCallback(
+					entityMetaCol[i] as Chunk<EntityMetadata>
+					, page.GetColumn<TC1>()[i] as Chunk<TC1>
+					, page.GetColumn<TC2>()[i] as Chunk<TC2>
+					, page.GetColumn<TC3>()[i] as Chunk<TC3>
+					, page.GetColumn<TC4>()[i] as Chunk<TC4>
+					);
+			}
+		}
+	}
+	public void SelectRange<TC1>(SelectRangeCallback_R<TC1> callback)
+	{
+		_ReadNotify<TC1>();
+
+		_SelectRangeHelper<TC1>((meta, c1) => callback(
+			ReadMem.Allocate(meta._storage)
+			, ReadMem.Allocate(c1._storage)
+			));
+	}
+
+	public void SelectRange<TC1>(SelectRangeCallback_W<TC1> callback)
+	{
+		_WriteNotify<TC1>();
+
+		_SelectRangeHelper<TC1>((meta, c1) =>
+		{
+			callback(
+				ReadMem.Allocate(meta._storage)
+				, WriteMem.Allocate(c1._storage)
+				);
+		});
 
 	}
+
+
+	public void SelectRange<TC1, TC2>(SelectRangeCallback_RR<TC1, TC2> callback)
+	{
+
+		_ReadNotify<TC1>();
+		_ReadNotify<TC2>();
+
+		_SelectRangeHelper<TC1, TC2>((meta, c1, c2) => callback(
+			ReadMem.Allocate(meta._storage)
+			, ReadMem.Allocate(c1._storage)
+			, ReadMem.Allocate(c2._storage)
+			));
+	}
+	public void SelectRange<TC1, TC2>(SelectRangeCallback_WR<TC1, TC2> callback)
+	{
+		_WriteNotify<TC1>();
+		_ReadNotify<TC2>();
+
+		_SelectRangeHelper<TC1, TC2>((meta, c1, c2) => callback(
+			ReadMem.Allocate(meta._storage)
+			, WriteMem.Allocate(c1._storage)
+			, ReadMem.Allocate(c2._storage)
+			));
+	}
+	public void SelectRange<TC1, TC2>(SelectRangeCallback_WW<TC1, TC2> callback)
+	{
+		_WriteNotify<TC1>();
+		_WriteNotify<TC2>();
+
+		_SelectRangeHelper<TC1, TC2>((meta, c1, c2) => callback(
+			ReadMem.Allocate(meta._storage)
+			, WriteMem.Allocate(c1._storage)
+			, WriteMem.Allocate(c2._storage)
+			));
+	}
+
+	public void SelectRange<TC1, TC2, TC3>(SelectRangeCallback_RRR<TC1, TC2, TC3> callback)
+	{
+		_ReadNotify<TC1>();
+		_ReadNotify<TC2>();
+		_ReadNotify<TC3>();
+
+		_SelectRangeHelper<TC1, TC2, TC3>((meta, c1, c2, c3) => callback(
+			ReadMem.Allocate(meta._storage)
+			, ReadMem.Allocate(c1._storage)
+			, ReadMem.Allocate(c2._storage)
+			, ReadMem.Allocate(c3._storage)
+			));
+	}
+	public void SelectRange<TC1, TC2, TC3>(SelectRangeCallback_WRR<TC1, TC2, TC3> callback)
+	{
+		_WriteNotify<TC1>();
+		_ReadNotify<TC2>();
+		_ReadNotify<TC3>();
+
+		_SelectRangeHelper<TC1, TC2, TC3>((meta, c1, c2, c3) => callback(
+			ReadMem.Allocate(meta._storage)
+			, WriteMem.Allocate(c1._storage)
+			, ReadMem.Allocate(c2._storage)
+			, ReadMem.Allocate(c3._storage)
+			));
+	}
+	public void SelectRange<TC1, TC2, TC3>(SelectRangeCallback_WWR<TC1, TC2, TC3> callback)
+	{
+		_WriteNotify<TC1>();
+		_WriteNotify<TC2>();
+		_ReadNotify<TC3>();
+
+		_SelectRangeHelper<TC1, TC2, TC3>((meta, c1, c2, c3) => callback(
+			ReadMem.Allocate(meta._storage)
+			, WriteMem.Allocate(c1._storage)
+			, WriteMem.Allocate(c2._storage)
+			, ReadMem.Allocate(c3._storage)
+			));
+	}
+	public void SelectRange<TC1, TC2, TC3>(SelectRangeCallback_WWW<TC1, TC2, TC3> callback)
+	{
+		_WriteNotify<TC1>();
+		_WriteNotify<TC2>();
+		_WriteNotify<TC3>();
+
+		_SelectRangeHelper<TC1, TC2, TC3>((meta, c1, c2, c3) => callback(
+			ReadMem.Allocate(meta._storage)
+			, WriteMem.Allocate(c1._storage)
+			, WriteMem.Allocate(c2._storage)
+			, WriteMem.Allocate(c3._storage)
+			));
+	}
+
+	#endregion SelectQuery
 }
+
 
 public partial class Archetype : DisposeGuard //initialization
 {
@@ -415,14 +794,15 @@ public partial class Archetype : DisposeGuard //initialization
 	public short ArchtypeId { get => _page._pageId; }
 	public int Version { get => _page._version; }
 
-	public List<Type> _componentTypes;
+	public HashSet<Type> _componentTypes;
 	public string Name { get; set; }
 
 	public bool AutoPack { get; init; } = true;
 	public int ChunkSize { get; init; } = 10000;
 
 	private EntityRegistry _entityRegistry;
-	public Archetype(string name, List<Type> componentTypes)
+	public EntityManager _entityManager;
+	public Archetype(string name, HashSet<Type> componentTypes)
 	{
 		Name = name;
 		_componentTypes = componentTypes;
@@ -432,17 +812,19 @@ public partial class Archetype : DisposeGuard //initialization
 	//internal Task _initTask;
 
 	public bool IsInitialized { get; private set; }
-	protected internal virtual void Initialize(EntityRegistry entityRegistry)
+	protected internal virtual void Initialize(EntityManager entityManager, EntityRegistry entityRegistry)
 	{
 		__ERROR.Throw(!IsInitialized, "already initialized");
 		IsInitialized = true;
+
+		_entityManager = entityManager;
 
 		if (_page == null)
 		{
 			_page = new Page(AutoPack, ChunkSize, _componentTypes);
 		}
 		_entityRegistry = entityRegistry;
-		_page.Initialize(this,entityRegistry);
+		_page.Initialize(this, entityRegistry);
 	}
 
 
@@ -489,6 +871,11 @@ public delegate void ComponentQueryCallback<TC1, TC2, TC3>(in AccessToken access
 
 public partial class Archetype  //query entities owned by this archetype
 {
+
+
+	public int Count { get => _page.Count; }
+
+
 	/// <summary>
 	/// efficient query of entities owned by this archetype.
 	/// </summary>
@@ -532,6 +919,11 @@ public partial class Archetype  //query entities owned by this archetype
 
 	public unsafe void QueryAsync<TC1, TC2>(MemoryOwner<AccessToken> accessTokens, ComponentQueryCallback_writeAll<TC1, TC2> callback)
 	{
+		//ComponentQueryCallback_w<int> test1 = (in AccessToken accessToken, ref int c1) => { };
+		//Query<int>(null, (in AccessToken accessToken, ref int c1) => {
+
+		//});
+
 		//OPTIMIZE LATER: assumign input is sorted, can get the current chunk and itterate through, then move to the next chunk.
 		//currently each chunk is re-aquired from the column for each element.   maybe that is okay perfwise tho.
 
@@ -578,7 +970,7 @@ public partial class Archetype  //query entities owned by this archetype
 				for (var slotIndex = 0; slotIndex < metaChunk._length; slotIndex++)
 				{
 					var entityToken = metaArray[slotIndex];
-					var pageToken = entityToken.pageToken;
+					var pageToken = entityToken.accessToken;
 					if (entityToken.IsAlive == false)
 					{
 						continue;

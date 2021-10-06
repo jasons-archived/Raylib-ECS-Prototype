@@ -652,6 +652,207 @@ public ref struct SpanGuard<T>
 	}
 }
 
+public static class WriteMem
+{
+	public static WriteMem<T> Allocate<T>(ArraySegment<T> backingStore) => WriteMem<T>.Allocate(backingStore);
+	public static WriteMem<T> Allocate<T>(MemoryOwner<T> memoryOwner) => WriteMem<T>.Allocate(memoryOwner);
+	public static WriteMem<T> Allocate<T>(T[] array) => WriteMem<T>.Allocate(array);
+	public static WriteMem<T> Allocate<T>(int count) => WriteMem<T>.Allocate(count);
+}
+public static class ReadMem
+{
+	public static ReadMem<T> Allocate<T>(ArraySegment<T> backingStore) => ReadMem<T>.Allocate(backingStore);
+	public static ReadMem<T> Allocate<T>(MemoryOwner<T> memoryOwner) => ReadMem<T>.Allocate(memoryOwner);
+	public static ReadMem<T> Allocate<T>(T[] array) => ReadMem<T>.Allocate(array);
+
+	public static ReadMem<T> Allocate<T>(int count) => ReadMem<T>.Allocate(count);
+}
+
+public readonly struct WriteMem<T>
+{
+	private readonly MemoryOwner<T> _owner;
+	private readonly ArraySegment<T> _segment;
+	private readonly T[] _array;
+	private readonly int _offset;
+	public readonly int length;
+	internal WriteMem(ArraySegment<T> segment) : this()
+	{
+		//_owner = null;
+		_segment = segment;
+		_array = segment.Array;
+		_offset = segment.Offset;
+		length = segment.Count;
+	}
+	internal WriteMem(MemoryOwner<T> owner) : this(owner.DangerousGetArray())
+	{
+		_owner = owner;
+	}
+
+	public static WriteMem<T> Allocate(int size)
+	{
+		return new WriteMem<T>(MemoryOwner<T>.Allocate(size));
+	}
+	public static WriteMem<T> Allocate(T[] array)
+	{
+		return new WriteMem<T>(new ArraySegment<T>(array));
+	}
+	public static WriteMem<T> Allocate(T[] array, int offset, int count)
+	{
+		return new WriteMem<T>(new ArraySegment<T>(array, offset, count));
+	}
+	public static WriteMem<T> Allocate(ArraySegment<T> backingStore)
+	{
+		return new WriteMem<T>(backingStore);
+	}
+	public static WriteMem<T> Allocate(MemoryOwner<T> memoryOwner)
+	{
+		return new WriteMem<T>(memoryOwner);
+	}
+
+	public ArraySegment<T> DangerousGetArray()
+	{
+		return _segment;
+	}
+
+	public Span<T> Span
+	{
+		get
+		{
+			return new Span<T>(_array, _offset, length);
+		}
+	}
+	public Memory<T> Memory
+	{
+		get
+		{
+			return new Memory<T>(_array, _offset, length);
+		}
+	}
+
+	public int Length
+	{
+		get
+		{
+			return length;
+		}
+	}
+
+	public void Dispose()
+	{
+		if (_owner != null)
+		{
+			_owner.Dispose();
+		}
+	}
+
+	public ref T this[int index]
+	{
+		get
+		{
+			__DEBUG.Throw(index >= 0 && index < length);			
+			return ref _array[_offset + index];
+		}
+	}
+	public Span<T>.Enumerator GetEnumerator()
+	{
+		return Span.GetEnumerator();
+	}
+
+}
+
+public readonly struct ReadMem<T>
+{
+	private readonly MemoryOwner<T> _owner;
+	private readonly ArraySegment<T> _segment;
+	private readonly T[] _array;
+	private readonly int _offset;
+	public readonly int length;
+	internal ReadMem(ArraySegment<T> segment) : this()
+	{
+		//_owner = null;
+		_segment = segment;
+		_array = segment.Array;
+		_offset = segment.Offset;
+		length = segment.Count;
+	}
+	internal ReadMem(MemoryOwner<T> owner) : this(owner.DangerousGetArray())
+	{
+		_owner = owner;
+	}
+
+	public static ReadMem<T> Allocate(int size)
+	{
+		return new ReadMem<T>(MemoryOwner<T>.Allocate(size));
+	}
+	public static ReadMem<T> Allocate(T[] array)
+	{
+		return new ReadMem<T>(new ArraySegment<T>(array));
+	}
+	public static ReadMem<T> Allocate(T[] array, int offset, int count)
+	{
+		return new ReadMem<T>(new ArraySegment<T>(array, offset, count));
+	}
+	public static ReadMem<T> Allocate(ArraySegment<T> backingStore)
+	{
+		return new ReadMem<T>(backingStore);
+	}
+	public static ReadMem<T> Allocate(MemoryOwner<T> memoryOwner)
+	{
+		return new ReadMem<T>(memoryOwner);
+	}
+
+	public ArraySegment<T> DangerousGetArray()
+	{
+		return _segment;
+	}
+
+	public ReadOnlySpan<T> Span
+	{
+		get
+		{
+			return new ReadOnlySpan<T>(_array, _offset, length);
+		}
+	}
+	public ReadOnlyMemory<T> Memory
+	{
+		get
+		{
+			return new ReadOnlyMemory<T>(_array, _offset, length);
+		}
+	}
+
+	public int Length
+	{
+		get
+		{
+			return length;
+		}
+	}
+
+	public void Dispose()
+	{
+		if (_owner != null)
+		{
+			_owner.Dispose();
+		}
+	}
+
+	public readonly T this[int index]
+	{
+		get
+		{
+			__DEBUG.Throw(index >= 0 && index < length);
+			return _array[_offset + index];
+		}
+	}
+	public ReadOnlySpan<T>.Enumerator GetEnumerator()
+	{
+		return Span.GetEnumerator();
+	}
+
+}
+
+
 /// <summary>
 /// helper to ensure object gets disposed properly.   can either be used as a base class, or as a member.
 /// </summary>

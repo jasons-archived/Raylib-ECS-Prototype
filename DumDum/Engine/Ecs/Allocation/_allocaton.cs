@@ -900,7 +900,7 @@ public partial class Page : IDisposable //init logic
 	/// <summary>
 	/// the Type of components this page manages.  
 	/// </summary>
-	public List<Type> ComponentTypes { get; init; }
+	public HashSet<Type> ComponentTypes { get; init; }
 
 
 	/// <summary>
@@ -935,7 +935,7 @@ public partial class Page : IDisposable //init logic
 	/// how many entities are stored in this Page
 	/// </summary>
 	public int Count { get => _entityLookup.Count; }
-	public Page(bool autoPack, int chunkSize, List<Type> componentTypes)
+	public Page(bool autoPack, int chunkSize, HashSet<Type> componentTypes)
 	{
 		AutoPack = autoPack;
 		//_entityRegistry = entityRegistry;
@@ -1361,7 +1361,7 @@ public partial class Page  //alloc/free/pack logic
 			__CHECKED.Throw(entityMetadata == default(EntityMetadata), "expect this to be cleared out, why not?");
 			entityMetadata = new EntityMetadata()
 			{
-				pageToken = pageToken,
+				accessToken = pageToken,
 				componentCount = _atomIdsUsed.Count,
 			};
 
@@ -1486,7 +1486,7 @@ public partial class Page  //alloc/free/pack logic
 		__CHECKED.Throw(manualGetChunk == autoGetChunk, "should match");
 
 		//verify entityMetadatas match
-		__ERROR.Throw(manualGetChunk.UnsafeArray[pageToken.slotRef.slotIndex].pageToken == pageToken);
+		__ERROR.Throw(manualGetChunk.UnsafeArray[pageToken.slotRef.slotIndex].accessToken == pageToken);
 
 
 
@@ -1648,7 +1648,7 @@ public partial class Page  //alloc/free/pack logic
 		{
 			__CHECKED.Throw(false, "this should not happen.  returning false means no chunk exists.");
 		}
-		__CHECKED.Assert(freeSlotMeta.IsAlive == false && freeSlotMeta.pageToken.isAlive == false, "should be default value");
+		__CHECKED.Assert(freeSlotMeta.IsAlive == false && freeSlotMeta.accessToken.isAlive == false, "should be default value");
 #endif
 		//generate our newPos pageToken
 		var newSlotPageAccessToken = _GenerateLivePageAccessToken(highestAlive.entityHandle, lowestFree);
@@ -1674,7 +1674,7 @@ public partial class Page  //alloc/free/pack logic
 		//var metadataChunk = GetChunk<EntityMetadata>(ref newSlotPageAccessToken);
 		//ref var metadataComponent = ref metadataChunk.Span[newSlotPageAccessToken.slotRef.chunkChunkIndex];
 		ref var metadataComponent = ref _UNCHECKED_GetComponent<EntityMetadata>(ref newSlotPageAccessToken);
-		metadataComponent.pageToken = newSlotPageAccessToken;
+		metadataComponent.accessToken = newSlotPageAccessToken;
 
 
 		//update our _lookup and registry
@@ -1735,7 +1735,7 @@ public partial class Page  //alloc/free/pack logic
 #if CHECKED
 					//verify next free is actually free
 					result = __TryQueryMetadata(_nextSlotTracker.nextAvailable, out var shouldBeFreeMetadata);
-					__ERROR.Throw(result && shouldBeFreeMetadata.IsAlive == false && shouldBeFreeMetadata.pageToken.isAlive == false);
+					__ERROR.Throw(result && shouldBeFreeMetadata.IsAlive == false && shouldBeFreeMetadata.accessToken.isAlive == false);
 #endif
 					if (shouldFreeChunk)
 					{
@@ -1785,8 +1785,8 @@ public partial class Page  //alloc/free/pack logic
 			{
 				//swap out free and highest
 				__CHECKED.Throw(highestAliveToken.IsAlive == true);
-				__CHECKED_INTERNAL_VerifyPageAccessToken(ref highestAliveToken.pageToken);
-				_PackHelper_MoveSlotToFree(highestAliveToken.pageToken, firstFreeSlotToFill);
+				__CHECKED_INTERNAL_VerifyPageAccessToken(ref highestAliveToken.accessToken);
+				_PackHelper_MoveSlotToFree(highestAliveToken.accessToken, firstFreeSlotToFill);
 
 
 			}
@@ -1866,7 +1866,7 @@ public partial class Page  //alloc/free/pack logic
 /// </summary>
 public record struct EntityMetadata
 {
-	public AccessToken pageToken;
+	public AccessToken accessToken;
 	public int componentCount;
 	/// <summary>
 	/// hint informing that a writeRef was aquired for one of the components.
@@ -1877,7 +1877,32 @@ public record struct EntityMetadata
 	/// <summary>
 	/// If this slot is in use by an entity
 	/// </summary>
-	public bool IsAlive { get => pageToken.isAlive; }
+	public bool IsAlive { get => accessToken.isAlive; }
+
+
+
+	/// <summary>
+	/// Obtain write access to the specified TComponent chunk that this entity is part of.
+	/// </summary>
+	public WriteMem<TComponent> GetWriteMem<TComponent>()
+	{
+		accessToken.GetArchetype()._entityManager._accessGuard.WriteNotify<TComponent>();
+
+		var chunk = accessToken.GetContainingChunk<TComponent>();
+		return WriteMem.Allocate(chunk._storage);
+	}
+	/// <summary>
+	/// Obtain read-only access to the specified TComponent chunk that this entity is part of.
+	/// </summary>
+	public ReadMem<TComponent> GetReadMem<TComponent>()
+	{
+
+		accessToken.GetArchetype()._entityManager._accessGuard.ReadNotify<TComponent>();
+
+		var chunk = accessToken.GetContainingChunk<TComponent>();
+		return ReadMem.Allocate(chunk._storage);
+	}
+
 }
 
 /// <summary>
@@ -2042,7 +2067,7 @@ public class Chunk<TComponent> : Chunk
 	public static ResizableArray<List<Chunk<TComponent>>> _GLOBAL_LOOKUP = new();
 
 
-	private MemoryOwner<TComponent> _storage;
+	public MemoryOwner<TComponent> _storage;
 	public Memory<TComponent> Memory { get => _storage.Memory; }
 	//public ArraySegment<TComponent> Span
 	//{
@@ -2216,7 +2241,7 @@ public class Chunk<TComponent> : Chunk
 			//__ERROR.Throw(result);
 			var entityMetadataChunk = Chunk<EntityMetadata>._GLOBAL_LOOKUP[pageToken.pageId]._AsSpan_Unsafe()[pageToken.slotRef.chunkIndex];
 			ref var entityMetadata = ref entityMetadataChunk.UnsafeArray[chunkIndex];
-			__DEBUG.Throw(entityMetadata.pageToken == pageToken, "invalid alloc token.   why?");
+			__DEBUG.Throw(entityMetadata.accessToken == pageToken, "invalid alloc token.   why?");
 		}
 	}
 }

@@ -313,3 +313,19 @@ Logical object structure is
 	- plugin system (gizmo example)
 	- asset store
 
+
+todo:
+
+	rename SpanGuard to SpanAlloc
+	make new WriteMem<T> //can be backed by ArraySegment or MemoryOwner
+	make new ReadMem<T>
+	AccessToken.GetReadChunk<T> //obtain a ReadMem<T> containing the chunk storage
+	AccessToken.GetWriteChunk<T> 
+	Archetype/Page List<TComponent> should be a hashSet
+	
+	keep interop with _allocation via interfaces
+	page.archetype should instead be an IPageOwner
+	read/write lock broadcasting should be via IAcessControl
+	MemoryOwner that clears ref types on dispose
+	
+	Read/Write sentinels should just track when reads/writes are permitted.  if they occur outside of those times, assert.   This way we don't need to track who does all writes.
