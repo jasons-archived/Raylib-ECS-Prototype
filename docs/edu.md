@@ -4,9 +4,10 @@ links for tangental educational stuff here
 
 
 
-# UnityECS
-Unity ECS has a similar API as our ECS.  
-
+# ECS
+Some ECS Intro videos that are mostly applicable to !!.Ecs
+- https://www.youtube.com/watch?v=OqzUr-Rg6w4
+- https://www.youtube.com/watch?v=3r4aFWqXY_8
 
 # Timesteps
  - https://medium.com/@tglaiel/how-to-make-your-game-run-at-60fps-24c61210fe75

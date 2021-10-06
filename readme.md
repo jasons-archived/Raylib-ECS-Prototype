@@ -45,7 +45,7 @@ still building first functional prototype.
 # Overview
 
 ## ECS
-The ECS api is archetype based, somewhat similar to Unity ECS api surface.  But some differences:
+The ECS api is archetype based.
 
 - Entities are dumb cattle, and query api reflects this.   Itteration over entities/components is done by array.
 - Components may be classes.
@@ -118,7 +118,7 @@ The execution engine is fully multithreaded.  Your nodes can be written in a sin
 - `async`/`await` and `Task` patterns.  
   
 ## architecture
-- general knowledge of Entity Component Systems.  If you read/watch some intro on Unity ECS that is a good start.
+- general knowledge of Entity Component Systems.  
   - The concept of components as resources having read/write locks, allowing coordination between multiple threads.
   - The concept that each System you create is effectively it's own thread.
   - Entity creation/deletion occurs at the start of each frame, between entity/component access by systems.

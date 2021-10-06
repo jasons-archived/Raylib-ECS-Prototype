@@ -12,9 +12,8 @@ indent_style = tab
 
 [*.cs]
 
-# File header template
-file_header_template = [!!] This is code from the NOTNOT Game Engine! \n[!!] This code Licensed under the AGPL-3.0: https://www.gnu.org/licenses/agpl-3.0.en.html unless terms and conditions apply.\n[!!] Contributions Guarantee Citizenship! Would you like to know more? https://github.com/NotNotTech/NotNotEngine \n[!!] Copyright (c) 2021 - Present.
-
+# File header template  https://docs.microsoft.com/en-us/visualstudio/ide/reference/add-file-header?view=vs-2019
+file_header_template = [!!] Copyright (c) the NOTNOT Game Engine Contributors. \n[!!] Licensed under the AGPL-3.0. \n[!!] Contributions Guarantee Citizenship! Would you like to know more? https://github.com/NotNotTech/NotNot 
 # #Core editorconfig formatting - indentation
 
 # #use soft tabs (spaces) for indentation
