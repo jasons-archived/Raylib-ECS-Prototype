@@ -798,7 +798,7 @@ public partial class Archetype : DisposeGuard //initialization
 	public string Name { get; set; }
 
 	public bool AutoPack { get; init; } = true;
-	public int ChunkSize { get; init; } = 10000;
+	public int ChunkSize { get; init; } = 1000;
 
 	private EntityRegistry _entityRegistry;
 	public EntityManager _entityManager;

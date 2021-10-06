@@ -1,7 +1,7 @@
 
 
 
-- [DumDum?](#dumdum)
+- [NotNot?](#notnot)
 - [Current status](#current-status)
 - [Overview](#overview)
   - [ECS](#ecs)
@@ -29,11 +29,12 @@
   - [oss community notes](#oss-community-notes)
     - [funding](#funding)
     - [important feature needs:](#important-feature-needs)
+    - [rendering?](#rendering)
 
-# DumDum?
+# NotNot?
 A codename?
 
-This is an **execution engine** and an **ecs** framework.  Not library.  You must build your game on top of, not next to this.
+This is an **execution engine** and an **ecs** Framework.  Not library.  You must build your game on top of, not next to this.
 
 # Current status
 
@@ -44,7 +45,13 @@ still building first functional prototype.
 # Overview
 
 ## ECS
-The ECS api is heavily inspired by Unity ECS.  very similar api surface.
+The ECS api is archetype based, somewhat similar to Unity ECS api surface.  But some differences:
+
+- Entities are dumb cattle, and query api reflects this.   Itteration over entities/components is done by array.
+- Components may be classes.
+- see [notnot/engine/ecs/readme.md](notnot/engine/ecs/readme.md) for more details
+
+ 
 
 ## ExecManager
 
@@ -80,13 +87,13 @@ The execution engine is fully multithreaded.  Your nodes can be written in a sin
 - code based game development
 - procedural workflows come first: dynamic objects, procedural scenes
 - support world coordinates 1000 x 1000 km
-- networking built in
+- multiplayer by default
 - modular systems
 - documentation:  
   - Class and namespace summaries at minimum.
   - end-to-end example games
   - samples via unit tests
-- open source via AGPL3, with commercial licensing
+- open source via AGPL3, with commercial licensing, revenue split among contribs
 
 
 ## non-goals
@@ -95,7 +102,6 @@ The execution engine is fully multithreaded.  Your nodes can be written in a sin
 - computers incompatable with the tech choises made
 - 2d games
 - photorealism
-- physical realism
 - visual editor
 - documentation
   - long-form text
@@ -329,3 +335,20 @@ todo:
 	MemoryOwner that clears ref types on dispose
 	
 	Read/Write sentinels should just track when reads/writes are permitted.  if they occur outside of those times, assert.   This way we don't need to track who does all writes.
+
+
+
+
+### rendering?
+a loaded topic.  there is scene management/spatial partitioning to consider.  camera, animation support
+some potentail solutions
+- RayLib / Raylib CS Bindings
+   - https://github.com/ChrisDill/Raylib-cs/wiki/FAQ
+   - https://www.raylib.com/examples.html
+- Urho3d
+  - https://urho3d.io/documentation/HEAD/index.html
+  - https://github.com/xamarin/urho
+- Ogre Next
+  - https://github.com/OGRECave/ogre-next
+  - ***DOES NOT SUPPORT C#***
+- 
