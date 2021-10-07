@@ -1,4 +1,4 @@
-﻿using NotNot.Bcl;
+using NotNot.Bcl;
 using NotNot.Bcl.Collections._unused;
 using NotNot.Bcl.Diagnostics;
 using NotNot.Engine.Ecs.Allocation;
@@ -36,7 +36,7 @@ public class World : SystemBase
 }
 
 
-public delegate void EntityCreateCallback(Archetype archetype, ReadOnlySpan<EntityHandle> entities);
+//public delegate void EntityCreateCallback(Archetype archetype, ReadOnlySpan<EntityHandle> entities);
 
 
 public abstract class SystemBase : Sim.FixedTimestepNode
@@ -296,7 +296,7 @@ public partial class EntityManager //entity creation
 			{
 				didWork = true;
 				var (toDelete, doneCallback) = tuple;
-				DoDeleteEntities_Phase0(toDelete, doneCallback);
+				_DoDeleteEntities_Phase0(toDelete, doneCallback);
 			}
 			while (_createQueue.TryDequeue(out var tuple))
 			{
@@ -307,32 +307,41 @@ public partial class EntityManager //entity creation
 		}
 	}
 
-	private void DoDeleteEntities_Phase0(Span<EntityHandle> toDelete, Action_RoSpan<AccessToken, Archetype> doneCallback)
+	/// <summary>
+	/// do deletes that have been enqueued while everything is stopped
+	/// </summary>
+	/// <param name="toDelete"></param>
+	/// <param name="doneCallback"></param>
+	private void _DoDeleteEntities_Phase0(Span<EntityHandle> toDelete, Action_RoSpan<AccessToken, Archetype> doneCallback)
 	{
 		if (toDelete.Length == 0)
 		{
 			return;
 		}
+
+		///obtain the actual accessTokens for the entities to be deleted
 		using var accessTokensSO = SpanGuard<AccessToken>.Allocate(toDelete.Length);
 		var accessTokens = accessTokensSO.Span;
-
-
 		_entityRegistry.Get(toDelete, accessTokens);
 
 		//sort so that in order by page
 		accessTokens.Sort();
+		__CHECKED.Throw(accessTokens[0].pageId<=accessTokens[accessTokens.Length-1].pageId,"not sorted properly?");
+
 		//group be pageId and send off for deletion
 		var pageStartIndex = 0;
 		var pageLength = 0;
 		var pageId = accessTokens[0].pageId;
 
-
-		static void DoDeleteHelper(Action_RoSpan<AccessToken, Archetype> doneCallback, Span<AccessToken> accessTokens, int pageStartIndex, int pageLength)
+		
+		static void __DoDeleteHelper(Action_RoSpan<AccessToken, Archetype> doneCallback, Span<AccessToken> accessTokens, int pageStartIndex, int pageLength)
 		{
 			//that page finished.
 			//find archetype and delte for it then call callback
 			var pageSpan = accessTokens.Slice(pageStartIndex, pageLength);
-			var archetype = pageSpan[0].GetArchetype();
+			//all owners are archetypes, so leap of faith cast
+			var archetype = pageSpan[0].GetOwner() as Archetype; 
+			//let archetype invoke the required callback function
 			archetype.DoDeleteEntities_Phase0(pageSpan, doneCallback);
 		}
 
@@ -345,7 +354,7 @@ public partial class EntityManager //entity creation
 			}
 			else
 			{
-				DoDeleteHelper(doneCallback, accessTokens, pageStartIndex, pageLength);
+				__DoDeleteHelper(doneCallback, accessTokens, pageStartIndex, pageLength);
 
 				//start marking our next page
 				pageStartIndex = i;
@@ -353,7 +362,7 @@ public partial class EntityManager //entity creation
 			}
 		}
 		//handle our last page
-		DoDeleteHelper(doneCallback, accessTokens, pageStartIndex, pageLength);
+		__DoDeleteHelper(doneCallback, accessTokens, pageStartIndex, pageLength);
 
 
 
@@ -364,20 +373,20 @@ public partial class EntityManager //entity creation
 		archetype.DoCreateEntities_Phase0(count, doneCallback);
 	}
 
-	private void TryRepackEntities_Sync()
-	{
-		//TODO: add expected cost of update metrics for current frame and past frames (to SimNode/Frame)
-		//check expected cost of update, if equal to lowest point in last 10 frames, or if at least 10 frames has gone by and we are expected lower than past frame, do a repack.
+	//private void TryRepackEntities_Sync()
+	//{
+	//	//TODO: add expected cost of update metrics for current frame and past frames (to SimNode/Frame)
+	//	//check expected cost of update, if equal to lowest point in last 10 frames, or if at least 10 frames has gone by and we are expected lower than past frame, do a repack.
 
-		//repace should 
+	//	//repace should 
 
-		throw new NotImplementedException();
-	}
+	//	throw new NotImplementedException();
+	//}
 
 	protected override Task Update()
 	{
 		ProcessEnqueued_Phase0();
-		TryRepackEntities_Sync();
+		//TryRepackEntities_Sync();
 		return Task.CompletedTask;
 	}
 }
@@ -797,7 +806,7 @@ public partial class Archetype : DisposeGuard //initialization
 	public HashSet<Type> _componentTypes;
 	public string Name { get; set; }
 
-	public bool AutoPack { get; init; } = true;
+	//public bool AutoPack { get; init; } = true;
 	public int ChunkSize { get; init; } = 1000;
 
 	private EntityRegistry _entityRegistry;
@@ -821,7 +830,7 @@ public partial class Archetype : DisposeGuard //initialization
 
 		if (_page == null)
 		{
-			_page = new Page(AutoPack, ChunkSize, _componentTypes);
+			_page = new Page(true, ChunkSize, _componentTypes);
 		}
 		_entityRegistry = entityRegistry;
 		_page.Initialize(this, entityRegistry);
@@ -836,6 +845,24 @@ public partial class Archetype : DisposeGuard //initialization
 		base.OnDispose();
 	}
 
+}
+
+public partial class Archetype : IPageOwner
+{
+	//void IPageOwner.DoDeleteEntities_Phase0(Span<AccessToken> pageSpan, Action_RoSpan<AccessToken, Archetype> doneCallback)
+	//{
+	//	throw new NotImplementedException();
+	//}
+
+	void IPageOwner.ReadNotify<TComponent>()
+	{
+		_entityManager._accessGuard.ReadNotify<TComponent>();
+	}
+
+	void IPageOwner.WriteNotify<TComponent>()
+	{
+		_entityManager._accessGuard.WriteNotify<TComponent>();
+	}
 }
 
 public partial class Archetype //passthrough of page stuff

@@ -1,4 +1,4 @@
-﻿using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Attributes;
 using NotNot.Engine.Ecs.Allocation;
 
 namespace MyBenchmarks;
@@ -52,7 +52,7 @@ public class AllocatorBenchmark
 	public int Allocators { get; set; } = 100;
 
 	[Params(100000)]
-	public int EntityCount { get; set; } = 100000;
+	public int EntityCount { get; set; } = 10000;
 
 
 	[Params(1000

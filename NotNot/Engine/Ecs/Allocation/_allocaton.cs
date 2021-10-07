@@ -225,7 +225,7 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 	/// </summary>
 	public ref TComponent GetComponentWriteRef<TComponent>()
 	{
-		GetArchetype()._entityManager._accessGuard.WriteNotify<TComponent>();
+		GetOwner().WriteNotify<TComponent>();
 
 		var (result, reason) = GetPage().CheckIsValid(this);
 		__ERROR.Throw(result, reason);
@@ -241,7 +241,7 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 	/// </summary>
 	public ref readonly TComponent GetComponentReadRef<TComponent>()
 	{
-		GetArchetype()._entityManager._accessGuard.ReadNotify<TComponent>();
+		GetOwner().ReadNotify<TComponent>();
 
 		var (result, reason) = GetPage().CheckIsValid(this);
 		__ERROR.Throw(result, reason);
@@ -251,9 +251,9 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 		return ref chunk.GetReadRef(this);
 	}
 
-	internal Archetype GetArchetype()
+	internal IPageOwner GetOwner()
 	{
-		return GetPage()._archetype;
+		return GetPage()._owner;
 	}
 
 	/// <summary>
@@ -290,18 +290,18 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 	/// <summary>
 	/// Get Write (exclusive) access to the chunk this entity component is in
 	/// </summary>
-	public WriteMem<TComponent> GetWriteChunk<TComponent>()
+	public WriteMem<TComponent> GetWriteMem<TComponent>()
 	{
-		GetArchetype()._entityManager._accessGuard.WriteNotify<TComponent>();
+		GetOwner().WriteNotify<TComponent>();
 		var chunk = GetContainingChunk<TComponent>();
 		return WriteMem.Allocate(chunk._storage);
 	}
 	/// <summary>
 	/// Get Read only (shared) access to the chunk this entity component is in
 	/// </summary>
-	public ReadMem<TComponent> GetReadChunk<TComponent>()
+	public ReadMem<TComponent> GetReadMem<TComponent>()
 	{
-		GetArchetype()._entityManager._accessGuard.ReadNotify<TComponent>();
+		GetOwner().ReadNotify<TComponent>();
 		var chunk = GetContainingChunk<TComponent>();
 		return ReadMem.Allocate(chunk._storage);
 	}
@@ -445,7 +445,6 @@ public record struct SlotRef : IComparable<SlotRef>
 	}
 }
 
-
 public partial class Page //unit test
 {
 
@@ -557,6 +556,19 @@ public partial class Page //unit test
 		return page;
 	}
 
+
+	private class _TEST_FakeOwner : IPageOwner
+	{
+		public void ReadNotify<TComponent>()
+		{
+			//throw new NotImplementedException();
+		}
+
+		public void WriteNotify<TComponent>()
+		{
+			//throw new NotImplementedException();
+		}
+	}
 	private static unsafe Page _TEST_HELPER_CreateAndEditPage(EntityRegistry entityRegistry, bool autoPack, int chunkSize, int entityCount)
 	{
 
@@ -573,7 +585,7 @@ public partial class Page //unit test
 
 
 		//};
-		page.Initialize(null, entityRegistry);
+		page.Initialize(new _TEST_FakeOwner(), entityRegistry);
 
 		//using var entityHandlesOwner = SpanPool<long>.Allocate(__.Rand.Next(0, 1000));
 		//var set = new HashSet<long>();
@@ -893,11 +905,34 @@ public partial class Page  //ATOM logic
 }
 
 /// <summary>
+/// allows integrating a Page (and thus, the allocation system) with external code
+/// </summary>
+public interface IPageOwner
+{
+	///// <summary>
+	///// /A helper 
+	///// </summary>
+	///// <param name="pageSpan"></param>
+	///// <param name="doneCallback"></param>
+	//void DoDeleteEntities_Phase0(Span<AccessToken> pageSpan, Action_RoSpan<AccessToken, Archetype> doneCallback);
+
+	/// <summary>
+	/// inform that a read occured to a component type.   Used for AccessSentinal guards
+	/// </summary>
+	public void ReadNotify<TComponent>();
+	/// <summary>
+	/// inform that a write occured to a component type.   Used for AccessSentinal guards
+	/// </summary>
+	public void WriteNotify<TComponent>();
+}
+
+/// <summary>
 /// page for archetypes 
 /// see ReadMe.md
 /// </summary>
 public partial class Page : IDisposable //init logic
 {
+	public IPageOwner _owner;
 
 	public EntityRegistry _entityRegistry;
 
@@ -967,10 +1002,9 @@ public partial class Page : IDisposable //init logic
 		ComponentTypes = componentTypes;
 	}
 
-	public Archetype _archetype;
-	public void Initialize(Archetype archetype, EntityRegistry entityRegistry)
+	public void Initialize(IPageOwner owner, EntityRegistry entityRegistry)
 	{
-		_archetype = archetype;
+		_owner = owner;
 
 		_entityRegistry = entityRegistry;
 		//add self to global lookup
@@ -1911,10 +1945,7 @@ public record struct EntityMetadata
 	/// </summary>
 	public WriteMem<TComponent> GetWriteMem<TComponent>()
 	{
-		accessToken.GetArchetype()._entityManager._accessGuard.WriteNotify<TComponent>();
-
-		var chunk = accessToken.GetContainingChunk<TComponent>();
-		return WriteMem.Allocate(chunk._storage);
+		return accessToken.GetWriteMem<TComponent>();
 	}
 	/// <summary>
 	/// Obtain read-only access to the specified TComponent chunk that this entity is part of.
@@ -1922,10 +1953,7 @@ public record struct EntityMetadata
 	public ReadMem<TComponent> GetReadMem<TComponent>()
 	{
 
-		accessToken.GetArchetype()._entityManager._accessGuard.ReadNotify<TComponent>();
-
-		var chunk = accessToken.GetContainingChunk<TComponent>();
-		return ReadMem.Allocate(chunk._storage);
+		return accessToken.GetReadMem<TComponent>();
 	}
 
 }
