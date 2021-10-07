@@ -224,7 +224,7 @@ any work done to unsafe code should be verified by using GC Hole stress, as defi
 
 - need to create a custom MemoryOwner that clears ref types on dispose	
 - Component Read/Write sentinels should just track when reads/writes are permitted.  if they occur outside of those times, assert.   This way we don't need to track who does all writes.
-
+- //TODO: add expected cost of update metrics for current frame and past frames (to SimNode/Frame)
 
 
 

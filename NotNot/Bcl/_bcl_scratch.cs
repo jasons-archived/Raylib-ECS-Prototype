@@ -26,7 +26,7 @@ public unsafe static class __
 	
 
 	[ThreadStatic]
-	private static Random _rand;
+	private static Random? _rand;
 	//private static ThreadLocal<Random> _rand2 = new(() => new());
 
 	/// <summary>
@@ -179,7 +179,7 @@ public static class ParallelFor
 		}
 		using var owner = _Range_ComputeBatches(start, length, batchSizeMultipler);
 		var span = owner.Span;
-		var array = owner.DangerousGetArray().Array;
+		var array = owner.DangerousGetArray().Array!;
 
 		Parallel.For(0, span.Length, (index) => Unsafe.AsRef(in action).Invoke(array[index].startInclusive, array[index].endExclusive));		
 	}
@@ -266,7 +266,7 @@ public readonly struct WriteMem<T>
 	{
 		//_owner = null;
 		_segment = segment;
-		_array = segment.Array;
+		_array = segment.Array!;
 		_offset = segment.Offset;
 		length = segment.Count;
 	}

@@ -134,7 +134,7 @@ namespace NotNot.Bcl.Collections._unused
 				__CHECKED.Throw(this._CHECKED_allocationTracker.TryRemove(slot, out var temp), "slot is not allocated but trying to remove");
 #endif
 				this._freeSlots.Push(slot);
-				this._storage[slot] = default;
+				this._storage[slot] = default!;
 			}
 		}
 		public void Free(Span<int> toFree)
@@ -150,7 +150,7 @@ namespace NotNot.Bcl.Collections._unused
 					__CHECKED.Throw(this._CHECKED_allocationTracker.TryRemove(slot, out var temp), "slot is not allocated but trying to remove");
 #endif
 					this._freeSlots.Push(slot);
-					this._storage[slot] = default;
+					this._storage[slot] = default!;
 				}
 			}
 		}
