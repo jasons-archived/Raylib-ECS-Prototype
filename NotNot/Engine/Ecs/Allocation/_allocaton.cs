@@ -1,4 +1,4 @@
-﻿using NotNot.Bcl;
+using NotNot.Bcl;
 using NotNot.Bcl.Collections._unused;
 using NotNot.Bcl.Diagnostics;
 using Microsoft.Toolkit.HighPerformance.Buffers;
@@ -225,6 +225,8 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 	/// </summary>
 	public ref TComponent GetComponentWriteRef<TComponent>()
 	{
+		GetArchetype()._entityManager._accessGuard.WriteNotify<TComponent>();
+
 		var (result, reason) = GetPage().CheckIsValid(this);
 		__ERROR.Throw(result, reason);
 
@@ -239,6 +241,8 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 	/// </summary>
 	public ref readonly TComponent GetComponentReadRef<TComponent>()
 	{
+		GetArchetype()._entityManager._accessGuard.ReadNotify<TComponent>();
+
 		var (result, reason) = GetPage().CheckIsValid(this);
 		__ERROR.Throw(result, reason);
 
@@ -257,7 +261,7 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 	/// </summary>
 	/// <typeparam name="T"></typeparam>
 	/// <returns></returns>
-	public Chunk<T> GetContainingChunk<T>()
+	internal Chunk<T> GetContainingChunk<T>()
 	{
 		//_CHECKED_VerifyInstance<T>();
 		//var chunkLookupId = GetChunkLookupId();
@@ -281,9 +285,29 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 		var chunk = column._AsSpan_Unsafe()[slotRef.chunkIndex];
 		__DEBUG.Throw(chunk != null);
 		return chunk;
-
-
 	}
+
+	/// <summary>
+	/// Get Write (exclusive) access to the chunk this entity component is in
+	/// </summary>
+	public WriteMem<TComponent> GetWriteChunk<TComponent>()
+	{
+		GetArchetype()._entityManager._accessGuard.WriteNotify<TComponent>();
+		var chunk = GetContainingChunk<TComponent>();
+		return WriteMem.Allocate(chunk._storage);
+	}
+	/// <summary>
+	/// Get Read only (shared) access to the chunk this entity component is in
+	/// </summary>
+	public ReadMem<TComponent> GetReadChunk<TComponent>()
+	{
+		GetArchetype()._entityManager._accessGuard.ReadNotify<TComponent>();
+		var chunk = GetContainingChunk<TComponent>();
+		return ReadMem.Allocate(chunk._storage);
+	}
+
+
+
 	/// <summary>
 	/// Get page this token is associated with.  If a null is returned or an exception is thchunkn, it is likely our PageAccessToken is out of date.
 	/// </summary>
@@ -1739,6 +1763,7 @@ public partial class Page  //alloc/free/pack logic
 #endif
 					if (shouldFreeChunk)
 					{
+						//okay to instantly free our chunk as soon as it's empty because we are using a memory pool tp aid recycling
 						_FreeLastChunk();
 					}
 				}

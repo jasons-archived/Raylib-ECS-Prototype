@@ -2,7 +2,7 @@
 
 
 - [NotNot?](#notnot)
-- [Current status](#current-status)
+- [Current status: DO NOT USE!](#current-status-do-not-use)
 - [Overview](#overview)
   - [ECS](#ecs)
   - [ExecManager](#execmanager)
@@ -32,13 +32,14 @@
     - [rendering?](#rendering)
 
 # NotNot?
-A codename?
+It's not not an engine.
 
 This is an **execution engine** and an **ecs** Framework.  Not library.  You must build your game on top of, not next to this.
 
-# Current status
+# Current status: DO NOT USE!
+do no not not use it yet
 
-still building first functional prototype.   
+still building first functional prototype.     
 
 
 
@@ -220,12 +221,10 @@ any work done to unsafe code should be verified by using GC Hole stress, as defi
 
 # TODO:
 
-- replace `Allocator` direct List indexer calls with `Span`
-- Free Chunk should only happen when 2 full chunks are empty, to prevent thrashing
-  - put the free in a lazy slot.  preallocate async.
-  - `Parallel.ForEach(_columns, (columnList, loopState) ` line in Allocator.Free() should be changed to __.ForRange() workflow
-- For Chunk global lookups
-   - AllocatorId --> ColumnList   so access is `Chunk<T>._GLOBAL_LOOKUP[allocatorId][chunkId][rowId]`
+
+- need to create a custom MemoryOwner that clears ref types on dispose	
+- Component Read/Write sentinels should just track when reads/writes are permitted.  if they occur outside of those times, assert.   This way we don't need to track who does all writes.
+
 
 
 
@@ -320,23 +319,6 @@ Logical object structure is
 	- asset store
 
 
-todo:
-
-	rename SpanGuard to SpanAlloc
-	make new WriteMem<T> //can be backed by ArraySegment or MemoryOwner
-	make new ReadMem<T>
-	AccessToken.GetReadChunk<T> //obtain a ReadMem<T> containing the chunk storage
-	AccessToken.GetWriteChunk<T> 
-	Archetype/Page List<TComponent> should be a hashSet
-	
-	keep interop with _allocation via interfaces
-	page.archetype should instead be an IPageOwner
-	read/write lock broadcasting should be via IAcessControl
-	MemoryOwner that clears ref types on dispose
-	
-	Read/Write sentinels should just track when reads/writes are permitted.  if they occur outside of those times, assert.   This way we don't need to track who does all writes.
-
-
 
 
 ### rendering?
@@ -351,4 +333,5 @@ some potentail solutions
 - Ogre Next
   - https://github.com/OGRECave/ogre-next
   - ***DOES NOT SUPPORT C#***
-- 
+
+review these tutorials if need to do basic things like camera/frustum: https://github.com/gametutorials/tutorials/tree/master/OpenGL

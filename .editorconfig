@@ -13,7 +13,7 @@ indent_style = tab
 [*.cs]
 
 # File header template  https://docs.microsoft.com/en-us/visualstudio/ide/reference/add-file-header?view=vs-2019
-file_header_template = [!!] Copyright (c) the NOTNOT Game Engine Contributors. \n[!!] Licensed under the AGPL-3.0. \n[!!] Contributions Guarantee Citizenship! Would you like to know more? https://github.com/NotNotTech/NotNot 
+file_header_template = [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] \n[!!] This file is part of the NOTNOT Game Engine. \n[!!] Copyright (c) Novaleaf and Contributors. \n[!!] Licensed under the AGPL-3.0. \n[!!] Contributions Guarantee Citizenship! \n[!!] Would you like to know more? https://github.com/NotNotTech/NotNot \n[!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
 # #Core editorconfig formatting - indentation
 
 # #use soft tabs (spaces) for indentation

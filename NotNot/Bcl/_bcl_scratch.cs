@@ -1,6 +1,4 @@
-// [!!] Copyright (c) the NOTNOT Game Engine Contributors.
-// [!!] Licensed under the AGPL-3.0 License.  If that doesn't work for you, other free/cheap options are available.
-// [!!] Contributions Guarantee Citizenship! Would you like to know more? https://github.com/NotNotTech/NotNotEngine 
+
 
 using NotNot.Bcl.Diagnostics;
 using Microsoft.Toolkit.HighPerformance.Buffers;
@@ -183,12 +181,13 @@ public static class ParallelFor
 		var span = owner.Span;
 		var array = owner.DangerousGetArray().Array;
 
-		Parallel.For(0, span.Length, (index) => Unsafe.AsRef(in action).Invoke(array[index].startInclusive, array[index].endExclusive));
-
+		Parallel.For(0, span.Length, (index) => Unsafe.AsRef(in action).Invoke(array[index].startInclusive, array[index].endExclusive));		
 	}
 
 
 }
+
+
 
 /// <summary>
 /// use this instead of <see cref="SpanOwner{T}"/>.  This will alert you if you do not dispose properly.  
@@ -197,7 +196,7 @@ public static class ParallelFor
 public ref struct SpanGuard<T>
 {
 	public static SpanGuard<T> Allocate(int size)
-	{
+	{		
 		return new SpanGuard<T>(SpanOwner<T>.Allocate(size));
 	}
 
@@ -231,6 +230,9 @@ public ref struct SpanGuard<T>
 	}
 }
 
+/// <summary>
+/// helpers to allocate a WriteMem instance
+/// </summary>
 public static class WriteMem
 {
 	public static WriteMem<T> Allocate<T>(ArraySegment<T> backingStore) => WriteMem<T>.Allocate(backingStore);
@@ -238,6 +240,9 @@ public static class WriteMem
 	public static WriteMem<T> Allocate<T>(T[] array) => WriteMem<T>.Allocate(array);
 	public static WriteMem<T> Allocate<T>(int count) => WriteMem<T>.Allocate(count);
 }
+/// <summary>
+/// helpers to allocate a ReadMem instance
+/// </summary>
 public static class ReadMem
 {
 	public static ReadMem<T> Allocate<T>(ArraySegment<T> backingStore) => ReadMem<T>.Allocate(backingStore);
@@ -246,7 +251,10 @@ public static class ReadMem
 
 	public static ReadMem<T> Allocate<T>(int count) => ReadMem<T>.Allocate(count);
 }
-
+/// <summary>
+/// a write capable view into an array/span
+/// </summary>
+/// <typeparam name="T"></typeparam>
 public readonly struct WriteMem<T>
 {
 	private readonly MemoryOwner<T> _owner;
@@ -338,7 +346,10 @@ public readonly struct WriteMem<T>
 	}
 
 }
-
+/// <summary>
+///  a read-only capable view into an array/span
+/// </summary>
+/// <typeparam name="T"></typeparam>
 public readonly struct ReadMem<T>
 {
 	private readonly MemoryOwner<T> _owner;
