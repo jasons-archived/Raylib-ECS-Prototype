@@ -1,4 +1,6 @@
 ﻿# Template coppied from https://github.com/LanguageDev/Yoakke/tree/master/Sources, mostly for the header example.   
+# help/hints: https://editorconfig.org/#supported-properties
+
 root = true
 
 [*]
@@ -13,7 +15,7 @@ indent_style = tab
 [*.cs]
 
 # File header template  https://docs.microsoft.com/en-us/visualstudio/ide/reference/add-file-header?view=vs-2019
-file_header_template = [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] \n[!!] This file is part of the NOTNOT Game Engine. \n[!!] Copyright (c) Novaleaf and Contributors. \n[!!] Licensed under the AGPL-3.0. \n[!!] Contributions Guarantee Citizenship! \n[!!] Would you like to know more? https://github.com/NotNotTech/NotNot \n[!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
+file_header_template = [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] \n[!!] This file is part of the NOTNOT Game Engine. \n[!!] Copyright (c) NOTNOT Maintainers and Contributors. \n[!!] Licensed under the AGPL-3.0. \n[!!] ------------------------------------------------- \n[!!] Contributions Guarantee Citizenship! \n[!!] Would you like to know more? https://github.com/NotNotTech/NotNot \n[!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
 # #Core editorconfig formatting - indentation
 
 # #use soft tabs (spaces) for indentation
@@ -189,6 +191,10 @@ dotnet_diagnostic.IDE0055.severity = none
 
 # We have some weird interaction between source generators and included sources when
 # trying to put this in Tests/.editorconfig
+
+# CS0642: Possible mistaken empty statement
+dotnet_diagnostic.CS0642.severity = error
+
 [Tests/**.cs]
 # dotnet_diagnostic.SA1116.severity = none
 # dotnet_diagnostic.SA1117.severity = none

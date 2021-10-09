@@ -20,3 +20,12 @@ Some ECS Intro videos that are mostly applicable to !!.Ecs
 # Graphics Programming
 - https://github.com/lettier/3d-game-shaders-for-beginners  beginner guides to shader dev
 - https://vksegfault.github.io/posts/gentle-intro-gpu-inner-workings/   inner workings of the modern gpu
+
+
+
+
+# Business / Market analysis
+- Market anaysis of Roblox https://www.fortressofdoors.com/so-you-want-to-compete-with-roblox/
+  - https://news.ycombinator.com/item?id=28714779
+
+

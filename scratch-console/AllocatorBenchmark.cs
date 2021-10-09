@@ -36,7 +36,6 @@ namespace MyBenchmarks;
 //}
 
 [SimpleJob(runStrategy: BenchmarkDotNet.Engines.RunStrategy.Throughput, launchCount: 1)]
-[ShortRunJob]
 [MemoryDiagnoser]
 [ThreadingDiagnoser]
 public class AllocatorBenchmark

@@ -14,8 +14,9 @@ namespace NotNot.Engine.Sim;
 /// <summary>
 /// Manages execution of <see cref="SimNode"/> in parallel based on order-of-execution requirements (see <see cref="SimNode._updateBefore"/>) and resource requirements (see <see cref="SimNode._readResources"/> and <see cref="SimNode._writeResources"/>)
 /// </summary>
-public partial class SimManager //tree management
+public partial class SimManager: DisposeGuard //tree management
 {
+	[Obsolete("doesn't handle hiearchies added/removed, ")]
 	public Dictionary<string, SimNode> _nodeRegistry = new();
 	public RootNode _root;
 
@@ -27,6 +28,8 @@ public partial class SimManager //tree management
 
 	public void Register(SimNode node)
 	{
+		__ERROR.Throw(node._children.Count == 0, "register/unregister hiearchies is not currently supported due to SimManager._nodeRegistry not getting updated for children");
+		__ERROR.Throw(node.Name != null, $"your node of type {node.GetType().Name} has a blank name.  It must have a unique .Name property");
 		SimNode parent;
 		lock (_nodeRegistry)
 		{
@@ -42,6 +45,7 @@ public partial class SimManager //tree management
 
 	public void Unregister(SimNode node)
 	{
+		__ERROR.Throw(node._children.Count == 0, "register/unregister hiearchies is not currently supported due to SimManager._nodeRegistry not getting updated for children");
 
 		node._parent.OnChildUnregister(node);
 
@@ -52,6 +56,22 @@ public partial class SimManager //tree management
 			__ERROR.Throw(result);
 			__ERROR.Throw(node == foundNode, "should ref equal");
 		}
+	}
+
+	protected override void OnDispose()
+	{
+		//dispose entire hirearchy
+		_root.Dispose();
+		_nodeRegistry.Clear();
+		_nodeRegistry = null;
+		_root = null;
+		_resourceLocks.Clear();
+		_resourceLocks= null;
+		_frame.Dispose();
+		_frame = null;
+		_priorFrameTask.Dispose();
+		_priorFrameTask = null;
+		base.OnDispose();
 	}
 }
 public partial class SimManager //thread execution
@@ -126,7 +146,9 @@ public class RootNode : SimNode, IIgnoreUpdate
 public abstract partial class SimNode   //tree logic
 {
 	public string Name { get; init; }
-	public string ParentName { get; init; }
+
+	private string _parentName;
+	public string ParentName { get=>_parentName; init=>_parentName=value; }
 	public SimNode _parent;
 	public SimManager _manager;
 
@@ -210,6 +232,24 @@ public abstract partial class SimNode   //tree logic
 		_parent = null;
 		_manager = null;
 	}
+
+	public void RegisterChild(SimNode child)
+	{
+		if(child.ParentName!=null && child.ParentName != this.Name)
+		{
+			__ERROR.Throw(false, $"you are adding the node {child.Name} as a child of ${this.Name} but it's Parent parameter is already set to {child.ParentName}.  either set the ParentName to null or to {this.Name}  ");
+		}
+
+		child._parentName = this.Name;
+
+		_manager.Register(child);		
+	}
+	public void UnregisterSelf()
+	{
+		_manager.Unregister(this);
+	}
+
+
 
 }
 
@@ -438,7 +478,9 @@ public abstract partial class SimNode : DisposeGuard, IComparable<SimNode> //fra
 	/// </summary>
 	public List<object> _writeResources = new();
 
-
+	/// <summary>
+	/// dispose self and all children
+	/// </summary>
 	protected override void OnDispose()
 	{
 		foreach (var child in _children)
@@ -459,7 +501,7 @@ public abstract partial class SimNode : DisposeGuard, IComparable<SimNode> //fra
 		if (IsInitialized == true)
 		{
 			return;
-		}
+		}		
 		IsInitialized = true;
 		OnInitialize();
 	}
@@ -478,7 +520,7 @@ public abstract partial class SimNode : DisposeGuard, IComparable<SimNode> //fra
 /// <summary>
 /// A frame of execution.  We need to store state regarding SimNode execution status and that is done here, with the accompanying logic.
 /// </summary>
-public partial class Frame //general setup
+public partial class Frame : DisposeGuard //general setup
 {
 	public TimeStats _stats;
 	public SimManager _manager;
@@ -496,6 +538,27 @@ public partial class Frame //general setup
 
 	public bool IsRunningSlowly { get => _slowRunningNodes.Count > 0; }
 	public List<FixedTimestepNode> _slowRunningNodes = new();
+
+
+	protected override void OnDispose()
+	{
+		_manager = null;
+		_stats= default(TimeStats);
+		_allNodesInFrame.Clear();
+		_allNodesInFrame = null;
+		_allNodesToProcess.Clear();
+		_allNodesToProcess = null;
+		_frameStates.Clear();
+		_frameStates = null;
+		_priorFrame = null;
+		_readRequestsRemaining.Clear();
+		_readRequestsRemaining = null;
+		_writeRequestsRemaining.Clear();
+		_writeRequestsRemaining = null;
+
+
+		base.OnDispose();
+	}
 
 }
 

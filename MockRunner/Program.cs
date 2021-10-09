@@ -1,4 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
+// See https://aka.ms/new-console-template for more information
 
 //Console.WriteLine("Hello, World!");
 
@@ -92,6 +92,21 @@ using Microsoft.Toolkit.HighPerformance.Buffers;
 
 //System.Environment.Exit(0);
 
+
+
+var engine = new NotNot.Engine.Engine();
+var updater = new NotNot.Engine.SimpleUpdater();
+engine.Updater = updater;
+engine.Initialize();
+updater.Run();
+
+engine.Dispose();
+
+
+
+
+
+
 var manager = new SimManager() { };
 
 
@@ -122,18 +137,6 @@ manager.Register(new DelayTest { ParentName = "B", Name = "C3", _updateAfter = {
 
 
 manager.Register(new DebugPrint { ParentName = "C3", Name = "DebugPrint" });
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 var loop = 0;

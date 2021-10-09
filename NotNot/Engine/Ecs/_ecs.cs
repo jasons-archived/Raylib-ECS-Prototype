@@ -19,7 +19,6 @@ using System.Threading.Tasks;
 namespace NotNot.Engine.Ecs;
 
 
-
 /// <summary>
 /// A "Simulation World".  all archetypes, their entities, their components, and systems are under a single world.
 /// </summary>
@@ -27,7 +26,11 @@ public class World : SystemBase
 {
 	public EntityManager entityManager = new();
 
-
+	protected override void OnInitialize()
+	{
+		RegisterChild(entityManager);
+		base.OnInitialize();
+	}
 
 	protected override Task Update()
 	{
@@ -53,6 +56,9 @@ public abstract class SystemBase : Sim.FixedTimestepNode
 
 }
 
+/// <summary>
+/// internal helper used to ensure components are not read+write at the same time.   for better performance, only checks during DEBUG builds
+/// </summary>
 public class AccessGuard
 {
 	//TODO: Read/Write sentinels should just track when reads/writes are permitted.
@@ -71,6 +77,10 @@ public class AccessGuard
 
 
 }
+
+/// <summary>
+/// coordinates the creation/deletion/query of entities and their components for the given <see cref="World"/>
+/// </summary>
 public partial class EntityManager : SystemBase //init / setup
 {
 	public EntityRegistry _entityRegistry = new();
@@ -443,12 +453,15 @@ public class QueryOptions
 	/// <summary>
 	/// an optional delegate to let you add/remove archetypes from the query.
 	/// </summary>
-
+	/// <remarks>be sure that added archetypes have all TComponents you may request in <see cref="EntityQuery.SelectRange"/> otherwise an exception will be thrown</remarks>
 	public Action<List<Archetype>> custom;
+
 	/// <summary>
-	/// default is false.   Set to True to disable the automatic requery when archetypes are added/removed from the world.
-	/// Setting to false means that when archetypes are added that match your query, they won't be included until you Manually Refresh.
+	/// Disables the automatic requery when archetypes are added to the world.
 	/// </summary>
+	/// <remarks>default is false, added archetypes causes will cause the query to re-aquire on it's next call.
+	/// Setting to true means that when archetypes are added that match your query, they won't be included until you Manually call <see cref="EntityQuery.RefreshQuery"/>.
+	/// <para>You might want to set to True for better performance, if you have a specialized query and you know no other archetypes added will impact it.</para></remarks>
 	public bool DisableAutoRefresh { get; set; }
 
 	public QueryOptions() { }

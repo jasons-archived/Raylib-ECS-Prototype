@@ -30,6 +30,7 @@
     - [funding](#funding)
     - [important feature needs:](#important-feature-needs)
     - [rendering?](#rendering)
+    - [Spatial partitioning notes](#spatial-partitioning-notes)
 
 # NotNot?
 It's not not an engine.
@@ -225,6 +226,10 @@ any work done to unsafe code should be verified by using GC Hole stress, as defi
 - need to create a custom MemoryOwner that clears ref types on dispose	
 - Component Read/Write sentinels should just track when reads/writes are permitted.  if they occur outside of those times, assert.   This way we don't need to track who does all writes.
 - //TODO: add expected cost of update metrics for current frame and past frames (to SimNode/Frame)
+- SimNode Register/Unregister writes to the SimManager.nodeRegistry lookup.  This doesn't handle hiearchy chains added/removed, plus still need to discover the name somehow.  
+  - maybe remove this.
+  - and have node searches be expensive tree traversal
+- 
 
 
 
@@ -262,6 +267,8 @@ Logical object structure is
     - https://github.com/CommunityToolkit/WindowsCommunityToolkit
     - https://docs.microsoft.com/en-us/windows/communitytoolkit/nuget-packages
 - physics: https://github.com/bepu/bepuphysics2
+  - physics, intersection: https://www.realtimerendering.com/intersections.html
+  - 
 - math helper libs: Silk.net
 - input and other platform libs: Silk.net
 - kitbash:  https://kenney.nl/tools/assetforge and https://kenney.itch.io/kenshape
@@ -299,8 +306,9 @@ Logical object structure is
   - https://github.com/cla-assistant/cla-assistant
   - https://github.com/Roblox/cla-signature-bot
 - SLA for contributions
-
-
+- **repository checklist**
+  - https://gist.github.com/ZacharyPatten/08532b31ef5efc7593b32326b498023a
+- project github badges: https://shields.io/category/downloads
 ### funding
 - donations
 	- patreon
@@ -333,5 +341,38 @@ some potentail solutions
 - Ogre Next
   - https://github.com/OGRECave/ogre-next
   - ***DOES NOT SUPPORT C#***
-
+- example silk based voxel rendering engine: https://github.com/Redhacker1/MinecraftClone-Core/tree/main/Engine
 review these tutorials if need to do basic things like camera/frustum: https://github.com/gametutorials/tutorials/tree/master/OpenGL
+
+
+
+### Spatial partitioning notes
+
+- re monogame discord
+  - prime31Role icon, Middleware — Today at 8:56 AM
+    - Scene graph: https://github.com/prime31/Nez/blob/master/Nez.Portable/ECS/Scene.cs
+    - Spatial partitioning: https://github.com/prime31/Nez/blob/master/Nez.Portable/Physics/SpatialHash.cs
+  - Apos — Today at 8:59 AM
+    - I have this one: https://github.com/Apostolique/Apos.Spatial/blob/main/Source/AABBTree.cs
+    - Dcrew has this: https://github.com/DeanReynolds/Dcrew.Spatial/blob/master/src/Quadtree.cs
+    - Based on this: https://github.com/RandyGaul/cute_framework/blob/master/src/cute_aabb_tree.cpp
+    - btw, it's based on Randy's code, but his code is based on Box2D
+         The Box2D creator has a presentation about it
+         But our's has improvements
+         Box2D has plans for other types of improvements but they aren't coded yet
+         https://box2d.org/files/ErinCatto_DynamicBVH_GDC2019.pdf
+         One thing that's cool is that I ported the C code to C# and by doing so I found a bunch of bugs
+         There are stuff that's undefined in C that C# doesn't allow as easily
+    - This is what I do in my map editor: https://github.com/Apostolique/Apos.Editor/blob/8cf0cfdabe13629f2c42932090a2a57a68f4ba18/Game/Layer1/World.cs#L41-L48
+      ```cs
+      public void Draw(SpriteBatch s) {
+         foreach (var e in Lilypads.Query(Camera.ViewRect).OrderBy(e => e))
+               e.Draw(s);
+         foreach (var e in Woods.Query(Camera.ViewRect).OrderBy(e => e))
+               e.Draw(s);
+         foreach (var e in Clouds.Query(Camera.ViewRect).OrderBy(e => e))
+               e.Draw(s);
+      }
+      ```
+
+- 
