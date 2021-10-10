@@ -10,7 +10,7 @@ using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
 using NotNot.Engine.Ecs;
 
-namespace NotNot.Engine._internal.ExecPipeline;
+namespace NotNot.Engine.Internal.SimPipeline;
 
 /// <summary>
 /// Manages execution of <see cref="SimNode"/> in parallel based on order-of-execution requirements (see <see cref="SimNode._updateBefore"/>) and resource requirements (see <see cref="SimNode._readResources"/> and <see cref="SimNode._writeResources"/>)
@@ -235,7 +235,23 @@ public class RootNode : SimNode, IIgnoreUpdate
 /// </remarks>
 public abstract partial class SimNode   //tree logic
 {
-	public string Name { get; init; } = InstanceNameCounter.CreateName<SimNode>();
+
+	private string _nameCached;
+	public string Name
+	{
+		get
+		{
+			if (_nameCached == null)
+			{
+				_nameCached = InstanceNameCounter.CreateName(this.GetType());
+			}
+			return _nameCached;
+		}
+		init
+		{
+			_nameCached = value;
+		}
+	}
 
 
 	private string _parentNameCached;

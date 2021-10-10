@@ -27,6 +27,14 @@ namespace NotNot.Bcl.Diagnostics
 				return $"{type.Name}_{counter++}";
 			}
 		}
+		public static string CreateName(Type type)
+		{
+			lock (_countTracker)
+			{
+				ref var counter = ref _countTracker._GetValueRefOrAddDefault_Unsafe(type, out _);
+				return $"{type.Name}_{counter++}";
+			}
+		}
 		/// <summary>
 		/// uses Type.FullName, eg: "System.Int_42"
 		/// </summary>

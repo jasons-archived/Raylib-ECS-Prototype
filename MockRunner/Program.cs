@@ -11,7 +11,7 @@ using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
 using NotNot.Engine.Ecs.Allocation;
 using NotNot.Engine.Ecs;
-using NotNot.Engine._internal.ExecPipeline;
+using NotNot.Engine.Internal.SimPipeline;
 using Microsoft.Toolkit.HighPerformance.Buffers;
 
 
@@ -103,7 +103,7 @@ using Microsoft.Toolkit.HighPerformance.Buffers;
 //engine.Dispose();
 
 var tests = new Tests.Internals.BasicWorkflow();
-await tests.ExecutionFramework_e2e();
+await tests.Engine_WorldWithChild();
 
 
 

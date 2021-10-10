@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
-using NotNot.Bcl._internal;
+using NotNot.Bcl.Internal;
 
 namespace NotNot.Bcl.Collections._unused
 {
@@ -170,9 +170,9 @@ namespace NotNot.Bcl.Collections._unused
 		{
 			lock (_lock)
 			{
-				if (_raw.Length > __Config.ResizableArray_minShrinkSize && (Length < _raw.Length / 4))
+				if (_raw.Length > Config.ResizableArray_minShrinkSize && (Length < _raw.Length / 4))
 				{
-					var newCapacity = Math.Max(Length * 2, __Config.ResizableArray_minShrinkSize);
+					var newCapacity = Math.Max(Length * 2, Config.ResizableArray_minShrinkSize);
 					this._SetCapacity(newCapacity);
 				}
 			}
@@ -366,9 +366,9 @@ namespace NotNot.Bcl.Collections._unused
 		{
 			lock (_lock)
 			{
-				if (_raw.Length > __Config.ResizableArray_minShrinkSize && (Length < _raw.Length / 4))
+				if (_raw.Length > Config.ResizableArray_minShrinkSize && (Length < _raw.Length / 4))
 				{
-					var newCapacity = Math.Max(Length * 2, __Config.ResizableArray_minShrinkSize);
+					var newCapacity = Math.Max(Length * 2, Config.ResizableArray_minShrinkSize);
 					this._SetCapacity(newCapacity);
 				}
 			}

@@ -2,7 +2,7 @@ using NotNot.Bcl;
 using NotNot.Bcl.Collections._unused;
 using NotNot.Bcl.Diagnostics;
 using NotNot.Engine.Ecs.Allocation;
-using NotNot.Engine._internal.ExecPipeline;
+using NotNot.Engine.Internal.SimPipeline;
 using Microsoft.Toolkit.HighPerformance.Buffers;
 using System;
 using System.Collections.Concurrent;

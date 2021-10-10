@@ -1,6 +1,6 @@
 ﻿using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
-using NotNot.Engine._internal.ExecPipeline;
+using NotNot.Engine.Internal.SimPipeline;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
