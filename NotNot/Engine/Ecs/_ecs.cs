@@ -420,19 +420,19 @@ public partial class EntityManager //entity query
 
 
 public delegate void SelectRangeCallback_R<TC1>(ReadMem<EntityMetadata> meta, ReadMem<TC1> c1);
-public delegate void SelectRangeCallback_W<TC1>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1);
+public delegate void SelectRangeCallback_W<TC1>(ReadMem<EntityMetadata> meta, Mem<TC1> c1);
 public delegate void SelectRangeCallback_RR<TC1, TC2>(ReadMem<EntityMetadata> meta, ReadMem<TC1> c1, ReadMem<TC2> c2);
-public delegate void SelectRangeCallback_WR<TC1, TC2>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1, ReadMem<TC2> c2);
-public delegate void SelectRangeCallback_WW<TC1, TC2>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1, WriteMem<TC2> c2);
+public delegate void SelectRangeCallback_WR<TC1, TC2>(ReadMem<EntityMetadata> meta, Mem<TC1> c1, ReadMem<TC2> c2);
+public delegate void SelectRangeCallback_WW<TC1, TC2>(ReadMem<EntityMetadata> meta, Mem<TC1> c1, Mem<TC2> c2);
 public delegate void SelectRangeCallback_RRR<TC1, TC2, TC3>(ReadMem<EntityMetadata> meta, ReadMem<TC1> c1, ReadMem<TC2> c2, ReadMem<TC3> c3);
-public delegate void SelectRangeCallback_WRR<TC1, TC2, TC3>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1, ReadMem<TC2> c2, ReadMem<TC3> c3);
-public delegate void SelectRangeCallback_WWR<TC1, TC2, TC3>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1, WriteMem<TC2> c2, ReadMem<TC3> c3);
-public delegate void SelectRangeCallback_WWW<TC1, TC2, TC3>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1, WriteMem<TC2> c2, WriteMem<TC3> c3);
+public delegate void SelectRangeCallback_WRR<TC1, TC2, TC3>(ReadMem<EntityMetadata> meta, Mem<TC1> c1, ReadMem<TC2> c2, ReadMem<TC3> c3);
+public delegate void SelectRangeCallback_WWR<TC1, TC2, TC3>(ReadMem<EntityMetadata> meta, Mem<TC1> c1, Mem<TC2> c2, ReadMem<TC3> c3);
+public delegate void SelectRangeCallback_WWW<TC1, TC2, TC3>(ReadMem<EntityMetadata> meta, Mem<TC1> c1, Mem<TC2> c2, Mem<TC3> c3);
 public delegate void SelectRangeCallback_RRRR<TC1, TC2, TC3, TC4>(ReadMem<EntityMetadata> meta, ReadMem<TC1> c1, ReadMem<TC2> c2, ReadMem<TC3> c3, ReadMem<TC4> c4);
 public delegate void SelectRangeCallback_WRRR<TC1, TC2, TC3, TC4>(ReadMem<EntityMetadata> meta, ReadMem<TC1> c1, ReadMem<TC2> c2, ReadMem<TC3> c3, ReadMem<TC4> c4);
-public delegate void SelectRangeCallback_WWRR<TC1, TC2, TC3, TC4>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1, ReadMem<TC2> c2, ReadMem<TC3> c3, ReadMem<TC4> c4);
-public delegate void SelectRangeCallback_WWWR<TC1, TC2, TC3, TC4>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1, ReadMem<TC2> c2, WriteMem<TC3> c3, ReadMem<TC4> c4);
-public delegate void SelectRangeCallback_WWWW<TC1, TC2, TC3, TC4>(ReadMem<EntityMetadata> meta, WriteMem<TC1> c1, ReadMem<TC2> c2, WriteMem<TC3> c3, WriteMem<TC4> c4);
+public delegate void SelectRangeCallback_WWRR<TC1, TC2, TC3, TC4>(ReadMem<EntityMetadata> meta, Mem<TC1> c1, ReadMem<TC2> c2, ReadMem<TC3> c3, ReadMem<TC4> c4);
+public delegate void SelectRangeCallback_WWWR<TC1, TC2, TC3, TC4>(ReadMem<EntityMetadata> meta, Mem<TC1> c1, ReadMem<TC2> c2, Mem<TC3> c3, ReadMem<TC4> c4);
+public delegate void SelectRangeCallback_WWWW<TC1, TC2, TC3, TC4>(ReadMem<EntityMetadata> meta, Mem<TC1> c1, ReadMem<TC2> c2, Mem<TC3> c3, Mem<TC4> c4);
 
 
 /// <summary>
@@ -710,7 +710,7 @@ public class EntityQuery
 		{
 			callback(
 				ReadMem.Allocate(meta._storage)
-				, WriteMem.Allocate(c1._storage)
+				, Mem.Allocate(c1._storage)
 				);
 		});
 
@@ -736,7 +736,7 @@ public class EntityQuery
 
 		_SelectRangeHelper<TC1, TC2>((meta, c1, c2) => callback(
 			ReadMem.Allocate(meta._storage)
-			, WriteMem.Allocate(c1._storage)
+			, Mem.Allocate(c1._storage)
 			, ReadMem.Allocate(c2._storage)
 			));
 	}
@@ -747,8 +747,8 @@ public class EntityQuery
 
 		_SelectRangeHelper<TC1, TC2>((meta, c1, c2) => callback(
 			ReadMem.Allocate(meta._storage)
-			, WriteMem.Allocate(c1._storage)
-			, WriteMem.Allocate(c2._storage)
+			, Mem.Allocate(c1._storage)
+			, Mem.Allocate(c2._storage)
 			));
 	}
 
@@ -773,7 +773,7 @@ public class EntityQuery
 
 		_SelectRangeHelper<TC1, TC2, TC3>((meta, c1, c2, c3) => callback(
 			ReadMem.Allocate(meta._storage)
-			, WriteMem.Allocate(c1._storage)
+			, Mem.Allocate(c1._storage)
 			, ReadMem.Allocate(c2._storage)
 			, ReadMem.Allocate(c3._storage)
 			));
@@ -786,8 +786,8 @@ public class EntityQuery
 
 		_SelectRangeHelper<TC1, TC2, TC3>((meta, c1, c2, c3) => callback(
 			ReadMem.Allocate(meta._storage)
-			, WriteMem.Allocate(c1._storage)
-			, WriteMem.Allocate(c2._storage)
+			, Mem.Allocate(c1._storage)
+			, Mem.Allocate(c2._storage)
 			, ReadMem.Allocate(c3._storage)
 			));
 	}
@@ -799,9 +799,9 @@ public class EntityQuery
 
 		_SelectRangeHelper<TC1, TC2, TC3>((meta, c1, c2, c3) => callback(
 			ReadMem.Allocate(meta._storage)
-			, WriteMem.Allocate(c1._storage)
-			, WriteMem.Allocate(c2._storage)
-			, WriteMem.Allocate(c3._storage)
+			, Mem.Allocate(c1._storage)
+			, Mem.Allocate(c2._storage)
+			, Mem.Allocate(c3._storage)
 			));
 	}
 
@@ -921,7 +921,7 @@ public partial class Archetype  //query entities owned by this archetype
 	/// <summary>
 	/// efficient query of entities owned by this archetype.
 	/// </summary>
-	public void Query<TComponent>(MemoryOwner<AccessToken> accessTokens, ComponentQueryCallback_w<TComponent> callback)
+	public void Query<TComponent>(Mem<AccessToken> accessTokens, ComponentQueryCallback_w<TComponent> callback)
 	{
 		var span = accessTokens.Span;
 		foreach (ref var token in span)
@@ -930,7 +930,7 @@ public partial class Archetype  //query entities owned by this archetype
 			callback(in token, ref c1);
 		}
 	}
-	public unsafe async Task QueryAsnyc<TComponent>(MemoryOwner<AccessToken> accessTokens, ComponentQueryCallback_w<TComponent> callback)
+	public unsafe async Task QueryAsnyc<TComponent>(Mem<AccessToken> accessTokens, ComponentQueryCallback_w<TComponent> callback)
 	{
 		var array = accessTokens.DangerousGetArray();
 
@@ -959,7 +959,7 @@ public partial class Archetype  //query entities owned by this archetype
 		return ref column[token.slotRef.chunkIndex].UnsafeArray[token.slotRef.slotIndex];
 	}
 
-	public unsafe void QueryAsync<TC1, TC2>(MemoryOwner<AccessToken> accessTokens, ComponentQueryCallback_writeAll<TC1, TC2> callback)
+	public unsafe void QueryAsync<TC1, TC2>(Mem<AccessToken> accessTokens, ComponentQueryCallback_writeAll<TC1, TC2> callback)
 	{
 		//ComponentQueryCallback_w<int> test1 = (in AccessToken accessToken, ref int c1) => { };
 		//Query<int>(null, (in AccessToken accessToken, ref int c1) => {

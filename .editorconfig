@@ -15,7 +15,18 @@ indent_style = tab
 [*.cs]
 
 # File header template  https://docs.microsoft.com/en-us/visualstudio/ide/reference/add-file-header?view=vs-2019
-file_header_template = [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] \n[!!] This file is part of the NOTNOT Game Engine. \n[!!] Copyright (c) NOTNOT Maintainers and Contributors. \n[!!] Licensed under the AGPL-3.0. \n[!!] ------------------------------------------------- \n[!!] Contributions Guarantee Citizenship! \n[!!] Would you like to know more? https://github.com/NotNotTech/NotNot \n[!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
+# file_header_template = [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] \n[!!] This file is part of the NOTNOT Game Engine. \n[!!] Copyright (c) NOTNOT Maintainers and Contributors. \n[!!] Licensed under the AGPL-3.0. \n[!!] ------------------------------------------------- \n[!!] Contributions Guarantee Citizenship! \n[!!] Would you like to know more? https://github.com/NotNotTech/NotNot \n[!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
+# file_header_template = [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
+# \n[!!] This file is Licensed to the NOTNOT Game Engine. 
+# \n[!!] Copyright (c) NOTNOT Maintainers and Contributors. 
+# \n[!!] This is being licensed to you under the AGPL-3.0.  
+# \n[!!] See the LICENSE.md file in the project root for more info.
+# \n[!!] Other, more permissive license options are also available.
+# \n[!!] ------------------------------------------------- 
+# \n[!!] Contributions Guarantee Citizenship! 
+# \n[!!] Would you like to know more? https://github.com/NotNotTech/NotNot 
+# \n[!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
+
 # #Core editorconfig formatting - indentation
 
 # #use soft tabs (spaces) for indentation

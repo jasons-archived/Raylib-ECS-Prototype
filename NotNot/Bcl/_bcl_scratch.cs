@@ -13,6 +13,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using NotNot.Bcl.Collections.Advanced;
 
 namespace NotNot.Bcl;
 
@@ -233,12 +234,14 @@ public ref struct SpanGuard<T>
 /// <summary>
 /// helpers to allocate a WriteMem instance
 /// </summary>
-public static class WriteMem
+public static class Mem
 {
-	public static WriteMem<T> Allocate<T>(ArraySegment<T> backingStore) => WriteMem<T>.Allocate(backingStore);
-	public static WriteMem<T> Allocate<T>(MemoryOwner<T> memoryOwner) => WriteMem<T>.Allocate(memoryOwner);
-	public static WriteMem<T> Allocate<T>(T[] array) => WriteMem<T>.Allocate(array);
-	public static WriteMem<T> Allocate<T>(int count) => WriteMem<T>.Allocate(count);
+	public static Mem<T> Allocate<T>(ArraySegment<T> backingStore) => Mem<T>.Allocate(backingStore);
+	//public static WriteMem<T> Allocate<T>(MemoryOwnerCustom<T> MemoryOwnerNew) => WriteMem<T>.Allocate(MemoryOwnerNew);
+	public static Mem<T> Allocate<T>(T[] array) => Mem<T>.Allocate(array);
+	public static Mem<T> Allocate<T>(int count, bool clearOnDispose) => Mem<T>.Allocate(count, clearOnDispose);
+	public static Mem<T> Allocate<T>(Mem<T> writeMem) => writeMem;
+
 }
 /// <summary>
 /// helpers to allocate a ReadMem instance
@@ -246,23 +249,24 @@ public static class WriteMem
 public static class ReadMem
 {
 	public static ReadMem<T> Allocate<T>(ArraySegment<T> backingStore) => ReadMem<T>.Allocate(backingStore);
-	public static ReadMem<T> Allocate<T>(MemoryOwner<T> memoryOwner) => ReadMem<T>.Allocate(memoryOwner);
+	//public static ReadMem<T> Allocate<T>(MemoryOwnerCustom<T> MemoryOwnerNew) => ReadMem<T>.Allocate(MemoryOwnerNew);
 	public static ReadMem<T> Allocate<T>(T[] array) => ReadMem<T>.Allocate(array);
 
-	public static ReadMem<T> Allocate<T>(int count) => ReadMem<T>.Allocate(count);
+	public static ReadMem<T> Allocate<T>(int count, bool clearOnDispose) => ReadMem<T>.Allocate(count, clearOnDispose);
+	public static ReadMem<T> Allocate<T>(Mem<T> writeMem) => ReadMem<T>.Allocate(writeMem);
 }
 /// <summary>
 /// a write capable view into an array/span
 /// </summary>
 /// <typeparam name="T"></typeparam>
-public readonly struct WriteMem<T>
+public readonly struct Mem<T>
 {
-	private readonly MemoryOwner<T> _owner;
+	private readonly MemoryOwnerCustom<T> _owner;
 	private readonly ArraySegment<T> _segment;
 	private readonly T[] _array;
 	private readonly int _offset;
 	public readonly int length;
-	internal WriteMem(ArraySegment<T> segment) : this()
+	internal Mem(ArraySegment<T> segment) : this()
 	{
 		//_owner = null;
 		_segment = segment;
@@ -270,30 +274,37 @@ public readonly struct WriteMem<T>
 		_offset = segment.Offset;
 		length = segment.Count;
 	}
-	internal WriteMem(MemoryOwner<T> owner) : this(owner.DangerousGetArray())
+	internal Mem(MemoryOwnerCustom<T> owner) : this(owner.DangerousGetArray())
 	{
 		_owner = owner;
 	}
 
-	public static WriteMem<T> Allocate(int size, bool clearOnDispose = false)
+	public static Mem<T> Allocate(int size, bool clearOnDispose)
 	{
-		return new WriteMem<T>(MemoryOwner<T>.Allocate(size));
+		__DEBUG.AssertOnce(System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<T>() || clearOnDispose, "alloc of classes via memPool can/will cause leaks");
+		var mo = MemoryOwnerCustom<T>.Allocate(size);
+		mo.ClearOnDispose= clearOnDispose;
+		return new Mem<T>(mo);
 	}
-	public static WriteMem<T> Allocate(T[] array)
+	public static Mem<T> Allocate(T[] array)
 	{
-		return new WriteMem<T>(new ArraySegment<T>(array));
+		return new Mem<T>(new ArraySegment<T>(array));
 	}
-	public static WriteMem<T> Allocate(T[] array, int offset, int count)
+	public static Mem<T> Allocate(T[] array, int offset, int count)
 	{
-		return new WriteMem<T>(new ArraySegment<T>(array, offset, count));
+		return new Mem<T>(new ArraySegment<T>(array, offset, count));
 	}
-	public static WriteMem<T> Allocate(ArraySegment<T> backingStore)
+	public static Mem<T> Allocate(ArraySegment<T> backingStore)
 	{
-		return new WriteMem<T>(backingStore);
+		return new Mem<T>(backingStore);
 	}
-	public static WriteMem<T> Allocate(MemoryOwner<T> memoryOwner)
+	internal static Mem<T> Allocate(MemoryOwnerCustom<T> MemoryOwnerNew)
 	{
-		return new WriteMem<T>(memoryOwner);
+		return new Mem<T>(MemoryOwnerNew);
+	}
+	public static Mem<T> Allocate(ReadMem<T> readMem)
+	{
+		return readMem.AsWriteMem();
 	}
 
 	public ArraySegment<T> DangerousGetArray()
@@ -345,14 +356,22 @@ public readonly struct WriteMem<T>
 		return Span.GetEnumerator();
 	}
 
+	public ReadMem<T> AsReadMem()
+	{
+		if (_owner != null)
+		{
+			return new ReadMem<T>(_owner);
+		}
+		return new ReadMem<T>(_segment);
+	}
 }
 /// <summary>
 ///  a read-only capable view into an array/span
 /// </summary>
 /// <typeparam name="T"></typeparam>
-public readonly struct ReadMem<T>
+public readonly struct ReadMem<T> 
 {
-	private readonly MemoryOwner<T> _owner;
+	private readonly MemoryOwnerCustom<T> _owner;
 	private readonly ArraySegment<T> _segment;
 	private readonly T[] _array;
 	private readonly int _offset;
@@ -365,14 +384,17 @@ public readonly struct ReadMem<T>
 		_offset = segment.Offset;
 		length = segment.Count;
 	}
-	internal ReadMem(MemoryOwner<T> owner) : this(owner.DangerousGetArray())
+	internal ReadMem(MemoryOwnerCustom<T> owner) : this(owner.DangerousGetArray())
 	{
 		_owner = owner;
 	}
 
-	public static ReadMem<T> Allocate(int size, bool clearOnDispose=false)
-	{
-		return new ReadMem<T>(MemoryOwner<T>.Allocate(size));
+	public static ReadMem<T> Allocate(int size, bool clearOnDispose)
+	{				
+		__DEBUG.AssertOnce(System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<T>() || clearOnDispose, "alloc of classes via memPool can/will cause leaks");
+		var mo = MemoryOwnerCustom<T>.Allocate(size);
+		mo.ClearOnDispose = clearOnDispose;
+		return new ReadMem<T>(mo);
 	}
 	public static ReadMem<T> Allocate(T[] array)
 	{
@@ -386,14 +408,23 @@ public readonly struct ReadMem<T>
 	{
 		return new ReadMem<T>(backingStore);
 	}
-	public static ReadMem<T> Allocate(MemoryOwner<T> memoryOwner)
+	internal static ReadMem<T> Allocate(MemoryOwnerCustom<T> MemoryOwnerNew)
 	{
-		return new ReadMem<T>(memoryOwner);
+		return new ReadMem<T>(MemoryOwnerNew);
+	}
+
+	public static ReadMem<T> Allocate(Mem<T> writeMem)
+	{
+		return writeMem.AsReadMem();
 	}
 
 	public ArraySegment<T> DangerousGetArray()
 	{
 		return _segment;
+	}
+	public Span<T> DangerousGetSpan()
+	{
+		return new Span<T>(_array, _offset, length);
 	}
 
 	public ReadOnlySpan<T> Span
@@ -441,7 +472,14 @@ public ref readonly T this[int index]
 	{
 		return Span.GetEnumerator();
 	}
-
+	public Mem<T> AsWriteMem()
+	{
+		if (_owner != null)
+		{
+			return new Mem<T>(_owner);
+		}
+		return new Mem<T>(_segment);
+	}
 }
 
 

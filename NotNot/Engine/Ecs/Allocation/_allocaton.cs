@@ -1,8 +1,6 @@
 using NotNot.Bcl;
 using NotNot.Bcl.Collections._unused;
 using NotNot.Bcl.Diagnostics;
-using Microsoft.Toolkit.HighPerformance.Buffers;
-using Microsoft.Toolkit.HighPerformance.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -76,9 +74,9 @@ public class EntityRegistry
 	public int Count { get => _storage.Count; }
 
 
-	public MemoryOwner<EntityHandle> Alloc(int count)
+	public Mem<EntityHandle> Alloc(int count)
 	{
-		var toReturn = MemoryOwner<EntityHandle>.Allocate(count);
+		var toReturn = Mem<EntityHandle>.Allocate(count,false);
 		Alloc(toReturn.Span);
 		return toReturn;
 	}
@@ -290,11 +288,12 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 	/// <summary>
 	/// Get Write (exclusive) access to the chunk this entity component is in
 	/// </summary>
-	public WriteMem<TComponent> GetWriteMem<TComponent>()
+	public Mem<TComponent> GetWriteMem<TComponent>()
 	{
 		GetOwner().WriteNotify<TComponent>();
 		var chunk = GetContainingChunk<TComponent>();
-		return WriteMem.Allocate(chunk._storage);
+		return Mem.Allocate(chunk._storage);
+		
 	}
 	/// <summary>
 	/// Get Read only (shared) access to the chunk this entity component is in
@@ -1943,7 +1942,7 @@ public record struct EntityMetadata
 	/// <summary>
 	/// Obtain write access to the specified TComponent chunk that this entity is part of.
 	/// </summary>
-	public WriteMem<TComponent> GetWriteMem<TComponent>()
+	public Mem<TComponent> GetWriteMem<TComponent>()
 	{
 		return accessToken.GetWriteMem<TComponent>();
 	}
@@ -2120,7 +2119,7 @@ public class Chunk<TComponent> : Chunk
 	public static ResizableArray<List<Chunk<TComponent>>> _GLOBAL_LOOKUP = new();
 
 
-	public MemoryOwner<TComponent> _storage;
+	public Mem<TComponent> _storage;
 	public Memory<TComponent> Memory { get => _storage.Memory; }
 	//public ArraySegment<TComponent> Span
 	//{
@@ -2168,7 +2167,7 @@ public class Chunk<TComponent> : Chunk
 		//__ERROR.Throw(_count == 0); 
 		UnsafeArray = null;
 		_storage.Dispose();
-		_storage = null;
+		_storage = default;
 	}
 
 	public override void Initialize(int length, Page page, int columnIndex)
@@ -2193,7 +2192,8 @@ public class Chunk<TComponent> : Chunk
 		__CHECKED.Throw(column.Count <= columnIndex || column[columnIndex] == null);
 		column._ExpandAndSet(columnIndex, this);
 
-		_storage = MemoryOwner<TComponent>.Allocate(_length, AllocationMode.Clear); //TODO: maybe no need to clear?
+		//_storage = MemoryOwner<TComponent>.Allocate(_length, AllocationMode.Clear); //TODO: maybe no need to clear?
+		_storage = Mem<TComponent>.Allocate(_length, true);
 		UnsafeArray = _storage.DangerousGetArray().Array;
 	}
 	internal override void OnAllocSlot(ref AccessToken pageToken)

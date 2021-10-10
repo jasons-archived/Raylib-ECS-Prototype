@@ -2138,6 +2138,11 @@ public static class zz__Extensions_Type
 		var instance = Activator.CreateInstance(constructedType);
 		return (instance as T);
 	}
+
+	//public static bool _IsUnmanagedStruct(this Type type)
+	//{
+	//	return System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences()
+	//}
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1050:DeclareTypesInNamespaces")]
