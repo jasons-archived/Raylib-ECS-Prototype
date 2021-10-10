@@ -142,6 +142,7 @@ namespace NotNot.Bcl.Diagnostics
 			public static void Assert(bool condition, string message)
 			{
 				message ??= "Assert condition failed";
+				
 				Debug.Assert(condition, message);
 			}
 

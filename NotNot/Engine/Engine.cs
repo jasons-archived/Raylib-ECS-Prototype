@@ -27,7 +27,7 @@ public class Engine : DisposeGuard
 	{
 		__ERROR.Throw(Updater != null, "you must set the Updater property before calling Initialize()");
 
-		Updater.Update += OnUpdate;
+		Updater.OnUpdate += OnUpdate;
 
 
 		if (DefaultWorld != null)
@@ -62,47 +62,60 @@ public class Engine : DisposeGuard
 
 public interface IUpdatePump : IDisposable
 {
-	public event Func<TimeSpan, ValueTask> Update;
+	public event Func<TimeSpan, ValueTask> OnUpdate;
 	public Task Stop();
+	public void Start();
+	public Task MainLoop { get; }
+	public bool ShouldStop { get; set; }
+
 }
 
 public class SimpleUpdater : DisposeGuard, IUpdatePump
 {
-	public bool IsRunning { get; private set; }
-
-	System.Threading.SemaphoreSlim runningLock = new(1);
+	//System.Threading.SemaphoreSlim runningLock = new(1);
 
 
-	public event Func<TimeSpan, ValueTask> Update;
+	public event Func<TimeSpan, ValueTask> OnUpdate;
 
-	public async Task Run()
+
+	public Task MainLoop { get; private set; }
+
+
+	public void Start()
 	{
+		MainLoop = _MainLoop();
 
-		var start = Stopwatch.GetTimestamp();
-		long lastElapsed = 0;
-		IsRunning = true;
-
-		var loop = 0;
-		await runningLock.WaitAsync();
-		while (true && IsRunning == true)
+		async Task _MainLoop()
 		{
-			loop++;
-			lastElapsed = Stopwatch.GetTimestamp() - start;
-			start = Stopwatch.GetTimestamp();
-			//Console.WriteLine($" ======================== {loop} ({Math.Round(TimeSpan.FromTicks(lastElapsed).TotalMilliseconds,1)}ms) ============================================== ");
-			await Update(TimeSpan.FromTicks(lastElapsed));
-			//Console.WriteLine($"last Elapsed = {lastElapsed}");
-			runningLock.Release();
-			await runningLock.WaitAsync();
+			var start = Stopwatch.GetTimestamp();
+			long lastElapsed = 0;
+
+			var loop = 0;
+			//await runningLock.WaitAsync();
+			while (ShouldStop==false)
+			{
+				loop++;
+				lastElapsed = Stopwatch.GetTimestamp() - start;
+				start = Stopwatch.GetTimestamp();
+				//Console.WriteLine($" ======================== {loop} ({Math.Round(TimeSpan.FromTicks(lastElapsed).TotalMilliseconds,1)}ms) ============================================== ");
+				await OnUpdate(TimeSpan.FromTicks(lastElapsed));
+				//Console.WriteLine($"last Elapsed = {lastElapsed}");
+				//runningLock.Release();
+				//await runningLock.WaitAsync();
+			}
+			//runningLock.Release();
 		}
-		runningLock.Release();
 	}
+	public bool ShouldStop { get; set; }
+
 
 	public async Task Stop()
 	{
-		await runningLock.WaitAsync();
-		IsRunning= false;
-		runningLock.Release();
+		ShouldStop=true;
+		await MainLoop;
+		//await runningLock.WaitAsync();
+		//IsRunning= false;
+		//runningLock.Release();
 	}
 }
 

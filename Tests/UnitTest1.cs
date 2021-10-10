@@ -12,21 +12,18 @@ namespace Tests
 		public async Task BasicEngine_StartStop()
 		{
 			var engine = new NotNot.Engine.Engine();
-			var updater = new NotNot.Engine.SimpleUpdater();
-			engine.Updater = updater;
+			//var updater = new NotNot.Engine.SimpleUpdater();
+			engine.Updater = new NotNot.Engine.SimpleUpdater();
 			engine.Initialize();
 
-			var endTask = Task.Run(async () =>
-			{
-				await Task.Delay(100);
-				await engine.Updater.Stop();				
-			});
-			await updater.Run();
+			engine.Updater.Start();
 
-			await endTask;
 
+			await Task.Delay(100);
+
+			await engine.Updater.Stop();
+			__ERROR.Assert(engine.DefaultWorld._lastUpdate._timeStats._frameId > 30);
 			engine.Dispose();
-
 			__ERROR.Throw(engine.IsDisposed);
 
 		}
