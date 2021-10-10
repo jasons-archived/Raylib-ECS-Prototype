@@ -3,7 +3,7 @@
 using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
 using NotNot.Engine.Ecs;
-using NotNot.Engine.Sim;
+using NotNot.Engine._internal.ExecPipeline;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -70,7 +70,7 @@ public interface IUpdatePump : IDisposable
 
 }
 
-public class SimpleUpdater : DisposeGuard, IUpdatePump
+public class HeadlessUpdater : DisposeGuard, IUpdatePump
 {
 	//System.Threading.SemaphoreSlim runningLock = new(1);
 

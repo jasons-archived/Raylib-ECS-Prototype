@@ -10,7 +10,7 @@ using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
 using NotNot.Engine.Ecs;
 
-namespace NotNot.Engine.Sim;
+namespace NotNot.Engine._internal.ExecPipeline;
 
 /// <summary>
 /// Manages execution of <see cref="SimNode"/> in parallel based on order-of-execution requirements (see <see cref="SimNode._updateBefore"/>) and resource requirements (see <see cref="SimNode._readResources"/> and <see cref="SimNode._writeResources"/>)

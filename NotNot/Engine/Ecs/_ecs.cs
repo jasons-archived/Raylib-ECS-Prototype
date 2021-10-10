@@ -2,7 +2,7 @@ using NotNot.Bcl;
 using NotNot.Bcl.Collections._unused;
 using NotNot.Bcl.Diagnostics;
 using NotNot.Engine.Ecs.Allocation;
-using NotNot.Engine.Sim;
+using NotNot.Engine._internal.ExecPipeline;
 using Microsoft.Toolkit.HighPerformance.Buffers;
 using System;
 using System.Collections.Concurrent;
@@ -44,7 +44,7 @@ public class World : SystemBase
 //public delegate void EntityCreateCallback(Archetype archetype, ReadOnlySpan<EntityHandle> entities);
 
 
-public abstract class SystemBase : Sim.FixedTimestepNode
+public abstract class SystemBase : FixedTimestepNode
 {
 	protected override Task OnUpdate(Frame frame, NodeFrameState nodeState)
 	{

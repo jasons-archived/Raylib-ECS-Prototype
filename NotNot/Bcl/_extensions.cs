@@ -13,8 +13,10 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Toolkit.HighPerformance;
-using Microsoft.Toolkit.HighPerformance.Extensions;
+//using Microsoft.Toolkit.HighPerformance;
+//using DotNext;
+
+
 
 namespace NotNot.Bcl;
 
@@ -959,15 +961,27 @@ public static class zz_Extensions_Span
 		return toReturn;
 	}
 
-	public static bool _Contains<T>(this Span<T> values, ref T toFind)
+	public static bool _Contains<T>(this Span<T> values, T toFind) where T : class
 	{
-		var index = values.IndexOf(ref toFind);
-		return index >= 0;
+		foreach (var val in values)
+		{
+			if (val == toFind)
+			{
+				return true;
+			}
+		}
+		return false;
 	}
-	public static bool _Contains<T>(this ReadOnlySpan<T> values, in T toFind)
+	public static bool _Contains<T>(this ReadOnlySpan<T> values, T toFind) where T : class
 	{
-		var index = values.IndexOf(in toFind);
-		return index >= 0;
+		foreach (var val in values)
+		{
+			if (val == toFind)
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 }
