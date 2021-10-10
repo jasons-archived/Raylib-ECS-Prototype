@@ -405,3 +405,4 @@ handle MemoryOwner clear on dispose!
    and change the WriteMem.Allocate() method to take the option explicitly (no default)
 
 
+Frame.FromPool() should recycle old frames, make chain for inspection of old state

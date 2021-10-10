@@ -792,6 +792,10 @@ public partial class Frame : DisposeGuard //general setup
 	internal static Frame FromPool(TimeStats stats, Frame priorFrame, SimManager manager)
 	{
 		//TODO: make chain, recycle old stuff every update
+		if (priorFrame != null)
+		{
+			priorFrame.Dispose();
+		}
 		return new Frame() { _stats = stats, _manager = manager };
 
 	}

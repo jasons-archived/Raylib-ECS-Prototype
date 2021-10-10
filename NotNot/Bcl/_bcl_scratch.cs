@@ -482,7 +482,7 @@ public class DisposeGuard : IDisposable
 	{
 		if (!IsDisposed)
 		{
-			__ERROR.Assert(false, "Did not call .Dispose() of the embedding type properly.    Callstack: " + CtorStackTrace);
+			__ERROR.Assert(false, $"Did not call {this.GetType().Name}.Dispose() of the embedding type properly.    Callstack: " + CtorStackTrace);
 		}
 	}
 }

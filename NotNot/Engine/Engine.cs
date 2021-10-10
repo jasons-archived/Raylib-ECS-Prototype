@@ -1,4 +1,4 @@
-﻿
+
 
 using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
@@ -21,7 +21,7 @@ public class Engine : DisposeGuard
 
 	public World DefaultWorld { get; set; } = new() { Name="DefaultWorld"};
 
-	public IUpdate Updater;
+	public IUpdatePump Updater;
 
 	public void Initialize()
 	{
@@ -44,6 +44,8 @@ public class Engine : DisposeGuard
 		//return ValueTask.CompletedTask;
 	}
 
+	
+
 	protected override void OnDispose()
 	{
 		Updater.Dispose();
@@ -58,23 +60,31 @@ public class Engine : DisposeGuard
 
 }
 
-public interface IUpdate : IDisposable
+public interface IUpdatePump : IDisposable
 {
 	public event Func<TimeSpan, ValueTask> Update;
+	public Task Stop();
 }
 
-public class SimpleUpdater : DisposeGuard, IUpdate
+public class SimpleUpdater : DisposeGuard, IUpdatePump
 {
+	public bool IsRunning { get; private set; }
+
+	System.Threading.SemaphoreSlim runningLock = new(1);
+
+
 	public event Func<TimeSpan, ValueTask> Update;
 
-	public async void Run()
+	public async Task Run()
 	{
 
 		var start = Stopwatch.GetTimestamp();
 		long lastElapsed = 0;
+		IsRunning = true;
 
 		var loop = 0;
-		while (true && IsDisposed == false)
+		await runningLock.WaitAsync();
+		while (true && IsRunning == true)
 		{
 			loop++;
 			lastElapsed = Stopwatch.GetTimestamp() - start;
@@ -82,7 +92,17 @@ public class SimpleUpdater : DisposeGuard, IUpdate
 			//Console.WriteLine($" ======================== {loop} ({Math.Round(TimeSpan.FromTicks(lastElapsed).TotalMilliseconds,1)}ms) ============================================== ");
 			await Update(TimeSpan.FromTicks(lastElapsed));
 			//Console.WriteLine($"last Elapsed = {lastElapsed}");
+			runningLock.Release();
+			await runningLock.WaitAsync();
 		}
+		runningLock.Release();
+	}
+
+	public async Task Stop()
+	{
+		await runningLock.WaitAsync();
+		IsRunning= false;
+		runningLock.Release();
 	}
 }
 

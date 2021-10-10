@@ -94,13 +94,13 @@ using Microsoft.Toolkit.HighPerformance.Buffers;
 
 
 
-var engine = new NotNot.Engine.Engine();
-var updater = new NotNot.Engine.SimpleUpdater();
-engine.Updater = updater;
-engine.Initialize();
-updater.Run();
+//var engine = new NotNot.Engine.Engine();
+//var updater = new NotNot.Engine.SimpleUpdater();
+//engine.Updater = updater;
+//engine.Initialize();
+//updater.Run();
 
-engine.Dispose();
+//engine.Dispose();
 
 
 
