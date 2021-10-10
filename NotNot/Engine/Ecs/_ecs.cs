@@ -28,13 +28,15 @@ public class World : SystemBase
 
 	protected override void OnInitialize()
 	{
-		RegisterChild(entityManager);
+		entityManager.Initialize();
+		AddChild(entityManager);
 		base.OnInitialize();
 	}
 
 	protected override Task Update()
 	{
-		throw new NotImplementedException();
+		//throw new NotImplementedException();
+		return Task.CompletedTask;
 	}
 }
 

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -14,49 +15,119 @@ namespace NotNot.Engine.Sim;
 /// <summary>
 /// Manages execution of <see cref="SimNode"/> in parallel based on order-of-execution requirements (see <see cref="SimNode._updateBefore"/>) and resource requirements (see <see cref="SimNode._readResources"/> and <see cref="SimNode._writeResources"/>)
 /// </summary>
-public partial class SimManager: DisposeGuard //tree management
+public partial class SimManager : DisposeGuard //tree management
 {
-	[Obsolete("doesn't handle hiearchies added/removed, ")]
-	public Dictionary<string, SimNode> _nodeRegistry = new();
+	public ConcurrentDictionary<string, SimNode> _nodeRegistry = new();
 	public RootNode _root;
 
 	public SimManager()
 	{
-		_root = new RootNode { Name = "root", _manager = this };
-		_nodeRegistry.Add(_root.Name, _root);
+		_root = new RootNode { Name = "root", HierarchyDepth = 0 };
+		_root.Register(this);
+		__DEBUG.Throw(_nodeRegistry.ContainsKey(_root.Name));
+		//var result = _nodeRegistry.TryAdd(_root.Name, _root);
+		//__DEBUG.Throw(result);
+		
 	}
 
+	/// <summary>
+	/// if you know the ParentName and that parent is already registered, you can attach to it indirectly here
+	/// </summary>
+	/// <param name="node"></param>
 	public void Register(SimNode node)
 	{
-		__ERROR.Throw(node._children.Count == 0, "register/unregister hiearchies is not currently supported due to SimManager._nodeRegistry not getting updated for children");
-		__ERROR.Throw(node.Name != null, $"your node of type {node.GetType().Name} has a blank name.  It must have a unique .Name property");
-		SimNode parent;
-		lock (_nodeRegistry)
-		{
-			__ERROR.Throw(_nodeRegistry.TryAdd(node.Name, node), $"A node with the same name of '{node.Name}' is already registered");
-			var result = _nodeRegistry.TryGetValue(node.ParentName, out parent);
-			__ERROR.Throw(result, $"Node registration failed.  Node '{node.Name}' parent of '{node.ParentName}' is not registered.");
-		}
+		__ERROR.Throw(node.ParentNameNew != null, "you must know the parent name and store it as string in node.ParentName ");
+		Register(node, node.ParentNameNew);
 
-		parent.OnChildRegister(node);
 
+
+		//__ERROR.Throw(node.Name != null, $"your node of type {node.GetType().Name} has a blank name.  It must have a unique .Name property");
+
+		////find parent
+		////SimNode parent;
+		//if(!_nodeRegistry.TryGetValue(node.ParentNameNew, out var parent))
+		//{
+		//	//no parent found
+		//	__ERROR.Throw(false, $"Registration of node '{node.Name}' failed because it's parent, named '{node.ParentNameNew}' was not already registered");
+		//	return;
+		//}
+		//__CHECKED.Throw(parent._managerNew == this);
+		//parent.AddChild(node);
+
+
+
+
+		//lock (_nodeRegistry)
+		//{
+		//	__ERROR.Throw(_nodeRegistry.TryAdd(node.Name, node), $"A node with the same name of '{node.Name}' is already registered");
+		//	var result = _nodeRegistry.TryGetValue(node.ParentName, out parent);
+		//	__ERROR.Throw(result, $"Node registration failed.  Node '{node.Name}' parent of '{node.ParentName}' is not registered.");
+		//}
+
+
+
+		//__ERROR.Throw(node._children.Count == 0, "register/unregister hiearchies is not currently supported due to SimManager._nodeRegistry not getting updated for children");
+		//SimNode parent;
+		//lock (_nodeRegistry)
+		//{
+		//	__ERROR.Throw(_nodeRegistry.TryAdd(node.Name, node), $"A node with the same name of '{node.Name}' is already registered");
+		//	var result = _nodeRegistry.TryGetValue(node.ParentName, out parent);
+		//	__ERROR.Throw(result, $"Node registration failed.  Node '{node.Name}' parent of '{node.ParentName}' is not registered.");
+		//}
+
+		//parent.OnChildRegister(node);
 	}
 
-
-	public void Unregister(SimNode node)
+	public void Register(SimNode node, string parentName)
 	{
-		__ERROR.Throw(node._children.Count == 0, "register/unregister hiearchies is not currently supported due to SimManager._nodeRegistry not getting updated for children");
 
-		node._parent.OnChildUnregister(node);
+		__ERROR.Throw(node.Name != null, $"your node of type {node.GetType().Name} has a blank name.  It must have a unique .Name property");
+		__CHECKED.Throw(node.IsRegistered==false && node.IsAdded==false);
 
-		lock (_nodeRegistry)
+		//find parent
+		//SimNode parent;
+		if (!_nodeRegistry.TryGetValue(parentName, out var parent))
 		{
-			var result = _nodeRegistry.TryGetValue(node.Name, out var foundNode);
-			_nodeRegistry.Remove(node.Name);
-			__ERROR.Throw(result);
-			__ERROR.Throw(node == foundNode, "should ref equal");
+			//no parent found
+			__ERROR.Throw(false, $"Registration of node '{node.Name}' failed because it's parent, named '{node.ParentNameNew}' was not already registered");
+			return;
 		}
+		__CHECKED.Throw(parent._managerNew == this);
+		parent.AddChild(node);
+
+
+		//node.ParentNameNew = parentName;
+		//Register(node);
+
+		//__ERROR.Throw(node._children.Count == 0, "register/unregister hiearchies is not currently supported due to SimManager._nodeRegistry not getting updated for children");
+		//__ERROR.Throw(node.Name != null, $"your node of type {node.GetType().Name} has a blank name.  It must have a unique .Name property");
+		//SimNode parent;
+		//lock (_nodeRegistry)
+		//{
+		//	__ERROR.Throw(_nodeRegistry.TryAdd(node.Name, node), $"A node with the same name of '{node.Name}' is already registered");
+		//	var result = _nodeRegistry.TryGetValue(node.ParentName, out parent);
+		//	__ERROR.Throw(result, $"Node registration failed.  Node '{node.Name}' parent of '{node.ParentName}' is not registered.");
+		//}
+
+		//parent.OnChildRegister(node);
 	}
+
+
+	//public void Unregister(SimNode node)
+	//{
+	//	node._parentNew.
+	//	__ERROR.Throw(node._children.Count == 0, "register/unregister hiearchies is not currently supported due to SimManager._nodeRegistry not getting updated for children");
+
+	//	node._parent.OnChildUnregister(node);
+
+	//	lock (_nodeRegistry)
+	//	{
+	//		var result = _nodeRegistry.TryGetValue(node.Name, out var foundNode);
+	//		_nodeRegistry.Remove(node.Name);
+	//		__ERROR.Throw(result);
+	//		__ERROR.Throw(node == foundNode, "should ref equal");
+	//	}
+	//}
 
 	protected override void OnDispose()
 	{
@@ -66,10 +137,10 @@ public partial class SimManager: DisposeGuard //tree management
 		_nodeRegistry = null;
 		_root = null;
 		_resourceLocks.Clear();
-		_resourceLocks= null;
-		_frame.Dispose();
+		_resourceLocks = null;
+		_frame?.Dispose();
 		_frame = null;
-		_priorFrameTask.Dispose();
+		_priorFrameTask?.Dispose();
 		_priorFrameTask = null;
 		base.OnDispose();
 	}
@@ -139,34 +210,104 @@ public class RootNode : SimNode, IIgnoreUpdate
 	{
 		throw new Exception("This exception will never be thrown because this implements IIgnoreUpdate");
 	}
+
+	protected override void OnAdded()
+	{
+		__ERROR.Throw(false, "root node is special, should not be added/removed, only manually placed at root of SimManager");
+		base.OnAdded();
+	}
+	protected override void OnRemoved()
+	{
+		__ERROR.Throw(false, "root node is special, should not be added/removed, only manually placed at root of SimManager");
+		base.OnRemoved();
+	}
 }
 /// <summary>
 /// A node holds logic in it's <see cref="Update(Frame)"/> method that is executed in parallel with other Simnodes.  See <see cref="SimManager"/> for detail.
 /// </summary>
+/// <remarks>
+/// <para>Lifecycle:  Create --> Add --> Register --> Update --> Unregister --> Remove --> Dispose.    
+/// Initialize() can occur any time between Create and Register.
+/// Dispose() can occur at any time, ahd the node doesn't nessicarly have to be Removed or Unregistered first, however it will crash if used when disposed.  
+/// This is acceptable in situations when the World is shutdown.
+/// For the Parent/Child hiearchy, parents get initialized/added/registered before children.  children get unregistered/removed/disposed before parents.
+/// </para>
+/// </remarks>
 public abstract partial class SimNode   //tree logic
 {
-	public string Name { get; init; }
+	public string Name { get; init; } = InstanceNameCounter.CreateName<SimNode>();
 
-	private string _parentName;
-	public string ParentName { get=>_parentName; init=>_parentName=value; }
-	public SimNode _parent;
-	public SimManager _manager;
-
-	public List<SimNode> _children = new();
+	//private string _parentName;
+	//public string ParentName { get=>_parentName; init=>_parentName=value; }
 
 
-	public List<SimNode> GetHierarchy()
+	private string _parentNameNew;
+	public string ParentNameNew
 	{
-		var toReturn = new List<SimNode>();
-		toReturn.Add(this);
-		var curNode = this;
-		while (curNode._parent != null)
+		get
 		{
-			toReturn.Add(curNode._parent);
-			curNode = curNode._parent;
+			if (_parentNew != null)
+			{
+				return _parentNew.Name;
+			}
+			return _parentNameNew;
 		}
-		toReturn.Reverse();
+		set
+		{
+			__ERROR.Throw(_parentNew == null, "can only set node.ParentName if there isn't a node.parent already set");
+			_parentNameNew = value;
+		}
+	}
+
+	public SimNode _parentNew;
+	public SimManager _managerNew;
+
+	public List<SimNode> _childrenNew = new();
+	/// <summary>
+	/// how far down the node hiearchy this is.  RootNode has depth 0.  
+	/// <para>when not registered with the SimManager (not attached to a running simulation) the depth is -1</para>
+	/// </summary>
+	protected internal int HierarchyDepth { get;internal set; } = -1;
+
+
+
+
+
+	public ReadMem<SimNode> GetHierarchy()
+	{
+		var toReturn = ReadMem<SimNode>.Allocate(HierarchyDepth + 1, true);
+
+		if (toReturn.length == 0)
+		{
+			return toReturn;
+		}
+
+		var array = toReturn.DangerousGetArray().Array;
+		var span = array.AsSpan(0, toReturn.length);
+
+		span[0] = this;
+		var curNode = this;
+		var index = 1;
+		while (curNode._parentNew != null)
+		{
+			span[index] = curNode._parentNew;
+			curNode = curNode._parentNew;
+			index++;
+		}
+		span.Reverse();  //so root is at item 0
 		return toReturn;
+
+
+		////var toReturn = new List<SimNode>();
+		////toReturn.Add(this);
+		//var curNode = this;
+		//while (curNode._parent != null)
+		//{
+		//	toReturn.Add(curNode._parent);
+		//	curNode = curNode._parent;
+		//}
+		//toReturn.Reverse();
+		//return toReturn;
 	}
 
 	/// <summary>
@@ -177,7 +318,7 @@ public abstract partial class SimNode   //tree logic
 	{
 		var chain = GetHierarchy();
 
-		var query = from node in chain select node.Name;
+		var query = from node in chain.DangerousGetArray() select node.Name;
 		return $"{Name}|{String.Join("->", query)}";
 	}
 
@@ -195,8 +336,8 @@ public abstract partial class SimNode   //tree logic
 	/// <returns></returns>
 	public int HiearchyCount()
 	{
-		var toReturn = _children.Count;
-		foreach (var child in _children)
+		var toReturn = _childrenNew.Count;
+		foreach (var child in _childrenNew)
 		{
 			toReturn += child.HiearchyCount();
 		}
@@ -206,48 +347,169 @@ public abstract partial class SimNode   //tree logic
 
 	public bool FindNode(string name, out SimNode node)
 	{
-		return _manager._nodeRegistry.TryGetValue(name, out node);
+		return _managerNew._nodeRegistry.TryGetValue(name, out node);
 	}
 
-	internal void OnChildRegister(SimNode node)
-	{
-		_children.Add(node);
-		node.OnRegister(this, _manager);
-	}
 
-	internal void OnChildUnregister(SimNode node)
-	{
-		_children.Remove(node);
-		node.OnUnregister();
-	}
 
-	protected virtual void OnRegister(SimNode parent, SimManager manager)
-	{
-		_parent = parent;
-		_manager = manager;
-	}
+	public bool IsRegistered { get; private set; }
 
-	protected virtual void OnUnregister()
+	internal void Register(SimManager manager)
 	{
-		_parent = null;
-		_manager = null;
-	}
-
-	public void RegisterChild(SimNode child)
-	{
-		if(child.ParentName!=null && child.ParentName != this.Name)
+		__ERROR.Throw(IsRegistered == false);
+		IsRegistered = true;
+		_managerNew = manager;
+		var result = _managerNew._nodeRegistry.TryAdd(Name, this);
+		__DEBUG.Throw(result);
+		OnRegister();
+		if (IsInitialized == false)
 		{
-			__ERROR.Throw(false, $"you are adding the node {child.Name} as a child of ${this.Name} but it's Parent parameter is already set to {child.ParentName}.  either set the ParentName to null or to {this.Name}  ");
+			Initialize();
+		}
+		foreach (var child in _childrenNew)
+		{
+			child.Register(manager);
+		}
+	}
+
+	/// <summary>
+	/// invoked when registered with the engine, meaning it will start getting <see cref="OnUpdate"/> calls
+	/// </summary>
+	protected virtual void OnRegister()
+	{
+
+	}
+	internal void Unregister()
+	{
+		__ERROR.Throw(IsRegistered == true);
+		IsRegistered = false;
+
+		foreach (var child in _childrenNew)
+		{
+			child.Unregister();
 		}
 
-		child._parentName = this.Name;
+		OnUnregister();
+		var result = _managerNew._nodeRegistry.TryRemove(Name,out var self);
+		__DEBUG.Throw(result && self == this);
+		_managerNew = null;
 
-		_manager.Register(child);		
+	
+
 	}
-	public void UnregisterSelf()
+	/// <summary>
+	/// invoked upon call to UnRegister, which detaches from the Engine so that it no longer recieves Update() calls. 
+	/// first unregisters children, then unregisters this
+	/// </summary>
+	protected virtual void OnUnregister()
 	{
-		_manager.Unregister(this);
+
 	}
+
+
+
+	public bool IsAdded { get; private set; }
+	public void AddChild(SimNode child)
+	{
+		__DEBUG.Throw(child.IsRegistered == false && child.IsAdded == false && _childrenNew.Contains(child) == false);
+		_childrenNew.Add(child);
+		child.Added(this);
+		OnChildAdded(child);
+
+		if (IsRegistered)
+		{
+			child.Register(_managerNew);
+		}
+
+	}
+
+	private void Added(SimNode parent)
+	{
+		__DEBUG.Throw(_parentNew == null && HierarchyDepth == -1);
+		_parentNew = parent;
+		HierarchyDepth = parent.HierarchyDepth + 1;
+		OnAdded();
+	}
+	/// <summary>
+	/// invoked when added to a parent, regardless of if registered with the engine or not.
+	/// </summary>
+	protected virtual void OnAdded()
+	{
+
+	}
+
+	protected virtual void OnChildAdded(SimNode node)
+	{
+	}
+
+
+	public void RemoveChild(SimNode child)
+	{
+		__DEBUG.Throw(child.IsAdded == true);
+		__DEBUG.Throw(_childrenNew.Contains(child));
+
+		_childrenNew.Remove(child);
+		if (IsRegistered)
+		{
+			child.Unregister();
+		}
+		child.Removed();
+
+		OnChildRemoved(child);
+	}
+
+	private void Removed()
+	{
+		_parentNew = null;
+		HierarchyDepth = -1;
+		OnRemoved();
+	}
+
+	protected virtual void OnRemoved() { }
+
+
+
+	internal virtual void OnChildRemoved(SimNode node)
+	{
+	}
+
+
+
+
+
+
+
+
+	//protected virtual void OnAdded(SimNode parent, SimManager manager)
+	//{
+	//	_parentNew = parent;
+	//	_managerNew = manager;
+	//}
+
+	///// <summary>
+	///// triggered when removed from the simNode parent
+	///// </summary>
+	//protected virtual void OnRemoved()
+	//{
+	//	_parentNew = null;
+	//	_managerNew = null;
+	//}
+
+	//public void RegisterChild(SimNode child)
+	//{
+	//	if (child.ParentName != null && child.ParentName != this.Name)
+	//	{
+	//		__ERROR.Throw(false, $"you are adding the node {child.Name} as a child of ${this.Name} but it's Parent parameter is already set to {child.ParentName}.  either set the ParentName to null or to {this.Name}  ");
+	//	}
+
+	//	child._parentName = this.Name;
+
+	//	_manager.Register(child);
+	//}
+	//public void UnregisterSelf()
+	//{
+	//	_manager.Unregister(this);
+	//}
 
 
 
@@ -373,9 +635,9 @@ public abstract partial class SimNode //update logic
 			//add this node to be executed this frame
 			allNodesToUpdateInFrame.Add(this);  //TODO: node filtering logic here based on FPS limiting, etc
 		}
-		foreach (var child in _children)
+		foreach (var child in _childrenNew)
 		{
-			child.IsDisabled = IsDisabled;
+			child.IsDisabled = IsDisabled; //current hiearchy state is propagated
 			child.OnFrameStarting(frame, allNodesToUpdateInFrame);
 		}
 
@@ -390,10 +652,10 @@ public abstract partial class SimNode //update logic
 	{
 		try
 		{
-			if (IsInitialized == false)
-			{
-				Initialize();
-			}
+			//if (IsInitialized == false)
+			//{
+			//	Initialize();
+			//}
 			return OnUpdate(frame, nodeState);
 		}
 		finally
@@ -483,7 +745,7 @@ public abstract partial class SimNode : DisposeGuard, IComparable<SimNode> //fra
 	/// </summary>
 	protected override void OnDispose()
 	{
-		foreach (var child in _children)
+		foreach (var child in _childrenNew)
 		{
 			if (child.IsDisposed == false)
 			{
@@ -501,13 +763,13 @@ public abstract partial class SimNode : DisposeGuard, IComparable<SimNode> //fra
 		if (IsInitialized == true)
 		{
 			return;
-		}		
+		}
 		IsInitialized = true;
 		OnInitialize();
 	}
 	/// <summary>
 	/// if your node has initialization steps, override this method, but be sure to call it's base.OnInitialize();
-	/// <para>If Initialize is not called by the first call to .Update(), initialize will be called automatically.</para>
+	/// <para>If Initialize is not called by the time this node is registered with the Engine, initialize will be called automatically.</para>
 	/// </summary>
 	protected virtual void OnInitialize()
 	{
@@ -543,7 +805,7 @@ public partial class Frame : DisposeGuard //general setup
 	protected override void OnDispose()
 	{
 		_manager = null;
-		_stats= default(TimeStats);
+		_stats = default(TimeStats);
 		_allNodesInFrame.Clear();
 		_allNodesInFrame = null;
 		_allNodesToProcess.Clear();
@@ -610,13 +872,13 @@ public partial class Frame ////node graph setup and execution
 		////This could probably be combined with prior foreach, but leaving sepearate for clarity and not assuming certain implementation
 		foreach (var node in _allNodesInFrame)
 		{
-			if (node._parent == null)
+			if (node._parentNew == null)
 			{
 				__DEBUG.Assert(node.GetType() == typeof(RootNode), "only root node should not have parent");
 				continue;
 			}
 			var thisNodeState = _frameStates[node];
-			var parentNodeState = _frameStates[node._parent];
+			var parentNodeState = _frameStates[node._parentNew];
 			parentNodeState._activeChildren.Add(thisNodeState);
 			thisNodeState._parent = parentNodeState;
 		}
@@ -629,7 +891,7 @@ public partial class Frame ////node graph setup and execution
 
 			//TODO: calculate and store all runBefore/ runAfter dependencies
 
-
+			
 			//updateAfter
 			foreach (var afterName in node._updateAfter)
 			{
@@ -644,7 +906,7 @@ public partial class Frame ////node graph setup and execution
 					__DEBUG.Assert(false, "missing?  maybe ok.  node not participating in this frame");
 					continue;
 				}
-				__ERROR.Throw(node.GetHierarchy().Contains(afterNodeState._node) == false, $"updateBefore('{afterName}') is invalid.  Node '{node.Name}' is a (grand)child of '{afterName}'.  You can not mark a parent as updateBefore/After." +
+				__DEBUG.Throw(node.GetHierarchy().Span._Contains(afterNodeState._node) == false, $"updateBefore('{afterName}') is invalid.  Node '{node.Name}' is a (grand)child of '{afterName}'.  You can not mark a parent as updateBefore/After." +
 					$"{node.Name} will always update during it's it's parent's update (parent updates first, but is not marked as complete until all it's children finish).");
 				nodeState._updateAfter.Add(afterNodeState);
 			}
@@ -662,7 +924,7 @@ public partial class Frame ////node graph setup and execution
 					__DEBUG.Assert(false, "missing?  maybe ok.  node not participating in this frame");
 					continue;
 				}
-				__ERROR.Throw(node.GetHierarchy().Contains(beforeNodeState._node) == false, $"updateBefore('{beforeName}') is invalid.  Node '{node.Name}' is a (grand)child of '{beforeName}'.  You can not mark a parent as updateBefore/After." +
+				__DEBUG.Throw(node.GetHierarchy().Span._Contains(beforeNodeState._node) == false, $"updateBefore('{beforeName}') is invalid.  Node '{node.Name}' is a (grand)child of '{beforeName}'.  You can not mark a parent as updateBefore/After." +
 					$"{node.Name} will always update during it's it's parent's update (parent updates first, but is not marked as complete until all it's children finish).");
 				beforeNodeState._updateAfter.Add(nodeState);
 			}

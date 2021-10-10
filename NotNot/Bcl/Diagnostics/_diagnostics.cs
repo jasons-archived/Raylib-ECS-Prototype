@@ -5,6 +5,44 @@ using System.Runtime;
 
 namespace NotNot.Bcl.Diagnostics
 {
+
+	/// <summary>
+	/// simple static helper to provide unique named instances of types.
+	/// <para>For example, calling .CreateName{int}() ==> "int_0".   Calling it again would return "int_1" </para>
+	/// </summary>
+	[ThreadSafety(ThreadSituation.Always)]
+	public static class InstanceNameCounter
+	{
+		private static Dictionary<Type, ulong> _countTracker = new();
+
+		/// <summary>
+		/// uses Type.Name, eg return: "Int_42"
+		/// </summary>
+		public static string CreateName<T>()
+		{
+			var type = typeof(T);
+			lock (_countTracker)
+			{
+				ref var counter = ref _countTracker._GetValueRefOrAddDefault_Unsafe(type, out _);
+				return $"{type.Name}_{counter++}";
+			}
+		}
+		/// <summary>
+		/// uses Type.FullName, eg: "System.Int_42"
+		/// </summary>
+		public static string CreateNameFull<T>()
+		{
+			var type = typeof(T);
+			lock (_countTracker)
+			{
+				ref var counter = ref _countTracker._GetValueRefOrAddDefault_Unsafe(type, out _);
+				return $"{type.FullName}_{counter++}";
+			}
+		}
+
+	}
+
+
 	/// <summary>
 	/// Debug helper used in #CHECKED builds.  Checked builds perform extra checks to ensure thread safety and detect data corruption
 	/// </summary>

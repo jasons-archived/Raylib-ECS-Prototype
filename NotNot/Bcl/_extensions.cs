@@ -1,4 +1,4 @@
-﻿using NotNot.Bcl.Diagnostics;
+using NotNot.Bcl.Diagnostics;
 using Microsoft.Toolkit.HighPerformance.Helpers;
 using System;
 using System.Collections.Generic;
@@ -13,6 +13,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Toolkit.HighPerformance;
+using Microsoft.Toolkit.HighPerformance.Extensions;
 
 namespace NotNot.Bcl;
 
@@ -956,6 +958,18 @@ public static class zz_Extensions_Span
 		}
 		return toReturn;
 	}
+
+	public static bool _Contains<T>(this Span<T> values, ref T toFind)
+	{
+		var index = values.IndexOf(ref toFind);
+		return index >= 0;
+	}
+	public static bool _Contains<T>(this ReadOnlySpan<T> values, in T toFind)
+	{
+		var index = values.IndexOf(in toFind);
+		return index >= 0;
+	}
+
 }
 
 

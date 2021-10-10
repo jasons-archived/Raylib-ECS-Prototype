@@ -275,7 +275,7 @@ public readonly struct WriteMem<T>
 		_owner = owner;
 	}
 
-	public static WriteMem<T> Allocate(int size)
+	public static WriteMem<T> Allocate(int size, bool clearOnDispose = false)
 	{
 		return new WriteMem<T>(MemoryOwner<T>.Allocate(size));
 	}
@@ -370,7 +370,7 @@ public readonly struct ReadMem<T>
 		_owner = owner;
 	}
 
-	public static ReadMem<T> Allocate(int size)
+	public static ReadMem<T> Allocate(int size, bool clearOnDispose=false)
 	{
 		return new ReadMem<T>(MemoryOwner<T>.Allocate(size));
 	}
@@ -408,14 +408,6 @@ public readonly struct ReadMem<T>
 		get
 		{
 			return new ReadOnlyMemory<T>(_array, _offset, length);
-		}
-	}
-
-	public int Length
-	{
-		get
-		{
-			return length;
 		}
 	}
 

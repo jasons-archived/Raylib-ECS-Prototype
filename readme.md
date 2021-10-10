@@ -21,7 +21,6 @@
 - [testing and verificaiton](#testing-and-verificaiton)
   - [unsafe code verification](#unsafe-code-verification)
     - [c# tricks/notes/perf](#c-tricksnotesperf)
-- [TODO:](#todo)
 - [issues](#issues)
 - [notes / scratch stuff below...](#notes--scratch-stuff-below)
   - [feature notes](#feature-notes)
@@ -31,6 +30,7 @@
     - [important feature needs:](#important-feature-needs)
     - [rendering?](#rendering)
     - [Spatial partitioning notes](#spatial-partitioning-notes)
+- [TODO:](#todo)
 
 # NotNot?
 It's not not an engine.
@@ -220,18 +220,6 @@ any work done to unsafe code should be verified by using GC Hole stress, as defi
   - also an algorithms book, for things like A* https://goalkicker.com/AlgorithmsBook/
   
 
-# TODO:
-
-
-- need to create a custom MemoryOwner that clears ref types on dispose	
-- Component Read/Write sentinels should just track when reads/writes are permitted.  if they occur outside of those times, assert.   This way we don't need to track who does all writes.
-- //TODO: add expected cost of update metrics for current frame and past frames (to SimNode/Frame)
-- SimNode Register/Unregister writes to the SimManager.nodeRegistry lookup.  This doesn't handle hiearchy chains added/removed, plus still need to discover the name somehow.  
-  - maybe remove this.
-  - and have node searches be expensive tree traversal
-- 
-
-
 
 # issues
 
@@ -278,6 +266,9 @@ Logical object structure is
   - https://sharplab.io/
 - linq: https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/linq/
    - https://github.com/jackmott/LinqFaster
+   - https://github.com/asc-community/HonkPerf.NET
+   - https://github.com/NetFabric/NetFabric.Hyperlinq
+   - It looks like HyperLinQ is the best bet: https://github.com/asc-community/HonkPerf.NET/blob/main/Benchmarks/PoorestWidestBenchmarks.cs
 - plinq: https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/introduction-to-plinq
 - ascii drawing tools: https://asciiflow.com/#/
 - github contributions CLA assistant:  https://github.com/cla-assistant/cla-assistant
@@ -375,4 +366,41 @@ review these tutorials if need to do basic things like camera/frustum: https://g
       }
       ```
 
+
+# TODO:
+
+
+- need to create a custom MemoryOwner that clears ref types on dispose	
+- Component Read/Write sentinels should just track when reads/writes are permitted.  if they occur outside of those times, assert.   This way we don't need to track who does all writes.
+- //TODO: add expected cost of update metrics for current frame and past frames (to SimNode/Frame)
+- SimNode Register/Unregister writes to the SimManager.nodeRegistry lookup.  This doesn't handle hiearchy chains added/removed, plus still need to discover the name somehow.  
+  - maybe remove this.
+  - and have node searches be expensive tree traversal
 - 
+
+
+
+
+valid ways of Adding a simNode
+- to parent, regardless of if parent is attached yet
+  - need a OnHierarchyAttached() / Detached() method
+    - this sets the SimManager and registers to the simManager
+- to SimManager, as long as specify parent by name
+  - do this by passing parent name as parameter to manager.RegisterNode()
+
+
+
+//deal with registration with SimManager
+OnRegister()
+OnUnregister()
+IsRegistered
+
+
+//deal with hiearchy
+OnAdded()
+OnRemoved()
+
+handle MemoryOwner clear on dispose!
+   and change the WriteMem.Allocate() method to take the option explicitly (no default)
+
+   

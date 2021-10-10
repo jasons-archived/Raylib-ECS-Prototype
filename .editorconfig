@@ -195,6 +195,9 @@ dotnet_diagnostic.IDE0055.severity = none
 # CS0642: Possible mistaken empty statement
 dotnet_diagnostic.CS0642.severity = error
 
+# CS1717: Assignment made to same variable
+dotnet_diagnostic.CS1717.severity = error
+
 [Tests/**.cs]
 # dotnet_diagnostic.SA1116.severity = none
 # dotnet_diagnostic.SA1117.severity = none

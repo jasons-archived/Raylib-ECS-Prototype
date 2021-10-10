@@ -33,7 +33,7 @@ public class Engine : DisposeGuard
 		if (DefaultWorld != null)
 		{
 			DefaultWorld.Initialize();
-			RootNode.RegisterChild(DefaultWorld);
+			RootNode.AddChild(DefaultWorld);
 		}
 	}
 
@@ -49,8 +49,9 @@ public class Engine : DisposeGuard
 		Updater.Dispose();
 		Updater = null;
 		_simManager.Dispose();
-		__ERROR.Throw(RootNode.IsDisposed == true && DefaultWorld.IsDisposed == true);
+		__ERROR.Throw(DefaultWorld.IsDisposed == true,"disposing simManager should have disposed all nodes inside");
 		DefaultWorld = null;
+		_simManager = null;
 
 		base.OnDispose();
 	}
