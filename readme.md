@@ -370,6 +370,7 @@ review these tutorials if need to do basic things like camera/frustum: https://g
 # TODO:
 
 
+
 - need to create a custom MemoryOwner that clears ref types on dispose	
 - Component Read/Write sentinels should just track when reads/writes are permitted.  if they occur outside of those times, assert.   This way we don't need to track who does all writes.
 - //TODO: add expected cost of update metrics for current frame and past frames (to SimNode/Frame)
@@ -403,4 +404,4 @@ OnRemoved()
 handle MemoryOwner clear on dispose!
    and change the WriteMem.Allocate() method to take the option explicitly (no default)
 
-   
+

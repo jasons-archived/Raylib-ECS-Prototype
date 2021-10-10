@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NotNot", "NotNot\NotNot.csp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MockRunner", "MockRunner\MockRunner.csproj", "{FD78B819-05A2-4923-937E-639DD86D3241}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "benchmarking", "scratch-console\benchmarking.csproj", "{C2A38031-3FD3-409E-A5E9-64881465EBD2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "benchmarking", "Benchmarks\benchmarking.csproj", "{C2A38031-3FD3-409E-A5E9-64881465EBD2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

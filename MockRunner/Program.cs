@@ -121,22 +121,22 @@ long lastElapsed = 0;
 
 
 //add some test nodes
-manager.Register(new TimestepNodeTest { ParentNameNew = "root", Name = "A", TargetFps = 1 });
-manager.Register(new DelayTest { ParentNameNew = "root", Name = "A2" });
+manager.Register(new TimestepNodeTest { ParentName = "root", Name = "A", TargetFps = 1 });
+manager.Register(new DelayTest { ParentName = "root", Name = "A2" });
 
-manager.Register(new DelayTest { ParentNameNew = "A", Name = "B", _updateBefore = { "A2" }, _writeResources = { "taco" } });
-manager.Register(new DelayTest { ParentNameNew = "A", Name = "B2", _readResources = { "taco" } });
-manager.Register(new DelayTest { ParentNameNew = "A", Name = "B3", _readResources = { "taco" } });
-manager.Register(new DelayTest { ParentNameNew = "A", Name = "B4!", _updateAfter = { "A2" }, _readResources = { "taco" } });
+manager.Register(new DelayTest { ParentName = "A", Name = "B", _updateBefore = { "A2" }, _writeResources = { "taco" } });
+manager.Register(new DelayTest { ParentName = "A", Name = "B2", _readResources = { "taco" } });
+manager.Register(new DelayTest { ParentName = "A", Name = "B3", _readResources = { "taco" } });
+manager.Register(new DelayTest { ParentName = "A", Name = "B4!", _updateAfter = { "A2" }, _readResources = { "taco" } });
 
-manager.Register(new DelayTest { ParentNameNew = "B", Name = "C" });
-manager.Register(new DelayTest { ParentNameNew = "B", Name = "C2" });
-manager.Register(new DelayTest { ParentNameNew = "B", Name = "C3", _updateAfter = { "C" } });
-
-
+manager.Register(new DelayTest { ParentName = "B", Name = "C" });
+manager.Register(new DelayTest { ParentName = "B", Name = "C2" });
+manager.Register(new DelayTest { ParentName = "B", Name = "C3", _updateAfter = { "C" } });
 
 
-manager.Register(new DebugPrint { ParentNameNew = "C3", Name = "DebugPrint" });
+
+
+manager.Register(new DebugPrint { ParentName = "C3", Name = "DebugPrint" });
 
 
 var loop = 0;
