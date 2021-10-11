@@ -2194,7 +2194,7 @@ public class Chunk<TComponent> : Chunk
 
 		//_storage = MemoryOwner<TComponent>.Allocate(_length, AllocationMode.Clear); //TODO: maybe no need to clear?
 		_storage = Mem<TComponent>.Allocate(_length, true);
-		UnsafeArray = _storage.DangerousGetArray().Array;
+		UnsafeArray = _storage.DangerousGetArray().Array!;
 	}
 	internal override void OnAllocSlot(ref AccessToken pageToken)
 	{

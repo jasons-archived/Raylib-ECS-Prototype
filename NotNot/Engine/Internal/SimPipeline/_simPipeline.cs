@@ -295,13 +295,16 @@ public abstract partial class SimNode   //tree logic
 	{
 		var toReturn = ReadMem<SimNode>.Allocate(HierarchyDepth + 1, true);
 
+		var writeable = toReturn.AsWriteMem();
+
+
 		if (toReturn.length == 0)
 		{
 			return toReturn;
 		}
 
-		var array = toReturn.DangerousGetArray().Array;
-		var span = array.AsSpan(0, toReturn.length);
+		//var array = toReturn.Segment().Array;
+		var span = writeable.Span;// toReturn. array.AsSpan(0, toReturn.length);
 
 		span[0] = this;
 		var curNode = this;

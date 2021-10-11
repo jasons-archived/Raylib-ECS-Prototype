@@ -334,7 +334,9 @@ some potentail solutions
   - ***DOES NOT SUPPORT C#***
 - example silk based voxel rendering engine: https://github.com/Redhacker1/MinecraftClone-Core/tree/main/Engine
 review these tutorials if need to do basic things like camera/frustum: https://github.com/gametutorials/tutorials/tree/master/OpenGL
-
+- super low level projects, just in case:
+  - https://github.com/mellinoe/veldrid
+  - 
 
 
 ### Spatial partitioning notes
@@ -365,7 +367,8 @@ review these tutorials if need to do basic things like camera/frustum: https://g
                e.Draw(s);
       }
       ```
-
+- see also: https://github.com/Auios/Auios.QuadTree for object based
+- 
 
 # TODO:
 

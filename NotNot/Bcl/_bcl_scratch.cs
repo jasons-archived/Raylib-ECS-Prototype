@@ -261,7 +261,7 @@ public static class ReadMem
 /// <typeparam name="T"></typeparam>
 public readonly struct Mem<T>
 {
-	private readonly MemoryOwnerCustom<T> _owner;
+	private readonly MemoryOwner_Custom<T> _owner;
 	private readonly ArraySegment<T> _segment;
 	private readonly T[] _array;
 	private readonly int _offset;
@@ -274,7 +274,7 @@ public readonly struct Mem<T>
 		_offset = segment.Offset;
 		length = segment.Count;
 	}
-	internal Mem(MemoryOwnerCustom<T> owner) : this(owner.DangerousGetArray())
+	internal Mem(MemoryOwner_Custom<T> owner) : this(owner.DangerousGetArray())
 	{
 		_owner = owner;
 	}
@@ -282,7 +282,7 @@ public readonly struct Mem<T>
 	public static Mem<T> Allocate(int size, bool clearOnDispose)
 	{
 		__DEBUG.AssertOnce(System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<T>() || clearOnDispose, "alloc of classes via memPool can/will cause leaks");
-		var mo = MemoryOwnerCustom<T>.Allocate(size);
+		var mo = MemoryOwner_Custom<T>.Allocate(size);
 		mo.ClearOnDispose= clearOnDispose;
 		return new Mem<T>(mo);
 	}
@@ -298,7 +298,7 @@ public readonly struct Mem<T>
 	{
 		return new Mem<T>(backingStore);
 	}
-	internal static Mem<T> Allocate(MemoryOwnerCustom<T> MemoryOwnerNew)
+	internal static Mem<T> Allocate(MemoryOwner_Custom<T> MemoryOwnerNew)
 	{
 		return new Mem<T>(MemoryOwnerNew);
 	}
@@ -307,6 +307,11 @@ public readonly struct Mem<T>
 		return readMem.AsWriteMem();
 	}
 
+
+	/// <summary>
+	/// beware: the size of the array allocated may be larger than the size requested by this Mem.  
+	/// As such, beware if using the backing Array directly.  respect the offset+length described in this segment.
+	/// </summary>
 	public ArraySegment<T> DangerousGetArray()
 	{
 		return _segment;
@@ -371,7 +376,7 @@ public readonly struct Mem<T>
 /// <typeparam name="T"></typeparam>
 public readonly struct ReadMem<T> 
 {
-	private readonly MemoryOwnerCustom<T> _owner;
+	private readonly MemoryOwner_Custom<T> _owner;
 	private readonly ArraySegment<T> _segment;
 	private readonly T[] _array;
 	private readonly int _offset;
@@ -384,7 +389,7 @@ public readonly struct ReadMem<T>
 		_offset = segment.Offset;
 		length = segment.Count;
 	}
-	internal ReadMem(MemoryOwnerCustom<T> owner) : this(owner.DangerousGetArray())
+	internal ReadMem(MemoryOwner_Custom<T> owner) : this(owner.DangerousGetArray())
 	{
 		_owner = owner;
 	}
@@ -392,7 +397,7 @@ public readonly struct ReadMem<T>
 	public static ReadMem<T> Allocate(int size, bool clearOnDispose)
 	{				
 		__DEBUG.AssertOnce(System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<T>() || clearOnDispose, "alloc of classes via memPool can/will cause leaks");
-		var mo = MemoryOwnerCustom<T>.Allocate(size);
+		var mo = MemoryOwner_Custom<T>.Allocate(size);
 		mo.ClearOnDispose = clearOnDispose;
 		return new ReadMem<T>(mo);
 	}
@@ -408,7 +413,7 @@ public readonly struct ReadMem<T>
 	{
 		return new ReadMem<T>(backingStore);
 	}
-	internal static ReadMem<T> Allocate(MemoryOwnerCustom<T> MemoryOwnerNew)
+	internal static ReadMem<T> Allocate(MemoryOwner_Custom<T> MemoryOwnerNew)
 	{
 		return new ReadMem<T>(MemoryOwnerNew);
 	}
@@ -418,19 +423,31 @@ public readonly struct ReadMem<T>
 		return writeMem.AsReadMem();
 	}
 
-	public ArraySegment<T> DangerousGetArray()
-	{
+	/// <summary>
+	/// <para>Returns the backing array segment, NOT READONLY protected.</para>
+	/// beware: the size of the array allocated may be larger than the size requested by this Mem.  
+	/// As such, beware if using the backing Array directly.  respect the offset+length described in this segment.
+	/// </summary>
+	public ArraySegment<T> DangerousGetArray() {
 		return _segment;
-	}
-	public Span<T> DangerousGetSpan()
-	{
-		return new Span<T>(_array, _offset, length);
-	}
+		}
 
 	public ReadOnlySpan<T> Span
 	{
 		get
 		{
+			//var x = new ReadOnlySpan<T>(_array, _offset, length);
+			//for(var i = 0; i < x.Length; i++)
+			//{
+			//	ref readonly var item = ref x[i];
+			//	//do stuff
+
+			//}
+			//foreach(ref readonly var item in x)
+			//{
+			//	//do stuff
+			//}
+
 			return new ReadOnlySpan<T>(_array, _offset, length);
 		}
 	}

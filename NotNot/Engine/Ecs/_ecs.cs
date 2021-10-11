@@ -913,8 +913,6 @@ public delegate void ComponentQueryCallback<TC1, TC2, TC3>(in AccessToken access
 
 public partial class Archetype  //query entities owned by this archetype
 {
-
-
 	public int Count { get => _page.Count; }
 
 
@@ -934,7 +932,7 @@ public partial class Archetype  //query entities owned by this archetype
 	{
 		var array = accessTokens.DangerousGetArray();
 
-		fixed (AccessToken* _pArray = &array.Array[0])
+		fixed (AccessToken* _pArray = &array.Array![0])
 		{
 			var pArray = _pArray;
 			ParallelFor.Range(0, array.Count, (start, end) =>
@@ -969,11 +967,11 @@ public partial class Archetype  //query entities owned by this archetype
 		//OPTIMIZE LATER: assumign input is sorted, can get the current chunk and itterate through, then move to the next chunk.
 		//currently each chunk is re-aquired from the column for each element.   maybe that is okay perfwise tho.
 
-		var array = accessTokens.DangerousGetArray();
-		fixed (AccessToken* _pArray = &array.Array[0])
+		//var array = accessTokens.ArraySegment();
+		fixed (AccessToken* _pArray = accessTokens.Span)
 		{
 			var pArray = _pArray;
-			ParallelFor.Range(0, array.Count, (start, end) =>
+			ParallelFor.Range(0, accessTokens.length, (start, end) =>
 			{
 				var col1 = Chunk<TC1>._GLOBAL_LOOKUP[ArchtypeId]._AsSpan_Unsafe();
 				var col2 = Chunk<TC2>._GLOBAL_LOOKUP[ArchtypeId]._AsSpan_Unsafe();
