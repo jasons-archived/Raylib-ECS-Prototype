@@ -46,6 +46,14 @@ still building first functional prototype.
 
 # Overview
 
+Finished Features:
+- ECS Framework
+- SimPipeline (multithreaded system+job execution)
+
+Current Work in Progress:
+- Physics system
+- OSS Project organization
+
 ## ECS
 The ECS api is archetype based.
 

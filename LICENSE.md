@@ -1,3 +1,7 @@
+# By *default*, this repository is licensed to you under the **AGPL-3.0**.  
+**If you need something different, alternative licenses are available. See LicenseOptions.md**
+----------------------------
+----------------------------
                     GNU AFFERO GENERAL PUBLIC LICENSE
                        Version 3, 19 November 2007
 
