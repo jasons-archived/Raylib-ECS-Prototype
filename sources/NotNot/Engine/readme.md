@@ -75,13 +75,3 @@ To control execution order you can specify both "updateAfter" and "updateBefore"
 Each node can specify resources they need Read or Write access to.  This is how multithreading is made "invisible" to the developer.  So that a system that needs Write access to Transform components will run singularly (no other systems that read/write Transform will be allowed to run at the same time), while Systems that need Read access to Transform can run in parallel.
 
 
-
- # notes
-
- ### r/w resource locking
-
- - do writes at highest priority.  (node sort order *10000)
- - reads * 100
- - children * 10
- - none =0
-

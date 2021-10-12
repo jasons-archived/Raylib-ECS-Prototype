@@ -17,8 +17,7 @@
 
 - If you want to read the raw, messy dev/WIP notes, [see here](meta/notes.md).
 - Source code is currently optimized for "getting it working".  Not for readability nor usability.
-  - A cleanup pass will be made prior to "go live".  
-  - That said, I (Jason/Novaleaf) take documentation super seriously, and even in it's current state, the inline docs are better than most OSS projects.
+  - A cleanup+doc+usability pass will be made prior to "go live".  
 
 
 Basic Execution+ECS infrastructure complete.  Now setting up OSS infrastructure and proving utility (integrating engine features).  **Current estimated timeframe for a end-to-end rendering demo is Dec 2021.**
@@ -41,14 +40,14 @@ Basic Execution+ECS infrastructure complete.  Now setting up OSS infrastructure 
 # NotNot?
 [!!] It's not not an engine. 🙃
 
-This is an **execution engine** and an **ecs** Framework.  Not library.  You must build your game on top of, not next to this.  
+This is the beignnings of an ECS based engine.  It is still in it's early infancy, not having any feature implemented other than a  **multithreading execution engine** and an **ecs Framework**.   
 
 # A grand, noble experiment! 
 The goal of the NotNot project is to create a modern, open-source C# engine in a sustainable fashion.  As part of that goal certain consessions must be made:
 
 - Reduced feature set to critical path:
   - No Editor / Bells / Whistles.
-  - Use off-the-shelf solutions where possible (including using another engine like Stride for rendering)
+  - Use off-the-shelf solutions where possible
   - Target use by skilled C# developers
   - Target Desktop runtime only (dotnet6)
 - Funding/Revenue paid out to contributors
@@ -72,7 +71,7 @@ The goal of the NotNot project is to create a modern, open-source C# engine in a
 
 
 ## Up Next?
-- [ ] Rendering via [Stride](https://github.com/stride3d/stride)
+- [ ] Rendering via [Stride](https://github.com/stride3d/stride) perhaps
 - [ ] SceneGraph
 - [ ] Github polish (wiki, roadmap, sponsors, etc)
 - [ ] SourceCode Polish (conform to api guidelines: make it easy for you to use!)
@@ -80,7 +79,7 @@ The goal of the NotNot project is to create a modern, open-source C# engine in a
 # Licensing
 By *default*, this repository is licensed to you under the **AGPL-3.0**.  See [LICENSE.md](LICENSE.md)
 
-An very low cost Propritary Software License will also be made available to those who can not accept the AGPL terms.  Please see the [LicenseOptions.md](meta/LicenseOptions.md) for more details.
+A very low cost Propritary Software License will also be made available to those who can not accept the AGPL terms.  Please see the [LicenseOptions.md](meta/LicenseOptions.md) for more details.
 
 # Contributing
 
