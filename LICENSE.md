@@ -1,5 +1,5 @@
-# By *default*, this repository is licensed to you under the **AGPL-3.0**.  
-**If you need something different, alternative licenses are available. See LicenseOptions.md**
+# By *default*, this project is licensed to you under the **AGPL-3.0**.  
+**If you need something different, alternative licenses are available. See [LicenseOptions.md](meta/LicenseOptions.md)**
 ---
 - A good summary of the AGPL-3 can be found here: https://tldrlegal.com/license/gnu-affero-general-public-license-v3-(agpl-3.0)
 ---

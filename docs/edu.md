@@ -1,4 +1,4 @@
-links for tangental educational stuff here
+links for tangental educational stuff here.
 
 
 
@@ -29,3 +29,9 @@ Some ECS Intro videos that are mostly applicable to !!.Ecs
   - https://news.ycombinator.com/item?id=28714779
 
 
+# technical writing
+- emoji lookup: https://gist.github.com/endolith/157796
+
+# Project Management
+- OSS Repo Checklist: https://gist.github.com/ZacharyPatten/08532b31ef5efc7593b32326b498023a
+- 
