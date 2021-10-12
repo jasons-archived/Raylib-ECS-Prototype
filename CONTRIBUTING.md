@@ -26,10 +26,6 @@ As NotNot is a new project, there is still work to be done!   Here are the "scra
 
 
 - a Contributor License Agreement (CLA) needs to be signed.
-- to recieve financial compensation if/when this project recieves funding, you must
-  - For USA persons:
-    - Have a paypal, or zelle account I can send money to
-  - For other persons:
-    - Have a paypal account that I can send money to
+- to recieve financial compensation if/when this project recieves funding, you must have some online account such as Github Sponsors that funds can be sent to.
 
 
