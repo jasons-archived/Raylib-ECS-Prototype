@@ -10,11 +10,12 @@ Because everything takes time, the legal small-text for the PCL has not been set
 Here are the "scratch notes" regarding the plan on alternative licenses.  Again, if you need this, let Jason know by raising an issue or pinging him directly.
 
 - PCL General permissions
-  - Use to create competing projects is prohibited.
+  - Use to create competing projects for distribution is prohibited.
     - no game engines
     - no code libraries
+    - creating these for your own use is okay, and using them to create other non-competing projects for distribution is okay.
   - No requirement to distribute your source code for derived projects
-    - However modifications to this project must still be made public
+    - Any source distributions that include this project or derived code must be made under the AGPL.
   - Otherwise terms match the AGPL.  
     - If there is some  fine-print you are concerned about, ping Jason (Novaleaf) and we will make the needed adjustments to the PCL plan.
 
