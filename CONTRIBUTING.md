@@ -29,3 +29,8 @@ As NotNot is a new project, there is still work to be done!   Here are the "scra
 - to recieve financial compensation if/when this project recieves funding, you must have some online account such as Github Sponsors that funds can be sent to.
 
 
+# Troubleshooting
+
+# 403 error when trying to push a commit
+- Git Hub org accounts need additional permissions, so if you are using a 3rd party app such as SourceTree, go to https://github.com/settings/applications and enable access to the org account
+- 
