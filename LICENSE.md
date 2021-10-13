@@ -2,6 +2,10 @@
 **If you need something different, alternative licenses are available. See [LicenseOptions.md](meta/LicenseOptions.md)**
 ---
 - A good summary of the AGPL-3 can be found here: https://tldrlegal.com/license/gnu-affero-general-public-license-v3-(agpl-3.0)
+
+
+The full text of this project's default license, the **GNU AFFERO GENERAL PUBLIC LICENSE** (***AGPL-3.0***), is as follows:
+
 ---
 
                     GNU AFFERO GENERAL PUBLIC LICENSE
@@ -64,7 +68,7 @@ modification follow.
 
                        TERMS AND CONDITIONS
 
-  0. Definitions.
+  1. Definitions.
 
   "This License" refers to version 3 of the GNU Affero General Public License.
 

@@ -1,7 +1,12 @@
-﻿
-// Licensed to the .NET Foundation under one or more agreements.
-// The .NET Foundation licenses this file to you under the MIT license.
-// See the LICENSE file in the project root for more information.
+﻿// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
+// [!!] Copyright ©️ NotNot Project and Contributors. 
+// [!!] By default, this file is licensed to you under the AGPL-3.0.
+// [!!] However a Private Commercial License is available. 
+// [!!] See the LICENSE.md file in the project root for more info. 
+// [!!] ------------------------------------------------- 
+// [!!] Contributions Guarantee Citizenship! 
+// [!!] Would you like to know more? https://github.com/NotNotTech/NotNot 
+// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!]  [!!] [!!] [!!] [!!]
 
 using Microsoft.Toolkit.HighPerformance;
 using Microsoft.Toolkit.HighPerformance.Buffers;
