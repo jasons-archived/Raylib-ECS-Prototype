@@ -20,7 +20,7 @@
   - A cleanup+doc+usability pass will be made prior to "go live".  
 
 
-Basic Execution+ECS infrastructure complete.  Now setting up OSS infrastructure and proving utility (integrating engine features).  **Current estimated timeframe for a end-to-end rendering demo is Dec 2021.**
+Basic Execution+ECS infrastructure complete.  Now setting up OSS infrastructure and proving utility (integrating engine features).  
 
 
 # Table of Contents
