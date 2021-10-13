@@ -51,7 +51,7 @@ The goal of the NotNot project is to create a modern, open-source C# engine in a
   - Target use by skilled C# developers
   - Target Desktop runtime only (dotnet6)
 - Funding/Revenue paid out to contributors
-- OSS Licensed under the [AGPL](LICENSE.md), with an inexpensive [Propritary Software License](meta/LicenseOptions.md) as an alternative.
+- OSS Licensed under the [AGPL](LICENSE.md), with an inexpensive [Private Commercial License](meta/LicenseOptions.md) as an alternative.
 
 ## 👶 Help this baby grow! 👶
 [Donate](https://github.com/sponsors/JasonSwearingen) / [Contribute](CONTRIBUTING.md) / [Chat](https://discord.gg/ZyCNM7wap8) / [Spread the word](https://www.reddit.com/)
@@ -71,7 +71,7 @@ The goal of the NotNot project is to create a modern, open-source C# engine in a
 
 
 ## Up Next?
-- [ ] Rendering via [Stride](https://github.com/stride3d/stride) perhaps
+- [ ] Rendering
 - [ ] SceneGraph
 - [ ] Github polish (wiki, roadmap, sponsors, etc)
 - [ ] SourceCode Polish (conform to api guidelines: make it easy for you to use!)
