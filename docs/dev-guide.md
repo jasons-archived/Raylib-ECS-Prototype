@@ -18,7 +18,7 @@
 
 
 # patterns
-These are development pattern "tricks" needed to be used in this codebase.  It is likely that users of this engine need to use similar patterns.
+These are development pattern "tricks" needed to be used in this codebase.  It is likely that users of this framework need to use similar patterns.
 
 - cast input `ref` struct to ptr to circumvent `return ref` type checks.   Only use this when you ***KNOW*** the function is safe, but here's how:
 ```cs

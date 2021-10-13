@@ -16,9 +16,7 @@ indent_size = 4
 tab_width = 4
 
 # File header template  https://docs.microsoft.com/en-us/visualstudio/ide/reference/add-file-header?view=vs-2019
-# file_header_template = [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] \n[!!] This file is part of the NOTNOT Game Engine. \n[!!] Copyright (c) NOTNOT Maintainers and Contributors. \n[!!] Licensed under the AGPL-3.0. \n[!!] ------------------------------------------------- \n[!!] Contributions Guarantee Citizenship! \n[!!] Would you like to know more? https://github.com/NotNotTech/NotNot \n[!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
-file_header_template = [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] \n[!!] This file is Licensed to the NOTNOT Game Engine. \n[!!] Copyright ©️ NOTNOT Maintainers and Contributors. \n[!!] This file is default licensed to you under the AGPL-3.0.\n[!!] However a Private Commercial License is available.\n[!!] See the LICENSE.md file in the project root for more info.\n[!!] ------------------------------------------------- \n[!!] Contributions Guarantee Citizenship! \n[!!] Would you like to know more? https://github.com/NotNotTech/NotNot \n[!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
-
+file_header_template = [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] \n[!!] Copyright ©️ NotNot Project and Contributors. \n[!!] By default, this file is licensed to you under the AGPL-3.0.\n[!!] However a Private Commercial License is available. \n[!!] See the LICENSE.md file in the project root for more info. \n[!!] ------------------------------------------------- \n[!!] Contributions Guarantee Citizenship! \n[!!] Would you like to know more? https://github.com/NotNotTech/NotNot \n[!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!]  [!!] [!!] [!!] [!!] 
 
 dotnet_diagnostic.IDE0073.severity = warning
 

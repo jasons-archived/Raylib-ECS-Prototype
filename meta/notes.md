@@ -3,19 +3,19 @@
 
 - [Current status: DO NOT USE!](#current-status-do-not-use)
 - [Overview](#overview)
-	- [ECS](#ecs)
-	- [ExecManager](#execmanager)
-		- [Multithreaded by default](#multithreaded-by-default)
-	- [goals](#goals)
-	- [non-goals](#non-goals)
+  - [ECS](#ecs)
+  - [ExecManager](#execmanager)
+    - [Multithreaded by default](#multithreaded-by-default)
+  - [goals](#goals)
+  - [non-goals](#non-goals)
 - [notes / scratch stuff below...](#notes--scratch-stuff-below)
-	- [feature notes](#feature-notes)
-	- [other private notes/scratch](#other-private-notesscratch)
-	- [oss community notes](#oss-community-notes)
-		- [funding](#funding)
-		- [important feature needs:](#important-feature-needs)
-		- [rendering?](#rendering)
-		- [Spatial partitioning notes](#spatial-partitioning-notes)
+  - [feature notes](#feature-notes)
+  - [other private notes/scratch](#other-private-notesscratch)
+  - [oss community notes](#oss-community-notes)
+    - [funding](#funding)
+    - [important feature needs:](#important-feature-needs)
+    - [rendering?](#rendering)
+    - [Spatial partitioning notes](#spatial-partitioning-notes)
 - [TODO:](#todo)
 
 
@@ -57,7 +57,7 @@ The execution engine is fully multithreaded.  Your nodes can be written in a sin
 
 ## goals
 - Best FTDE (First-Time-Developer-Experience)
-  - Steps needed to debug a sample project and full engine soure should be only:
+  - Steps needed to debug a sample project and full framework source should be only:
     1. Download Repository (may include Git LFS setup)
     2. Open RpgSample.sln
     3. Hit F5
@@ -129,8 +129,9 @@ Logical object structure is
     - https://docs.microsoft.com/en-us/windows/communitytoolkit/nuget-packages
 - physics: https://github.com/bepu/bepuphysics2
   - physics, intersection: https://www.realtimerendering.com/intersections.html
-  - 
+
 - math helper libs: Silk.net
+  - - spatial maths: https://github.com/reeseschultz/ReeseUnityDemos/blob/master/Packages/com.reese.math/README.md#reeses-dots-math-extensions
 - input and other platform libs: Silk.net
 - kitbash:  https://kenney.nl/tools/assetforge and https://kenney.itch.io/kenshape
 - map editor: https://trenchbroom.github.io/
