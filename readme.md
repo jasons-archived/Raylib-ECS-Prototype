@@ -54,7 +54,7 @@ The goal of the NotNot project is to create a modern, open-source C# engine in a
 - OSS Licensed under the [AGPL](LICENSE.md), with an inexpensive [Private Commercial License](meta/LicenseOptions.md) as an alternative.
 
 ## 👶 Help this baby grow! 👶
-[Donate](https://github.com/sponsors/JasonSwearingen) / [Contribute](CONTRIBUTING.md) / [Chat](https://discord.gg/ZyCNM7wap8) / [Spread the word](https://www.reddit.com/)
+[Donate](https://github.com/sponsors/jasonswearingen?frequency=recurring) / [Contribute](CONTRIBUTING.md) / [Chat](https://discord.gg/ZyCNM7wap8) / [Spread the word](https://www.reddit.com/)
 
 
 
@@ -64,7 +64,7 @@ The goal of the NotNot project is to create a modern, open-source C# engine in a
 ## Complete
 
 - [X] ECS Framework
-- [X] SimPipeline (multithreaded system+job execution)
+- [X] SimPipeline (multithreaded execution)
 ## In progress
 - [ ] Physics system via [BepuPhysics](https://github.com/bepu/bepuphysics2)
 - [ ] OSS Project organization
@@ -79,12 +79,12 @@ The goal of the NotNot project is to create a modern, open-source C# engine in a
 # Licensing
 By *default*, this repository is licensed to you under the **AGPL-3.0**.  See [LICENSE.md](LICENSE.md)
 
-A very low cost Propritary Software License will also be made available to those who can not accept the AGPL terms.  Please see the [LicenseOptions.md](meta/LicenseOptions.md) for more details.
+A very low cost Private Commercial License will also be made available to those who can not accept the AGPL terms.  Please see the [LicenseOptions.md](meta/LicenseOptions.md) for more details.
 
 # Contributing
 
 Contributions are welcome!  See [CONTRIBUTING.md](meta/CONTRIBUTING.md)
 
 # Funding
-NotNot is a grand experiment in open source: Is there room for another open source game engine?  Can it be made sustainable?  Your financial support will help make this a reality.  Sponsor NotNot through [Jason (Novaleaf)](https://github.com/sponsors/JasonSwearingen).
+NotNot is a grand experiment in open source: Is there room for another open source game engine?  Can it be made sustainable?  Your financial support will help make this a reality.  Sponsor NotNot through [Jason (Novaleaf)](https://github.com/sponsors/jasonswearingen?frequency=recurring).
 
