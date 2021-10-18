@@ -32,7 +32,7 @@ namespace NotNot.Bcl;
 public unsafe static class __
 {
 
-	
+
 
 	[ThreadStatic]
 	private static Random? _rand;
@@ -44,7 +44,7 @@ public unsafe static class __
 	public static Random Rand
 	{
 		get
-		{			
+		{
 			if (_rand == null)
 			{
 				_rand = new Random();
@@ -190,7 +190,7 @@ public static class ParallelFor
 		var span = owner.Span;
 		var array = owner.DangerousGetArray().Array!;
 
-		Parallel.For(0, span.Length, (index) => Unsafe.AsRef(in action).Invoke(array[index].startInclusive, array[index].endExclusive));		
+		Parallel.For(0, span.Length, (index) => Unsafe.AsRef(in action).Invoke(array[index].startInclusive, array[index].endExclusive));
 	}
 
 
@@ -205,7 +205,7 @@ public static class ParallelFor
 public ref struct SpanGuard<T>
 {
 	public static SpanGuard<T> Allocate(int size)
-	{		
+	{
 		return new SpanGuard<T>(SpanOwner<T>.Allocate(size));
 	}
 
@@ -244,11 +244,13 @@ public ref struct SpanGuard<T>
 /// </summary>
 public static class Mem
 {
-	public static Mem<T> Allocate<T>(ArraySegment<T> backingStore) => Mem<T>.Allocate(backingStore);
+	public static Mem<T> CreateUsing<T>(ArraySegment<T> backingStore) => Mem<T>.CreateUsing(backingStore);
 	//public static WriteMem<T> Allocate<T>(MemoryOwnerCustom<T> MemoryOwnerNew) => WriteMem<T>.Allocate(MemoryOwnerNew);
-	public static Mem<T> Allocate<T>(T[] array) => Mem<T>.Allocate(array);
+	public static Mem<T> CreateUsing<T>(T[] array) => Mem<T>.CreateUsing(array);
 	public static Mem<T> Allocate<T>(int count, bool clearOnDispose) => Mem<T>.Allocate(count, clearOnDispose);
-	public static Mem<T> Allocate<T>(Mem<T> writeMem) => writeMem;
+	public static Mem<T> Allocate<T>(ReadOnlySpan<T> span, bool clearOnDispose) => Mem<T>.Allocate(span, clearOnDispose);
+	public static Mem<T> CreateUsing<T>(Mem<T> writeMem) => writeMem;
+	public static Mem<T> CreateUsing<T>(ReadMem<T> readMem) => Mem<T>.CreateUsing(readMem);
 
 }
 /// <summary>
@@ -256,12 +258,13 @@ public static class Mem
 /// </summary>
 public static class ReadMem
 {
-	public static ReadMem<T> Allocate<T>(ArraySegment<T> backingStore) => ReadMem<T>.Allocate(backingStore);
+	public static ReadMem<T> CreateUsing<T>(ArraySegment<T> backingStore) => ReadMem<T>.CreateUsing(backingStore);
 	//public static ReadMem<T> Allocate<T>(MemoryOwnerCustom<T> MemoryOwnerNew) => ReadMem<T>.Allocate(MemoryOwnerNew);
-	public static ReadMem<T> Allocate<T>(T[] array) => ReadMem<T>.Allocate(array);
+	public static ReadMem<T> CreateUsing<T>(T[] array) => ReadMem<T>.CreateUsing(array);
 
 	public static ReadMem<T> Allocate<T>(int count, bool clearOnDispose) => ReadMem<T>.Allocate(count, clearOnDispose);
-	public static ReadMem<T> Allocate<T>(Mem<T> writeMem) => ReadMem<T>.Allocate(writeMem);
+	public static ReadMem<T> Allocate<T>(ReadOnlySpan<T> span, bool clearOnDispose) => ReadMem<T>.Allocate(span, clearOnDispose);
+	public static ReadMem<T> CreateUsing<T>(Mem<T> writeMem) => ReadMem<T>.CreateUsing(writeMem);
 }
 /// <summary>
 /// a write capable view into an array/span
@@ -286,31 +289,45 @@ public readonly struct Mem<T>
 	{
 		_owner = owner;
 	}
-
+    /// <summary>
+    /// allocate memory from the shared pool.
+    /// If your Type is a reference type or contains references, be sure to use clearOnDispose otherwise you will have memory leaks.
+    /// also note that the memory is not cleared by default.
+    /// </summary>
 	public static Mem<T> Allocate(int size, bool clearOnDispose)
 	{
-		__DEBUG.AssertOnce(System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<T>() || clearOnDispose, "alloc of classes via memPool can/will cause leaks");
+		__DEBUG.AssertOnce(System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<T>()==false || clearOnDispose, "alloc of classes via memPool can/will cause leaks");
 		var mo = MemoryOwner_Custom<T>.Allocate(size);
-		mo.ClearOnDispose= clearOnDispose;
+		mo.ClearOnDispose = clearOnDispose;
 		return new Mem<T>(mo);
 	}
-	public static Mem<T> Allocate(T[] array)
+    /// <summary>
+    /// allocate memory from the shared pool and copy the contents of the specified span into it
+    /// </summary>
+	public static Mem<T> Allocate(ReadOnlySpan<T> span, bool clearOnDispose)
+	{
+		var toReturn = Allocate(span.Length, clearOnDispose);
+		span.CopyTo(toReturn.Span);
+		return toReturn;
+	}
+
+	public static Mem<T> CreateUsing(T[] array)
 	{
 		return new Mem<T>(new ArraySegment<T>(array));
 	}
-	public static Mem<T> Allocate(T[] array, int offset, int count)
+	public static Mem<T> CreateUsing(T[] array, int offset, int count)
 	{
 		return new Mem<T>(new ArraySegment<T>(array, offset, count));
 	}
-	public static Mem<T> Allocate(ArraySegment<T> backingStore)
+	public static Mem<T> CreateUsing(ArraySegment<T> backingStore)
 	{
 		return new Mem<T>(backingStore);
 	}
-	internal static Mem<T> Allocate(MemoryOwner_Custom<T> MemoryOwnerNew)
+	internal static Mem<T> CreateUsing(MemoryOwner_Custom<T> MemoryOwnerNew)
 	{
 		return new Mem<T>(MemoryOwnerNew);
 	}
-	public static Mem<T> Allocate(ReadMem<T> readMem)
+	public static Mem<T> CreateUsing(ReadMem<T> readMem)
 	{
 		return readMem.AsWriteMem();
 	}
@@ -354,7 +371,10 @@ public readonly struct Mem<T>
 		{
 			_owner.Dispose();
 		}
-	}
+#if DEBUG
+        Array.Clear(_array, _offset, Length);        
+#endif
+    }
 
 	public ref T this[int index]
 	{
@@ -382,7 +402,7 @@ public readonly struct Mem<T>
 ///  a read-only capable view into an array/span
 /// </summary>
 /// <typeparam name="T"></typeparam>
-public readonly struct ReadMem<T> 
+public readonly struct ReadMem<T>
 {
 	private readonly MemoryOwner_Custom<T> _owner;
 	private readonly ArraySegment<T> _segment;
@@ -403,44 +423,51 @@ public readonly struct ReadMem<T>
 	}
 
 	public static ReadMem<T> Allocate(int size, bool clearOnDispose)
-	{				
+	{
 		__DEBUG.AssertOnce(System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<T>() || clearOnDispose, "alloc of classes via memPool can/will cause leaks");
 		var mo = MemoryOwner_Custom<T>.Allocate(size);
 		mo.ClearOnDispose = clearOnDispose;
 		return new ReadMem<T>(mo);
 	}
-	public static ReadMem<T> Allocate(T[] array)
+	public static ReadMem<T> Allocate(ReadOnlySpan<T> span, bool clearOnDispose)
+	{
+		var toReturn = Allocate(span.Length, clearOnDispose);
+		span.CopyTo(toReturn.AsWriteSpan());
+		return toReturn;
+	}
+	public static ReadMem<T> CreateUsing(T[] array)
 	{
 		return new ReadMem<T>(new ArraySegment<T>(array));
 	}
-	public static ReadMem<T> Allocate(T[] array, int offset, int count)
+	public static ReadMem<T> CreateUsing(T[] array, int offset, int count)
 	{
 		return new ReadMem<T>(new ArraySegment<T>(array, offset, count));
 	}
-	public static ReadMem<T> Allocate(ArraySegment<T> backingStore)
+	public static ReadMem<T> CreateUsing(ArraySegment<T> backingStore)
 	{
 		return new ReadMem<T>(backingStore);
 	}
-	internal static ReadMem<T> Allocate(MemoryOwner_Custom<T> MemoryOwnerNew)
+	internal static ReadMem<T> CreateUsing(MemoryOwner_Custom<T> MemoryOwnerNew)
 	{
 		return new ReadMem<T>(MemoryOwnerNew);
 	}
 
-	public static ReadMem<T> Allocate(Mem<T> writeMem)
+	public static ReadMem<T> CreateUsing(Mem<T> writeMem)
 	{
 		return writeMem.AsReadMem();
 	}
 
-	/// <summary>
-	/// <para>Returns the backing array segment, NOT READONLY protected.</para>
-	/// beware: the size of the array allocated may be larger than the size requested by this Mem.  
-	/// As such, beware if using the backing Array directly.  respect the offset+length described in this segment.
-	/// </summary>
-	public ArraySegment<T> DangerousGetArray() {
-		return _segment;
-		}
+    /// <summary>
+    /// <para>Returns the backing array segment, NOT READONLY protected.</para>
+    /// beware: the size of the array allocated may be larger than the size requested by this Mem.  
+    /// As such, beware if using the backing Array directly.  respect the offset+length described in this segment.
+    /// </summary>
+    public ArraySegment<T> DangerousGetArray()
+    {
+        return _segment;
+    }    
 
-	public ReadOnlySpan<T> Span
+    public ReadOnlySpan<T> Span
 	{
 		get
 		{
@@ -504,7 +531,13 @@ public ref readonly T this[int index]
 			return new Mem<T>(_owner);
 		}
 		return new Mem<T>(_segment);
-	}
+    }
+    public Span<T> AsWriteSpan()
+    {
+        return new Span<T>(_array, _offset, length);
+    }
+
+
 }
 
 

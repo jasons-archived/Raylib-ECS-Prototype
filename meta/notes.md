@@ -17,6 +17,7 @@
     - [rendering?](#rendering)
     - [Spatial partitioning notes](#spatial-partitioning-notes)
 - [TODO:](#todo)
+- [ecs review notes](#ecs-review-notes)
 
 
 
@@ -154,7 +155,22 @@ Logical object structure is
 - debugging
   - simPipeline debug/visualization
     - https://github.com/JamieDixon/GraphViz-C-Sharp-Wrapper
-    - 
+    - https://github.com/klassmann/libnoise-csharp
+
+
+- timestep smoothing
+  - https://blog.unity.com/technology/fixing-time-deltatime-in-unity-2020-2-for-smoother-gameplay-what-did-it-take
+  - https://www.gafferongames.com/post/fix_your_timestep/
+
+
+- perlin / noise generation
+  - https://github.com/Auburn/FastNoiseLite
+
+
+
+- free art assets
+  - https://opengameart.org/content/ui-pack
+  - 
 ## other private notes/scratch
 
 - ecs system example
@@ -289,3 +305,17 @@ handle MemoryOwner clear on dispose!
 
 
 Frame.FromPool() should recycle old frames, make chain for inspection of old state
+
+
+# ecs review notes
+- Systems Roots
+  - start 
+    - inputs
+    - SYNC
+      - updateFrame    
+      - ecsDatabase
+  - start
+    - inputs
+  - simulation
+  - presentation
+  - end

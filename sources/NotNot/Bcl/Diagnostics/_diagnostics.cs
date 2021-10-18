@@ -1,4 +1,4 @@
-﻿// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
+// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
 // [!!] Copyright ©️ NotNot Project and Contributors. 
 // [!!] By default, this file is licensed to you under the AGPL-3.0.
 // [!!] However a Private Commercial License is available. 
@@ -21,7 +21,7 @@ namespace NotNot.Bcl.Diagnostics
 	/// <para>For example, calling .CreateName{int}() ==> "int_0".   Calling it again would return "int_1" </para>
 	/// </summary>
 	[ThreadSafety(ThreadSituation.Always)]
-	public static class InstanceNameCounter
+	public static class InstanceNameHelper
 	{
 		private static Dictionary<Type, ulong> _countTracker = new();
 

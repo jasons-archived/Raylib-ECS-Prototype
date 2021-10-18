@@ -253,7 +253,7 @@ public abstract partial class SimNode   //tree logic
 		{
 			if (_nameCached == null)
 			{
-				_nameCached = InstanceNameCounter.CreateName(this.GetType());
+				_nameCached = InstanceNameHelper.CreateName(this.GetType());
 			}
 			return _nameCached;
 		}

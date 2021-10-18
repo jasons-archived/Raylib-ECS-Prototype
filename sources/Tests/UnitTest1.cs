@@ -7,6 +7,10 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 
 namespace Tests.Internals;
+using NotNot.Engine;
+using NotNot.Engine.Ecs;
+using NotNot.Bcl;
+		 
 [TestClass]
 public class BasicWorkflow
 {
@@ -104,6 +108,51 @@ public class BasicWorkflow
 		engine.Dispose();
 		__ERROR.Throw(engine.IsDisposed);
 
+        GC.Collect();
+        await Task.Delay(100);
+    }
+
+
+
+
+
+	[TestMethod]
+	public async Task Ecs_CreateEntity()
+	{
+		var engine = new NotNot.Engine.Engine();
+		engine.Updater = new NotNot.Engine.HeadlessUpdater();
+		engine.Initialize();
+		engine.DefaultWorld.AddChild(new TimestepNodeTest() { TargetFps = 10 });
+		engine.Updater.Start();
+
+
+		var em = engine.DefaultWorld.entityManager;
+
+		var archetype = em.GetOrCreateArchetype(new(){typeof(int),typeof(bool)});
+
+		em.EnqueueCreateEntity(100, archetype, (args) => {
+            var (accessTokens, entityHandles, archetype) = args;
+            foreach(var accessToken in accessTokens)
+            {
+                ref var cInt = ref accessToken.GetComponentWriteRef<int>();
+                ref var cBool = ref accessToken.GetComponentWriteRef<bool>();
+                cInt = accessToken.entityHandle.id;
+                cBool = cInt % 2 == 0;
+            }
+        });
+
+
+		await Task.Delay(100);
+
+		await engine.Updater.Stop();
+		__ERROR.Assert(engine.DefaultWorld._lastUpdate._timeStats._frameId > 30);
+		engine.Dispose();
+		__ERROR.Throw(engine.IsDisposed);
+
 	}
+
+
+
+
 }
 
