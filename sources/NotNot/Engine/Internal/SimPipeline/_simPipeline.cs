@@ -785,7 +785,7 @@ public abstract partial class SimNode : DisposeGuard, IComparable<SimNode> //fra
 	/// </summary>
 	protected void RegisterWriteLock(object resource)
 	{
-		_registeredReadLocks.Add(resource);
+		_registeredWriteLocks.Add(resource);
 	}
 	/// <summary>
 	/// informs the SimPipeline that this node needs shared-read access to the specified resource during the Update() loop
@@ -800,7 +800,7 @@ public abstract partial class SimNode : DisposeGuard, IComparable<SimNode> //fra
 	/// </summary>
 	protected void RegisterWriteLock<TComponent>()
 	{
-		_registeredReadLocks.Add(typeof(TComponent));
+		_registeredWriteLocks.Add(typeof(TComponent));
 	}
 
 
