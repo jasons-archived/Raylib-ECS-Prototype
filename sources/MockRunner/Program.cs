@@ -102,7 +102,7 @@ using Microsoft.Toolkit.HighPerformance.Buffers;
 
 //engine.Dispose();
 
-var tests = new Tests.Internals.BasicWorkflow();
+var tests = new Tests.Internals.EngineBasic();
 await tests.Engine_WorldWithChild();
 
 

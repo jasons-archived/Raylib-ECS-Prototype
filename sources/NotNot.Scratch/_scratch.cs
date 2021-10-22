@@ -4,6 +4,7 @@ using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
 using NotNot.Engine.Ecs;
 using NotNot.Engine.Ecs.Allocation;
+using NotNot.Engine.Internal.SimPipeline;
 
 namespace NotNot;
 
@@ -81,7 +82,7 @@ public class PlayerInputSystem : NotNot.Engine.Ecs.System
 
 
 
-	protected override async Task Update()
+	protected override async Task OnUpdate(Frame frame)
 	{
 		playerMoveQuery.Run((ReadMem<EntityMetadata> meta,Mem<Move> moves,ReadMem<PlayerInput> players) => {
 
@@ -89,7 +90,11 @@ public class PlayerInputSystem : NotNot.Engine.Ecs.System
 			for(var i = 0; i < meta.length; i++)
 			{
 				__ERROR.Throw(metaSpan[i].IsAlive, "why dead being enumerated?  we are forcing autopack");
-				moves[i].value =Vector3.Normalize(__.Rand._NextVector3());
+				//moves[i].value =Vector3.Normalize(__.Rand._NextVector3());
+				var vec = __.Rand._NextVector3();
+				var norm = Vector3.Normalize(vec);
+				moves[i].value = norm;
+
 			}
 
 		});
@@ -113,9 +118,11 @@ public class MoveSystem: NotNot.Engine.Ecs.System
 		RegisterReadLock<Move>();
 		
 	}
-
-	protected override async Task Update()
+	
+	protected override async Task OnUpdate(Frame frame)
 	{
+		Console.WriteLine($"-------------------- {frame._stats._frameId}");
+
 		//run the query, selecting all entities and doing work on them.
 		moveQuery.Run((
 			//metadata about the entity
@@ -138,41 +145,41 @@ public class MoveSystem: NotNot.Engine.Ecs.System
 }
 
 
-public class TestGame
-{
-	public void Run()
-	{
-		var engine = new Engine.Engine();
-		engine.Updater = new NotNot.Engine.HeadlessUpdater();
-		engine.Initialize();
-		//engine.DefaultWorld.AddChild(new TimestepNodeTest() { TargetFps = 10 });
+//public class TestGame
+//{
+//	public void Run()
+//	{
+//		var engine = new Engine.Engine();
+//		engine.Updater = new NotNot.Engine.HeadlessUpdater();
+//		engine.Initialize();
+//		//engine.DefaultWorld.AddChild(new TimestepNodeTest() { TargetFps = 10 });
 
-		engine.DefaultWorld.AddChild(new MoveSystem());
-		engine.DefaultWorld.AddChild(new PlayerInputSystem());
-
-
-
-
-		engine.Updater.Start();
-
-		var em = engine.DefaultWorld.entityManager;
-
-		var archetype = em.GetOrCreateArchetype(new() { typeof(PlayerInput), typeof(Translation), typeof(Move) });
-
-		em.EnqueueCreateEntity(1, archetype, (args) => {
-			var (accessTokens, entityHandles, archetype) = args;
-			foreach (var accessToken in accessTokens)
-			{
-				ref var translation = ref accessToken.GetComponentWriteRef<Translation>();
-				ref var move = ref accessToken.GetComponentWriteRef<Move>();
-				translation = new Translation() { value = Vector3.One };
-				move = new() { value = Vector3.Zero };
-			}
-		});
+//		engine.DefaultWorld.AddChild(new MoveSystem());
+//		engine.DefaultWorld.AddChild(new PlayerInputSystem());
 
 
 
-	}
 
-}
+//		engine.Updater.Start();
+
+//		var em = engine.DefaultWorld.entityManager;
+
+//		var archetype = em.GetOrCreateArchetype(new() { typeof(PlayerInput), typeof(Translation), typeof(Move) });
+
+//		em.EnqueueCreateEntity(1, archetype, (args) => {
+//			var (accessTokens, entityHandles, archetype) = args;
+//			foreach (var accessToken in accessTokens)
+//			{
+//				ref var translation = ref accessToken.GetComponentWriteRef<Translation>();
+//				ref var move = ref accessToken.GetComponentWriteRef<Move>();
+//				translation = new Translation() { value = Vector3.One };
+//				move = new() { value = Vector3.Zero };
+//			}
+//		});
+
+
+
+//	}
+
+//}
 

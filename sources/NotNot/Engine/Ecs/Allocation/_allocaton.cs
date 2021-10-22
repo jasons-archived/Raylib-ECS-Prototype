@@ -60,6 +60,11 @@ public readonly record struct EntityHandle : IComparable<EntityHandle>
 	{
 		return id.CompareTo(other.id);
 	}
+
+	public override string ToString()
+	{
+		return $"{id}.{version}";
+	}
 }
 public record struct EntityData
 {
@@ -86,7 +91,7 @@ public class EntityRegistry
 
 	public Mem<EntityHandle> Alloc(int count)
 	{
-		var toReturn = Mem<EntityHandle>.Allocate(count,false);
+		var toReturn = Mem<EntityHandle>.Allocate(count, false);
 		Alloc(toReturn.Span);
 		return toReturn;
 	}
@@ -166,7 +171,7 @@ public class EntityRegistry
 		for (var i = 0; i < output.Length; i++)
 		{
 			var handle = handles[i];
-			output[i] = storageArray[handle.id].pageAccessToken;			
+			output[i] = storageArray[handle.id].pageAccessToken;
 		}
 	}
 }
@@ -302,8 +307,8 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 	{
 		GetOwner().WriteNotify<TComponent>();
 		var chunk = GetContainingChunk<TComponent>();
-		return Mem.CreateUsing(chunk._storage);
-		
+		return Mem.CreateUsing(chunk.StorageSlice);
+
 	}
 	/// <summary>
 	/// Get Read only (shared) access to the chunk this entity component is in
@@ -312,7 +317,7 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 	{
 		GetOwner().ReadNotify<TComponent>();
 		var chunk = GetContainingChunk<TComponent>();
-		return ReadMem.CreateUsing(chunk._storage);
+		return ReadMem.CreateUsing(chunk.StorageSlice);
 	}
 
 
@@ -539,7 +544,7 @@ public partial class Page //unit test
 
 
 		//};
-		page.Initialize(null,entityRegistry);
+		page.Initialize(null, entityRegistry);
 
 
 		var entityCount = __.Rand.Next(0, 1000);
@@ -1769,6 +1774,7 @@ public partial class Page  //alloc/free/pack logic
 		///<summary>helper function to walk from our highest slot downward (deallocating any free) until it hits a live slot.</summary>
 		void _TryFreeAndGetNextAlive(out SlotRef highestAllocatedSlot, out EntityMetadata highestAliveToken)
 		{
+			highestAliveToken = default;
 			while (true)
 			{
 				var result = _nextSlotTracker.TryGetHighestAllocatedSlot(out highestAllocatedSlot);
@@ -1935,12 +1941,18 @@ public partial class Page  //alloc/free/pack logic
 public record struct EntityMetadata
 {
 	public AccessToken accessToken;
+	/// <summary>
+	/// how many components are associated with this entity
+	/// </summary>
 	public int componentCount;
 	/// <summary>
 	/// hint informing that a writeRef was aquired for one of the components.
 	/// <para>Important Note: writing to this fieldWrites is done internally, and does not increment the Chunk[EntityMetadata]._writeVersion.  This is so _writeVersion can be used to detect entity alloc/free </para>
 	/// </summary>
 	public int fieldWrites;
+
+
+	public EntityHandle Entity { get => accessToken.entityHandle; }
 
 	/// <summary>
 	/// If this slot is in use by an entity
@@ -1964,7 +1976,11 @@ public record struct EntityMetadata
 
 		return accessToken.GetReadMem<TComponent>();
 	}
-
+	public override string ToString()
+	{
+		var live = IsAlive ? "ALIVE" : "DEAD";
+		return $"{Entity}.{live}";
+	}
 }
 
 /// <summary>
@@ -2076,15 +2092,38 @@ public struct AllocPositionTracker
 public abstract class Chunk : IDisposable
 {
 	//public long _chunkLookupId = -1;
+
+	/// <summary>
+	/// The ID of the Page this Chunk is associated with
+	/// </summary>
 	public int pageId = -1;
+	/// <summary>
+	/// Page version counter, if this does not match the current page at slot pageId, we have a mismatched reference. (stale ref/disposed page)
+	/// </summary>
 	public int pageVersion = -1;
+	/// <summary>
+	/// the offset down the column this chunk is in (when referencing <see cref="Chunk{TComponent}._GLOBAL_LOOKUP"/>)
+	/// </summary>
 	public int columnIndex = -1;
+	/// <summary>
+	/// how many entities are currently in this chunk
+	/// </summary>
 	public int _count;
+
+	/// <summary>
+	/// how many entity row slots our chunk has.
+	/// </summary>
 	public int _length = -1;
 	/// <summary>
 	/// incremented every time a system writes to any of its slots.  
 	/// </summary>
 	public int _writeVersion;
+
+	/// <summary>
+	/// if true, obtaining components via StorageSlice will provide a contiguous sequence of all entity components in this chunk.
+	/// If false, the user needs to manually detect 
+	/// </summary>
+	public bool _isAutoPack;
 
 
 	/// <summary>
@@ -2129,8 +2168,26 @@ public class Chunk<TComponent> : Chunk
 	public static ResizableArray<List<Chunk<TComponent>>> _GLOBAL_LOOKUP = new();
 
 
-	public Mem<TComponent> _storage;
-	public Memory<TComponent> Memory { get => _storage.Memory; }
+	
+	public Mem<TComponent> _storageRaw;
+
+	/// <summary>
+	/// If the Page is set to AutoPack (default true for NotNot Engine) this will provide a contiguous slice of allocated entity components.
+	/// This is useful so you don't have to check if the slot is alive, and don't have gaps in live data.
+	/// If AutoPack is false, this will return the underlying storage array.
+	/// </summary>
+	public Mem<TComponent> StorageSlice
+	{
+		get
+		{
+			if (_isAutoPack)
+			{
+				return _storageRaw.Slice(0, _count);
+			}
+			return _storageRaw;
+		}
+	}
+
 	//public ArraySegment<TComponent> Span
 	//{
 	//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2176,8 +2233,8 @@ public class Chunk<TComponent> : Chunk
 		//our page.FreeLastChunk code checks count.   we don't want to check count here because of cases like game shutdown
 		//__ERROR.Throw(_count == 0); 
 		UnsafeArray = null;
-		_storage.Dispose();
-		_storage = default;
+		_storageRaw.Dispose();
+		_storageRaw = default;
 	}
 
 	public override void Initialize(int length, Page page, int columnIndex)
@@ -2187,6 +2244,7 @@ public class Chunk<TComponent> : Chunk
 		pageId = page._pageId;
 		pageVersion = page._version;
 		this.columnIndex = columnIndex;
+		_isAutoPack = page.AutoPack;
 
 
 
@@ -2203,8 +2261,9 @@ public class Chunk<TComponent> : Chunk
 		column._ExpandAndSet(columnIndex, this);
 
 		//_storage = MemoryOwner<TComponent>.Allocate(_length, AllocationMode.Clear); //TODO: maybe no need to clear?
-		_storage = Mem<TComponent>.Allocate(_length, true);
-		UnsafeArray = _storage.DangerousGetArray().Array!;
+		_storageRaw = Mem<TComponent>.Allocate(_length, true);
+		
+		UnsafeArray = _storageRaw.DangerousGetArray().Array!;
 	}
 	internal override void OnAllocSlot(ref AccessToken pageToken)
 	{

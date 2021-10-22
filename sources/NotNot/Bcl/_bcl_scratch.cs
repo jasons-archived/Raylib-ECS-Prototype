@@ -272,14 +272,23 @@ public static class ReadMem
 /// <typeparam name="T"></typeparam>
 public readonly struct Mem<T>
 {
-	private readonly MemoryOwner_Custom<T> _owner;
+	private readonly MemoryOwner_Custom<T>? _owner;
 	private readonly ArraySegment<T> _segment;
 	private readonly T[] _array;
 	private readonly int _offset;
 	public readonly int length;
-	internal Mem(ArraySegment<T> segment) : this()
+	internal Mem(MemoryOwner_Custom<T> owner, ArraySegment<T> segment, T[] array, int offset, int length)
 	{
-		//_owner = null;
+		_owner = owner;
+		_segment = segment;
+		_array = array;
+		_offset = offset;
+		this.length = length;
+	}
+
+	internal Mem(ArraySegment<T> segment)
+	{
+		_owner = null;
 		_segment = segment;
 		_array = segment.Array!;
 		_offset = segment.Offset;
@@ -296,8 +305,8 @@ public readonly struct Mem<T>
 	/// </summary>
 	public static Mem<T> Allocate(int size, bool clearOnDispose)
 	{
-		__DEBUG.AssertOnce(System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<T>() == false || clearOnDispose, "alloc of classes via memPool can/will cause leaks");
-		var mo = MemoryOwner_Custom<T>.Allocate(size);
+		__DEBUG.AssertOnce(System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<T>() == false || clearOnDispose, "alloc of classes via memPool can/will cause leaks");	
+		var mo = MemoryOwner_Custom<T>.Allocate(size,clearOnDispose? AllocationMode.Clear: AllocationMode.Default);
 		mo.ClearOnDispose = clearOnDispose;
 		return new Mem<T>(mo);
 	}
@@ -331,6 +340,15 @@ public readonly struct Mem<T>
 	{
 		return readMem.AsWriteMem();
 	}
+
+
+
+	public Mem<T> Slice(int offset, int count)
+	{
+		var toReturn = new Mem<T>(_owner, new(_array, _offset + offset, count), _array, _offset + offset, count);
+		return toReturn;
+	}
+
 
 
 	/// <summary>
@@ -391,11 +409,7 @@ public readonly struct Mem<T>
 
 	public ReadMem<T> AsReadMem()
 	{
-		if (_owner != null)
-		{
-			return new ReadMem<T>(_owner);
-		}
-		return new ReadMem<T>(_segment);
+		return new ReadMem<T>(_owner,_segment,_array,_offset,length);
 	}
 }
 /// <summary>
@@ -404,14 +418,22 @@ public readonly struct Mem<T>
 /// <typeparam name="T"></typeparam>
 public readonly struct ReadMem<T>
 {
-	private readonly MemoryOwner_Custom<T> _owner;
+	private readonly MemoryOwner_Custom<T>? _owner;
 	private readonly ArraySegment<T> _segment;
 	private readonly T[] _array;
 	private readonly int _offset;
 	public readonly int length;
-	internal ReadMem(ArraySegment<T> segment) : this()
+	internal ReadMem(MemoryOwner_Custom<T> owner, ArraySegment<T> segment, T[] array, int offset, int length)
 	{
-		//_owner = null;
+		_owner = owner;
+		_segment = segment;
+		_array = array;
+		_offset = offset;
+		this.length = length;
+	}
+	internal ReadMem(ArraySegment<T> segment)
+	{
+		_owner = null;
 		_segment = segment;
 		_array = segment.Array;
 		_offset = segment.Offset;
@@ -455,6 +477,12 @@ public readonly struct ReadMem<T>
 	public static ReadMem<T> CreateUsing(Mem<T> writeMem)
 	{
 		return writeMem.AsReadMem();
+	}
+
+	public ReadMem<T> Slice(int offset, int count)
+	{
+		var toReturn = new ReadMem<T>(_owner, new(_array, _offset + offset, count), _array, _offset + offset, count);
+		return toReturn;
 	}
 
 	/// <summary>
@@ -526,11 +554,7 @@ public ref readonly T this[int index]
 	}
 	public Mem<T> AsWriteMem()
 	{
-		if (_owner != null)
-		{
-			return new Mem<T>(_owner);
-		}
-		return new Mem<T>(_segment);
+		return new Mem<T>(_owner, _segment, _array, _offset, length);
 	}
 	public Span<T> AsWriteSpan()
 	{

@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
 
     <IsPackable>false</IsPackable>
+
+    <StartupObject></StartupObject>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Benchmarks\Benchmarks.csproj" />
+    <ProjectReference Include="..\NotNot.Scratch\NotNot.Scratch.csproj" />
     <ProjectReference Include="..\NotNot\NotNot.csproj" />
   </ItemGroup>
 

@@ -1,0 +1,12 @@
+global using Microsoft.VisualStudio.TestTools.UnitTesting;
+global using NotNot.Bcl.Diagnostics;
+global using NotNot.Engine.Internal.SimPipeline;
+global using scratch_console.Helpers.Pipeline;
+global using System;
+global using System.Diagnostics;
+global using System.Threading.Tasks;
+global using NotNot.Engine;
+global using NotNot.Engine.Ecs;
+global using NotNot.Bcl;
+global using NotNot;
+global using System.Numerics;

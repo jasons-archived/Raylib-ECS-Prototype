@@ -1,18 +1,8 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using NotNot.Bcl.Diagnostics;
-using NotNot.Engine.Internal.SimPipeline;
-using scratch_console.Helpers.Pipeline;
-using System;
-using System.Diagnostics;
-using System.Threading.Tasks;
 
 namespace Tests.Internals;
-using NotNot.Engine;
-using NotNot.Engine.Ecs;
-using NotNot.Bcl;
 		 
 [TestClass]
-public class BasicWorkflow
+public class EngineBasic
 {
 	[TestMethod]
 	public async Task Engine_StartStop()
