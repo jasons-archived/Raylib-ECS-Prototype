@@ -23,7 +23,7 @@ using NotNot.Engine.Ecs;
 namespace NotNot.Engine.Internal.SimPipeline;
 
 /// <summary>
-/// Manages execution of <see cref="SimNode"/> in parallel based on order-of-execution requirements (see <see cref="SimNode._updateBefore"/>) and resource requirements (see <see cref="SimNode._readResources"/> and <see cref="SimNode._writeResources"/>)
+/// Manages execution of <see cref="SimNode"/> in parallel based on order-of-execution requirements (see <see cref="SimNode._updateBefore"/>) and resource requirements (see <see cref="SimNode._registeredReadLocks"/> and <see cref="SimNode._registeredWriteLocks"/>)
 /// </summary>
 public partial class SimManager : DisposeGuard //tree management
 {
@@ -37,7 +37,7 @@ public partial class SimManager : DisposeGuard //tree management
 		__DEBUG.Throw(_nodeRegistry.ContainsKey(_root.Name));
 		//var result = _nodeRegistry.TryAdd(_root.Name, _root);
 		//__DEBUG.Throw(result);
-		
+
 	}
 
 	/// <summary>
@@ -92,7 +92,7 @@ public partial class SimManager : DisposeGuard //tree management
 	{
 
 		__ERROR.Throw(node.Name != null, $"your node of type {node.GetType().Name} has a blank name.  It must have a unique .Name property");
-		__CHECKED.Throw(node.IsRegistered==false && node.IsAdded==false);
+		__CHECKED.Throw(node.IsRegistered == false && node.IsAdded == false);
 
 		//find parent
 		//SimNode parent;
@@ -295,7 +295,7 @@ public abstract partial class SimNode   //tree logic
 	/// how far down the node hiearchy this is.  RootNode has depth 0.  
 	/// <para>when not registered with the SimManager (not attached to a running simulation) the depth is -1</para>
 	/// </summary>
-	protected internal int HierarchyDepth { get;internal set; } = -1;
+	protected internal int HierarchyDepth { get; internal set; } = -1;
 
 
 
@@ -404,7 +404,8 @@ public abstract partial class SimNode   //tree logic
 	}
 
 	/// <summary>
-	/// invoked when registered with the engine, meaning it will start getting <see cref="OnUpdate"/> calls
+	/// invoked when registered with the engine, meaning its parents are all hooked up with the engine and could possibly start getting <see cref="OnUpdate"/> calls
+	/// parents will register before children.   children unregister before parents.
 	/// </summary>
 	protected virtual void OnRegister()
 	{
@@ -421,11 +422,11 @@ public abstract partial class SimNode   //tree logic
 		}
 
 		OnUnregister();
-		var result = manager._nodeRegistry.TryRemove(Name,out var self);
+		var result = manager._nodeRegistry.TryRemove(Name, out var self);
 		__DEBUG.Throw(result && self == this);
 		manager = null;
 
-	
+
 
 	}
 	/// <summary>
@@ -739,8 +740,8 @@ public abstract partial class SimNode //update logic
 
 public abstract partial class SimNode : DisposeGuard, IComparable<SimNode> //frame blocking / update order
 {
-	public int _executionPriority = 0;
-	public int CompareTo(SimNode other)
+	private int _executionPriority = 0;
+	int IComparable<SimNode>.CompareTo(SimNode? other)
 	{
 		if (other == null)
 		{
@@ -763,13 +764,45 @@ public abstract partial class SimNode : DisposeGuard, IComparable<SimNode> //fra
 	/// object "token" used as a shared read-access key when trying to execute this node.  
 	/// <para>Nodes with read access to the same key may execute in parallel</para>
 	/// </summary>
-	public List<object> _readResources = new();
+	public HashSet<object> _registeredReadLocks = new();
 
 	/// <summary>
 	/// object "token" used as an exclusive write-access key when trying to execute this node.  
 	/// <para>Nodes with write access to a key will run seperate from any other node using the same resource (Read or Write)</para>
 	/// </summary>
-	public List<object> _writeResources = new();
+	public HashSet<object> _registeredWriteLocks = new();
+
+	/// <summary>
+	/// informs the SimPipeline that this node needs shared-read access to the specified resource during the Update() loop
+	/// </summary>
+	/// <typeparam name="TComponent"></typeparam>
+	protected void RegisterReadLock(object resource)
+	{
+		_registeredReadLocks.Add(resource);
+	}
+	/// <summary>
+	/// informs the SimPipeline that this node needs exclusive-write access to the specified resource during the Update() loop
+	/// </summary>
+	protected void RegisterWriteLock(object resource)
+	{
+		_registeredReadLocks.Add(resource);
+	}
+	/// <summary>
+	/// informs the SimPipeline that this node needs shared-read access to the specified resource during the Update() loop
+	/// </summary>
+	/// <typeparam name="TComponent"></typeparam>
+	protected void RegisterReadLock<TComponent>()
+	{
+		_registeredReadLocks.Add(typeof(TComponent));
+	}
+	/// <summary>
+	/// informs the SimPipeline that this node needs exclusive-write access to the specified resource during the Update() loop
+	/// </summary>
+	protected void RegisterWriteLock<TComponent>()
+	{
+		_registeredReadLocks.Add(typeof(TComponent));
+	}
+
 
 	/// <summary>
 	/// dispose self and all children
@@ -801,11 +834,13 @@ public abstract partial class SimNode : DisposeGuard, IComparable<SimNode> //fra
 	/// <summary>
 	/// if your node has initialization steps, override this method, but be sure to call it's base.OnInitialize();
 	/// <para>If Initialize is not called by the time this node is registered with the Engine, initialize will be called automatically.</para>
+	/// <para>will only be called ONCE for the node's lifetime</para>
 	/// </summary>
 	protected virtual void OnInitialize()
 	{
 
 	}
+
 }
 
 
@@ -926,7 +961,7 @@ public partial class Frame ////node graph setup and execution
 
 			//TODO: calculate and store all runBefore/ runAfter dependencies
 
-			
+
 			//updateAfter
 			foreach (var afterName in node._updateAfter)
 			{
@@ -971,13 +1006,13 @@ public partial class Frame ////node graph setup and execution
 			//calc and store resource R/W locking
 
 			//reads
-			foreach (var obj in node._readResources)
+			foreach (var obj in node._registeredReadLocks)
 			{
 				var readRequests = _readRequestsRemaining._GetOrAdd(obj, () => new());
 				readRequests.Add(node);
 			}
 			//writes
-			foreach (var obj in node._writeResources)
+			foreach (var obj in node._registeredWriteLocks)
 			{
 				var writeRequests = _writeRequestsRemaining._GetOrAdd(obj, () => new());
 				writeRequests.Add(node);
@@ -1211,7 +1246,7 @@ public partial class Frame //resource locking
 		if (_priorFrame != null)
 		{
 			//for a READ resource, make sure no WRITES remaining from last frame, otherwise can not proceed yet.
-			foreach (var obj in node._readResources)
+			foreach (var obj in node._registeredReadLocks)
 			{
 				if (_priorFrame._writeRequestsRemaining.TryGetValue(obj, out var nodesRemaining) && nodesRemaining.Count > 0)
 				{
@@ -1219,7 +1254,7 @@ public partial class Frame //resource locking
 				}
 			}
 			//for a WRITE resource, make sure no READS or WRITES remaining from last frame, otherwise can not proceed yet.
-			foreach (var obj in node._writeResources)
+			foreach (var obj in node._registeredWriteLocks)
 			{
 				{
 					if (_priorFrame._writeRequestsRemaining.TryGetValue(obj, out var nodesRemaining) && nodesRemaining.Count > 0)
@@ -1237,7 +1272,7 @@ public partial class Frame //resource locking
 
 		}
 		//reads
-		foreach (var obj in node._readResources)
+		foreach (var obj in node._registeredReadLocks)
 		{
 			var rwCounter = _manager._resourceLocks._GetOrAdd(obj, () => new());
 			if (rwCounter.IsWriteHeld)
@@ -1246,7 +1281,7 @@ public partial class Frame //resource locking
 			}
 		}
 		//writes
-		foreach (var obj in node._writeResources)
+		foreach (var obj in node._registeredWriteLocks)
 		{
 			var rwCounter = _manager._resourceLocks._GetOrAdd(obj, () => new());
 			if (rwCounter.IsAnyHeld)
@@ -1263,7 +1298,7 @@ public partial class Frame //resource locking
 	private bool LockResources(SimNode node)
 	{
 		//reads
-		foreach (var obj in node._readResources)
+		foreach (var obj in node._registeredReadLocks)
 		{
 			var rwCounter = _manager._resourceLocks._GetOrAdd(obj, () => new());
 			rwCounter.EnterRead();
@@ -1272,7 +1307,7 @@ public partial class Frame //resource locking
 
 		}
 		//writes
-		foreach (var obj in node._writeResources)
+		foreach (var obj in node._registeredWriteLocks)
 		{
 			var rwCounter = _manager._resourceLocks._GetOrAdd(obj, () => new());
 			rwCounter.EnterWrite();
@@ -1284,14 +1319,14 @@ public partial class Frame //resource locking
 	private bool UnlockResources(SimNode node)
 	{
 		//reads
-		foreach (var obj in node._readResources)
+		foreach (var obj in node._registeredReadLocks)
 		{
 			var rwLock = _manager._resourceLocks._GetOrAdd(obj, () => new());
 			rwLock.ExitRead();
 
 		}
 		//writes
-		foreach (var obj in node._writeResources)
+		foreach (var obj in node._registeredWriteLocks)
 		{
 			var rwLock = _manager._resourceLocks._GetOrAdd(obj, () => new());
 			rwLock.ExitWrite();

@@ -48,10 +48,10 @@ public class BasicWorkflow
 		manager.Register(new TimestepNodeTest { ParentName = "root", Name = "A", TargetFps = 1 });
 		manager.Register(new DelayTest { ParentName = "root", Name = "A2" });
 
-		manager.Register(new DelayTest { ParentName = "A", Name = "B", _updateBefore = { "A2" }, _writeResources = { "taco" } });
-		manager.Register(new DelayTest { ParentName = "A", Name = "B2", _readResources = { "taco" } });
-		manager.Register(new DelayTest { ParentName = "A", Name = "B3", _readResources = { "taco" } });
-		manager.Register(new DelayTest { ParentName = "A", Name = "B4!", _updateAfter = { "A2" }, _readResources = { "taco" } });
+		manager.Register(new DelayTest { ParentName = "A", Name = "B", _updateBefore = { "A2" }, _registeredWriteLocks = { "taco" } });
+		manager.Register(new DelayTest { ParentName = "A", Name = "B2", _registeredReadLocks = { "taco" } });
+		manager.Register(new DelayTest { ParentName = "A", Name = "B3", _registeredReadLocks = { "taco" } });
+		manager.Register(new DelayTest { ParentName = "A", Name = "B4!", _updateAfter = { "A2" }, _registeredReadLocks = { "taco" } });
 
 		manager.Register(new DelayTest { ParentName = "B", Name = "C" });
 		manager.Register(new DelayTest { ParentName = "B", Name = "C2" });

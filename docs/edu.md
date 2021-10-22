@@ -8,6 +8,8 @@ links for tangental educational stuff here.
 Some ECS Intro videos that are mostly applicable to !!.Ecs
 - https://www.youtube.com/watch?v=OqzUr-Rg6w4
 - https://www.youtube.com/watch?v=3r4aFWqXY_8
+- rant about unity ecs: https://www.youtube.com/watch?v=SQ7GJFL8ttE
+- 
 
 # Timesteps
  - https://medium.com/@tglaiel/how-to-make-your-game-run-at-60fps-24c61210fe75
@@ -34,4 +36,10 @@ Some ECS Intro videos that are mostly applicable to !!.Ecs
 
 # Project Management
 - OSS Repo Checklist: https://gist.github.com/ZacharyPatten/08532b31ef5efc7593b32326b498023a
-- 
+
+
+# c# performance
+  - Scott Meyers: Cpu Caches and Why You Care: https://www.youtube.com/watch?v=WDIkqP4JbkE&t=247s
+
+
+- row major traversal of matrix vs column major traversal

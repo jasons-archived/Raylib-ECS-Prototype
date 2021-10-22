@@ -15,6 +15,7 @@
     - [funding](#funding)
     - [important feature needs:](#important-feature-needs)
     - [rendering?](#rendering)
+      - [raylib](#raylib)
     - [Spatial partitioning notes](#spatial-partitioning-notes)
 - [TODO:](#todo)
 - [ecs review notes](#ecs-review-notes)
@@ -219,9 +220,7 @@ Logical object structure is
 ### rendering?
 a loaded topic.  there is scene management/spatial partitioning to consider.  camera, animation support
 some potentail solutions
-- RayLib / Raylib CS Bindings
-   - https://github.com/ChrisDill/Raylib-cs/wiki/FAQ
-   - https://www.raylib.com/examples.html
+
 - Urho3d
   - https://urho3d.io/documentation/HEAD/index.html
   - https://github.com/xamarin/urho
@@ -232,8 +231,15 @@ some potentail solutions
 review these tutorials if need to do basic things like camera/frustum: https://github.com/gametutorials/tutorials/tree/master/OpenGL
 - super low level projects, just in case:
   - https://github.com/mellinoe/veldrid
-  - 
 
+
+#### raylib
+raylib seems most complete.  meaning least work to get a working renderer out-of-the-box for a "reference" renderer.
+- RayLib / Raylib CS Bindings
+   - https://github.com/ChrisDill/Raylib-cs/wiki/FAQ
+   - https://www.raylib.com/examples.html
+- raylib based debug frames.  **EXCELENT**
+  - https://github.com/JeffM2501/TestFrame
 
 ### Spatial partitioning notes
 
@@ -264,7 +270,9 @@ review these tutorials if need to do basic things like camera/frustum: https://g
       }
       ```
 - see also: https://github.com/Auios/Auios.QuadTree for object based
-- 
+- other not really optimized math lib
+  - https://github.com/gradientspace/geometry3Sharp
+  - 
 
 # TODO:
 
@@ -319,3 +327,17 @@ Frame.FromPool() should recycle old frames, make chain for inspection of old sta
   - simulation
   - presentation
   - end
+
+
+maths
+- dot product:  (scalar product)
+  - gives similarity
+- cross product: (vector product)
+  - gives normal
+- game related libraries with maths:
+  - https://github.com/tgjones/nexus
+  - https://github.com/ykafia/stride/blob/master/sources/core/Stride.Core.Mathematics/Matrix.cs
+  - https://github.com/RonenNess/MonoGame-SceneGraph
+  - https://github.com/craftworkgames/MonoGame.Extended
+  - 
+  - 

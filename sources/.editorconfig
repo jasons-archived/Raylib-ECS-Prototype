@@ -23,7 +23,7 @@ dotnet_diagnostic.IDE0073.severity = warning
 
 
 [*.cs]
-
+indent_style = tab
 
 # #Core editorconfig formatting - indentation
 

@@ -68,10 +68,42 @@ public abstract class SystemBase : FixedTimestepNode
     }
 
     protected abstract Task Update();
-
-
-
 }
+
+
+/// <summary>
+/// A system that is a child of a world
+/// <para>If you don't like/need this constraint, inherit from SystemBase instead</para>
+/// </summary>
+public abstract class System : SystemBase
+{
+	public World world;
+	public EntityManager entityManager;
+
+	protected override void OnRegister()
+	{
+		try
+		{
+			world = GetHierarchy().DangerousGetArray().OfType<World>().First();
+			entityManager = world.entityManager;
+		}catch(Exception ex)
+		{
+			throw new ApplicationException("could not find world in hiearchy. a WorldSystem should be registered as a child of a World", ex);
+		}
+
+		base.OnRegister();
+	}
+
+	protected override void OnUnregister()
+	{
+		world = null;
+		entityManager = null;
+
+		base.OnUnregister();
+
+	}
+}
+
 
 /// <summary>
 /// internal helper used to ensure components are not read+write at the same time.   for better performance, only checks during DEBUG builds
@@ -86,8 +118,16 @@ public class AccessGuard
     {
         this._entityManager = entityManager;
     }
-    [Conditional("DEBUG")]
+	/// <summary>
+	/// for internal use only.  informs that a read is about to occur
+	/// </summary>
+	/// <typeparam name="TComponent"></typeparam>
+	[Conditional("DEBUG")]
     public void ReadNotify<TComponent>() { }
+	/// <summary>
+	/// for internal use only.  informs that a write is about to occur
+	/// </summary>
+	/// <typeparam name="TComponent"></typeparam>
     [Conditional("DEBUG")]
     public void WriteNotify<TComponent>() { }
 
@@ -299,7 +339,7 @@ public partial class EntityManager //archetype management
 
 public partial class EntityManager //entity creation
 {
-    private System.Collections.Concurrent.ConcurrentQueue<(int count, Archetype archetype, CreateEntitiesCallback doneCallback)> _createQueue = new();
+    private global::System.Collections.Concurrent.ConcurrentQueue<(int count, Archetype archetype, CreateEntitiesCallback doneCallback)> _createQueue = new();
 
 
     //public void EnqueueCreateEntity(int count, Archetype archetype, Action<Mem<AccessToken>, Mem<EntityHandle>, Archetype> doneCallback)
@@ -309,7 +349,7 @@ public partial class EntityManager //entity creation
     {
         _createQueue.Enqueue((count, archetype, doneCallback));
     }
-    private System.Collections.Concurrent.ConcurrentQueue<(EntityHandle[] toDelete, DeleteEntitiesCallback doneCallback)> _deleteQueue = new();
+    private global::System.Collections.Concurrent.ConcurrentQueue<(EntityHandle[] toDelete, DeleteEntitiesCallback doneCallback)> _deleteQueue = new();
     public void EnqueueDeleteEntity(ReadOnlySpan<EntityHandle> toDelete, DeleteEntitiesCallback doneCallback)
     {
         _deleteQueue.Enqueue((toDelete.ToArray(), doneCallback));
@@ -714,7 +754,7 @@ public class EntityQuery
             }
         }
     }
-    public void SelectRange<TC1>(SelectRangeCallback_R<TC1> callback)
+    public void Run<TC1>(SelectRangeCallback_R<TC1> callback)
     {
         _ReadNotify<TC1>();
 
@@ -724,7 +764,7 @@ public class EntityQuery
             ));
     }
 
-    public void SelectRange<TC1>(SelectRangeCallback_W<TC1> callback)
+    public void Run<TC1>(SelectRangeCallback_W<TC1> callback)
     {
         _WriteNotify<TC1>();
 
@@ -739,7 +779,7 @@ public class EntityQuery
     }
 
 
-    public void SelectRange<TC1, TC2>(SelectRangeCallback_RR<TC1, TC2> callback)
+    public void Run<TC1, TC2>(SelectRangeCallback_RR<TC1, TC2> callback)
     {
 
         _ReadNotify<TC1>();
@@ -751,7 +791,7 @@ public class EntityQuery
             , ReadMem.CreateUsing(c2._storage)
             ));
     }
-    public void SelectRange<TC1, TC2>(SelectRangeCallback_WR<TC1, TC2> callback)
+    public void Run<TC1, TC2>(SelectRangeCallback_WR<TC1, TC2> callback)
     {
         _WriteNotify<TC1>();
         _ReadNotify<TC2>();
@@ -762,7 +802,7 @@ public class EntityQuery
             , ReadMem.CreateUsing(c2._storage)
             ));
     }
-    public void SelectRange<TC1, TC2>(SelectRangeCallback_WW<TC1, TC2> callback)
+    public void Run<TC1, TC2>(SelectRangeCallback_WW<TC1, TC2> callback)
     {
         _WriteNotify<TC1>();
         _WriteNotify<TC2>();
@@ -774,7 +814,7 @@ public class EntityQuery
             ));
     }
 
-    public void SelectRange<TC1, TC2, TC3>(SelectRangeCallback_RRR<TC1, TC2, TC3> callback)
+    public void Run<TC1, TC2, TC3>(SelectRangeCallback_RRR<TC1, TC2, TC3> callback)
     {
         _ReadNotify<TC1>();
         _ReadNotify<TC2>();
@@ -787,7 +827,7 @@ public class EntityQuery
             , ReadMem.CreateUsing(c3._storage)
             ));
     }
-    public void SelectRange<TC1, TC2, TC3>(SelectRangeCallback_WRR<TC1, TC2, TC3> callback)
+    public void Run<TC1, TC2, TC3>(SelectRangeCallback_WRR<TC1, TC2, TC3> callback)
     {
         _WriteNotify<TC1>();
         _ReadNotify<TC2>();
@@ -800,7 +840,7 @@ public class EntityQuery
             , ReadMem.CreateUsing(c3._storage)
             ));
     }
-    public void SelectRange<TC1, TC2, TC3>(SelectRangeCallback_WWR<TC1, TC2, TC3> callback)
+    public void Run<TC1, TC2, TC3>(SelectRangeCallback_WWR<TC1, TC2, TC3> callback)
     {
         _WriteNotify<TC1>();
         _WriteNotify<TC2>();
@@ -813,7 +853,7 @@ public class EntityQuery
             , ReadMem.CreateUsing(c3._storage)
             ));
     }
-    public void SelectRange<TC1, TC2, TC3>(SelectRangeCallback_WWW<TC1, TC2, TC3> callback)
+    public void Run<TC1, TC2, TC3>(SelectRangeCallback_WWW<TC1, TC2, TC3> callback)
     {
         _WriteNotify<TC1>();
         _WriteNotify<TC2>();

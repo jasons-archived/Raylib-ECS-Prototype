@@ -11,7 +11,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Benchmarks", "Benchmarks\Be
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tests", "Tests\Tests.csproj", "{D88CC4DF-7176-4FB6-8012-1B1C23E4FA27}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NotNot.Physics", "NotNot.Physics\NotNot.Physics.csproj", "{6CD62DEF-2E28-46A5-B036-9DC98E1EA397}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NotNot.Scratch", "NotNot.Scratch\NotNot.Scratch.csproj", "{6CD62DEF-2E28-46A5-B036-9DC98E1EA397}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "App.Scratch", "App.Scratch\App.Scratch.csproj", "{3CB37EE3-1316-4D96-AD11-57537B21AAF7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -39,6 +41,10 @@ Global
 		{6CD62DEF-2E28-46A5-B036-9DC98E1EA397}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6CD62DEF-2E28-46A5-B036-9DC98E1EA397}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6CD62DEF-2E28-46A5-B036-9DC98E1EA397}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3CB37EE3-1316-4D96-AD11-57537B21AAF7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3CB37EE3-1316-4D96-AD11-57537B21AAF7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3CB37EE3-1316-4D96-AD11-57537B21AAF7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3CB37EE3-1316-4D96-AD11-57537B21AAF7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

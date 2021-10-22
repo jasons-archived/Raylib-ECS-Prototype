@@ -1051,6 +1051,24 @@ public static class zz_Extensions_IntLong
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1050:DeclareTypesInNamespaces")]
 public static class zz__Extensions_Random
 {
+
+
+	/// <summary>
+	/// Return a vector with each component ranging from -1f to 1f
+	/// </summary>
+	/// <param name="random"></param>
+	/// <returns></returns>
+	public static Vector3 _NextVector3(this Random random)
+	{
+		//return (float)random.NextDouble();
+		return new()
+		{
+			X = (float)(random.NextDouble() * 2 - 1),
+			Y = (float)(random.NextDouble() * 2 - 1),
+			Z = (float)(random.NextDouble() * 2 - 1),
+		};
+	}
+
 	public static float _NextSingle(this Random random)
 	{
 		return (float)random.NextDouble();

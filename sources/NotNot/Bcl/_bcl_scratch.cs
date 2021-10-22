@@ -289,21 +289,21 @@ public readonly struct Mem<T>
 	{
 		_owner = owner;
 	}
-    /// <summary>
-    /// allocate memory from the shared pool.
-    /// If your Type is a reference type or contains references, be sure to use clearOnDispose otherwise you will have memory leaks.
-    /// also note that the memory is not cleared by default.
-    /// </summary>
+	/// <summary>
+	/// allocate memory from the shared pool.
+	/// If your Type is a reference type or contains references, be sure to use clearOnDispose otherwise you will have memory leaks.
+	/// also note that the memory is not cleared by default.
+	/// </summary>
 	public static Mem<T> Allocate(int size, bool clearOnDispose)
 	{
-		__DEBUG.AssertOnce(System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<T>()==false || clearOnDispose, "alloc of classes via memPool can/will cause leaks");
+		__DEBUG.AssertOnce(System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<T>() == false || clearOnDispose, "alloc of classes via memPool can/will cause leaks");
 		var mo = MemoryOwner_Custom<T>.Allocate(size);
 		mo.ClearOnDispose = clearOnDispose;
 		return new Mem<T>(mo);
 	}
-    /// <summary>
-    /// allocate memory from the shared pool and copy the contents of the specified span into it
-    /// </summary>
+	/// <summary>
+	/// allocate memory from the shared pool and copy the contents of the specified span into it
+	/// </summary>
 	public static Mem<T> Allocate(ReadOnlySpan<T> span, bool clearOnDispose)
 	{
 		var toReturn = Allocate(span.Length, clearOnDispose);
@@ -372,9 +372,9 @@ public readonly struct Mem<T>
 			_owner.Dispose();
 		}
 #if DEBUG
-        Array.Clear(_array, _offset, Length);        
+		Array.Clear(_array, _offset, Length);
 #endif
-    }
+	}
 
 	public ref T this[int index]
 	{
@@ -457,17 +457,17 @@ public readonly struct ReadMem<T>
 		return writeMem.AsReadMem();
 	}
 
-    /// <summary>
-    /// <para>Returns the backing array segment, NOT READONLY protected.</para>
-    /// beware: the size of the array allocated may be larger than the size requested by this Mem.  
-    /// As such, beware if using the backing Array directly.  respect the offset+length described in this segment.
-    /// </summary>
-    public ArraySegment<T> DangerousGetArray()
-    {
-        return _segment;
-    }    
+	/// <summary>
+	/// <para>Returns the backing array segment, NOT READONLY protected.</para>
+	/// beware: the size of the array allocated may be larger than the size requested by this Mem.  
+	/// As such, beware if using the backing Array directly.  respect the offset+length described in this segment.
+	/// </summary>
+	public ArraySegment<T> DangerousGetArray()
+	{
+		return _segment;
+	}
 
-    public ReadOnlySpan<T> Span
+	public ReadOnlySpan<T> Span
 	{
 		get
 		{
@@ -531,11 +531,11 @@ public ref readonly T this[int index]
 			return new Mem<T>(_owner);
 		}
 		return new Mem<T>(_segment);
-    }
-    public Span<T> AsWriteSpan()
-    {
-        return new Span<T>(_array, _offset, length);
-    }
+	}
+	public Span<T> AsWriteSpan()
+	{
+		return new Span<T>(_array, _offset, length);
+	}
 
 
 }
