@@ -6,7 +6,7 @@
 
     <IsPackable>false</IsPackable>
 
-    <StartupObject></StartupObject>
+    <StartupObject>_TestDebugLauncher</StartupObject>
   </PropertyGroup>
 
   <ItemGroup>
