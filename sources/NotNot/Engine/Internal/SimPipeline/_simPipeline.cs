@@ -1080,7 +1080,7 @@ public partial class Frame ////node graph setup and execution
 						__DEBUG.Assert(nodeState._status == FrameStatus.RUNNING);
 						nodeState._status = FrameStatus.FINISHED_WAITING_FOR_CHILDREN;
 						nodeState._updateTime = nodeState._updateStopwatch.Elapsed;
-						nodeState._updateTcs.SetFromTask(updateTask);
+						//nodeState._updateTcs.SetFromTask(updateTask);
 						//return updateTask;
 					};
 
@@ -1088,6 +1088,7 @@ public partial class Frame ////node graph setup and execution
 					{
 						//node has no update loop, it's done immediately.
 						doneUpdateTask(Task.CompletedTask);
+						nodeState.UpdateTask = Task.CompletedTask;
 						DEBUG_finishedNodeUpdate++;
 					}
 					else
@@ -1101,6 +1102,7 @@ public partial class Frame ////node graph setup and execution
 							return _task;
 						});//.ContinueWith(doneUpdateTask);
 						currentTasks.Add(updateTask);
+						nodeState.UpdateTask = updateTask;
 						DEBUG_startedThisPass++;
 
 					}
@@ -1365,12 +1367,16 @@ public class NodeFrameState
 	/// <summary> the target node </summary>
 	public SimNode _node { get; init; }
 	public NodeFrameState _parent;
-	public TaskCompletionSource _updateTcs { get; init; } = new();
+	//public TaskCompletionSource _updateTcs { get; init; } = new();
 	public FrameStatus _status { get; set; } = FrameStatus.SCHEDULED;
-	public Task UpdateTask
-	{
-		get => _updateTcs.Task;
-	}
+
+	/// <summary>
+	/// the current state of the node's update.   
+	/// </summary>
+	internal Task UpdateTask { get; set; }
+	//{
+	//	get => _updateTcs.Task;
+	//}
 
 	/// <summary>
 	/// how long the update took.  used for prioritizing future frame execution order
