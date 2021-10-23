@@ -74,11 +74,11 @@ public class ContainerNode: SystemBase
 /// </summary>
 public abstract class SystemBase : FixedTimestepNode
 {
+	protected NodeFrameState _lastUpdateState;
 	sealed protected override Task OnUpdate(Frame frame, NodeFrameState nodeState)
 	{
-
+		_lastUpdateState = nodeState;
 		return OnUpdate(frame);
-	
 	}
 
 	protected abstract Task OnUpdate(Frame frame);

@@ -28,13 +28,15 @@ namespace NotNot.Engine.Internal.SimPipeline;
 public partial class SimManager : DisposeGuard //tree management
 {
 	public ConcurrentDictionary<string, SimNode> _nodeRegistry = new();
-	public RootNode _root;
+	public RootNode root;
+	public Engine engine;
 
-	public SimManager()
+	public SimManager(Engine engine)
 	{
-		_root = new RootNode { Name = "root", HierarchyDepth = 0 };
-		_root.Register(this);
-		__DEBUG.Throw(_nodeRegistry.ContainsKey(_root.Name));
+		this.engine = engine;
+		root = new RootNode { Name = "root", HierarchyDepth = 0 };
+		root.Register(this);
+		__DEBUG.Throw(_nodeRegistry.ContainsKey(root.Name));
 		//var result = _nodeRegistry.TryAdd(_root.Name, _root);
 		//__DEBUG.Throw(result);
 
@@ -142,10 +144,10 @@ public partial class SimManager : DisposeGuard //tree management
 	protected override void OnDispose()
 	{
 		//dispose entire hirearchy
-		_root.Dispose();
+		root.Dispose();
 		_nodeRegistry.Clear();
 		_nodeRegistry = null;
-		_root = null;
+		root = null;
 		_resourceLocks.Clear();
 		_resourceLocks = null;
 		_frame?.Dispose();
@@ -191,7 +193,7 @@ public partial class SimManager //thread execution
 		_frame = Frame.FromPool(_stats, _frame, this);
 
 
-		await _frame.InitializeNodeGraph(_root);
+		await _frame.InitializeNodeGraph(root);
 
 		await _frame.ExecuteNodeGraph();
 		// }
@@ -1373,7 +1375,7 @@ public class NodeFrameState
 	/// <summary>
 	/// the current state of the node's update.   
 	/// </summary>
-	internal Task UpdateTask { get; set; }
+	public Task UpdateTask { get; set; }
 	//{
 	//	get => _updateTcs.Task;
 	//}

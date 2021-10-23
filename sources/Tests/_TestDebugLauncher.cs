@@ -18,6 +18,6 @@ public static class _TestDebugLauncher
 	public static async Task Main(params string[] args)
 	{
 		var test = new Tests.End2End.End2End();
-		await test.CompleteWorkflow();
+		await test.EcsWorldWithRendering();
 	}
 }

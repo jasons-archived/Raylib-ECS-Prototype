@@ -27,7 +27,7 @@ public class EngineBasic
 	public async Task SimPipeline_e2e()
 	{
 
-		using var manager = new SimManager() { };
+		using var manager = new SimManager(null) { };
 
 
 		var start = Stopwatch.GetTimestamp();

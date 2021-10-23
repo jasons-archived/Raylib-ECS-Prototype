@@ -23,22 +23,26 @@ namespace NotNot.Engine;
 
 public class Engine : DisposeGuard
 {
-	private SimManager _simManager = new();
+	private SimManager _simManager;
 
-	public RootNode RootNode { get => _simManager._root; }
+	public RootNode RootNode { get => _simManager.root; }
 
 	public World DefaultWorld { get; set; } = new() { Name="DefaultWorld"};
 
-	public ContainerNode Worlds { get; } = new() { Name = "Worlds" };
+	public ContainerNode Rendering { get; } = new() { Name = "_Rendering" };
+	public ContainerNode Worlds { get; } = new() { Name = "_Worlds", _updateAfter = { "_Rendering" } };
 
 	public IUpdatePump Updater;
+
+	public Task RunningTask { get => Updater.MainLoop; }
 
 	public void Initialize()
 	{
 		__ERROR.Throw(Updater != null, "you must set the Updater property before calling Initialize()");
 
+		_simManager = new(this);
 
-
+		RootNode.AddChild(Rendering);
 		RootNode.AddChild(Worlds);
 
 		if (DefaultWorld != null)
@@ -81,6 +85,9 @@ public interface IUpdatePump : IDisposable
 	public void Start();
 	public Task MainLoop { get; }
 	public bool ShouldStop { get; set; }
+
+	
+
 
 }
 
