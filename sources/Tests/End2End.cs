@@ -26,8 +26,8 @@ namespace Tests.End2End
 				engine.Initialize();
 				//engine.DefaultWorld.AddChild(new TimestepNodeTest() { TargetFps = 10 });
 
-				engine.DefaultWorld.AddChild(new MoveSystem());
-				engine.DefaultWorld.AddChild(new PlayerInputSystem());
+				engine.DefaultWorld.AddChild(new MoveSystem() {Name="MOVE" });
+				engine.DefaultWorld.AddChild(new PlayerInputSystem() { Name="PLAYER"});
 
 
 

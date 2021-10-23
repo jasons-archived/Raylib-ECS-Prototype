@@ -26,7 +26,7 @@ using System.Threading.Tasks;
 namespace NotNot.Engine.Ecs.Allocation;
 
 [StructLayout(LayoutKind.Explicit)]
-public readonly record struct EntityHandle : IComparable<EntityHandle>
+public readonly struct EntityHandle : IComparable<EntityHandle>
 {
 	/// <summary>
 	/// this entityHandle stored as a long
@@ -64,6 +64,14 @@ public readonly record struct EntityHandle : IComparable<EntityHandle>
 	public override string ToString()
 	{
 		return $"{id}.{version}";
+		//try
+		//{
+		//	return $"{id}.{version}";
+		//}
+		//catch
+		//{
+		//	return "ERROR";
+		//}
 	}
 }
 public record struct EntityData
@@ -149,7 +157,7 @@ public class EntityRegistry
 		get
 		{
 			ref var toReturn = ref _storage[handle.id];
-			__DEBUG.Assert(toReturn.handle == handle, "handle is invalid.  do you have a stale handle?  (use after dispose?)");
+			__DEBUG.Assert(toReturn.handle._packValue == handle._packValue, "handle is invalid.  do you have a stale handle?  (use after dispose?)");
 			return ref toReturn;
 		}
 	}
@@ -369,6 +377,21 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 		}
 		return toReturn;
 	}
+
+	//public bool Equals(AccessToken other)
+	//{
+	//	throw new NotImplementedException();
+	//}
+
+	//public static bool operator ==(AccessToken left, AccessToken right)
+	//{
+	//	throw new NotImplementedException();
+	//}
+
+	//public static bool operator !=(AccessToken left, AccessToken right)
+	//{
+	//	throw new NotImplementedException();
+	//}
 
 
 

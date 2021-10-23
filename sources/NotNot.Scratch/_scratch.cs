@@ -76,6 +76,7 @@ public class PlayerInputSystem : NotNot.Engine.Ecs.System
 		playerMoveQuery =entityManager.Query(new() { All = {typeof(PlayerInput), typeof(Move) } });
 
 		RegisterWriteLock<Move>();
+		RegisterReadLock<PlayerInput>();
 
 	}
 

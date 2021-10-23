@@ -58,7 +58,20 @@ public class World : SystemBase
 
 //public delegate void EntityCreateCallback(Archetype archetype, ReadOnlySpan<EntityHandle> entities);
 
+/// <summary>
+/// a node meant to be used as a container for other nodes
+/// </summary>
+public class ContainerNode: SystemBase
+{
+	protected override Task OnUpdate(Frame frame)
+	{
+		return Task.CompletedTask;
+	}
+}
 
+/// <summary>
+/// base class for all nodes used by an engine
+/// </summary>
 public abstract class SystemBase : FixedTimestepNode
 {
 	sealed protected override Task OnUpdate(Frame frame, NodeFrameState nodeState)
@@ -74,13 +87,14 @@ public abstract class SystemBase : FixedTimestepNode
 
 /// <summary>
 /// A system that is a child of a world
-/// <para>If you don't like/need this constraint, inherit from SystemBase instead</para>
+/// <para>sets up required execution order stuff and gives references to important things</para>
+/// <para>If you don't like/need this constraint, inherit from SystemBase instead, but don't interact with ECS if you do.</para>
 /// </summary>
 public abstract class System : SystemBase
 {
 	public World world;
 	public EntityManager entityManager;
-
+	
 	protected override void OnRegister()
 	{
 		try
@@ -91,6 +105,10 @@ public abstract class System : SystemBase
 		{
 			throw new ApplicationException("could not find world in hiearchy. a WorldSystem should be registered as a child of a World", ex);
 		}
+
+		//ensure that nodes execute after entityManager finishes.  
+		_updateAfter.Add(entityManager.Name);
+
 
 		base.OnRegister();
 	}
@@ -114,7 +132,7 @@ public class AccessGuard
 	//TODO: Read/Write sentinels should just track when reads/writes are permitted.
 	//if they occur outside of those times, assert.   This way we don't need to track who does all writes.
 	private EntityManager _entityManager;
-
+	internal bool _enabled = true;
 	public AccessGuard(EntityManager entityManager)
 	{
 		this._entityManager = entityManager;
@@ -124,13 +142,50 @@ public class AccessGuard
 	/// </summary>
 	/// <typeparam name="TComponent"></typeparam>
 	[Conditional("DEBUG")]
-	public void ReadNotify<TComponent>() { }
+	public void ReadNotify<TComponent>() {
+		if (_enabled == false)
+		{
+			return;
+		}
+		var type = typeof(TComponent);
+		if (type == typeof(EntityMetadata))
+		{
+			//ignore entityMetadata special field
+			return;
+		}
+		var errorMessage = $"Unregistered Component Access.  You are reading a '{type.Name}' component but have not registered your System for shared-read access. Add the Following to your System.OnInitialize():  RegisterReadLock<{type.Name}>();";
+
+		
+		__ERROR.Throw(_entityManager.manager._resourceLocks.ContainsKey(type),errorMessage);
+		var rwLock = _entityManager.manager._resourceLocks[type];
+		__ERROR.Throw(rwLock.IsReadHeld, errorMessage);
+		__ERROR.Throw(rwLock.IsWriteHeld==false, errorMessage);
+	}
 	/// <summary>
 	/// for internal use only.  informs that a write is about to occur
 	/// </summary>
 	/// <typeparam name="TComponent"></typeparam>
 	[Conditional("DEBUG")]
-	public void WriteNotify<TComponent>() { }
+	public void WriteNotify<TComponent>() {
+		if (_enabled == false)
+		{
+			return;
+		}
+		var type = typeof(TComponent);
+		if (type == typeof(EntityMetadata))
+		{
+			//ignore entityMetadata special field
+			return;
+		}
+		var errorMessage = $"Unregistered Component Access.  You are writing to a '{type.Name}' component but have not registered your System for exclusive-write access. Add the Following to your System.OnInitialize():  RegisterWriteLock<{type.Name}>();";
+
+
+
+		__ERROR.Throw(_entityManager.manager._resourceLocks.ContainsKey(type), errorMessage);
+		var rwLock = _entityManager.manager._resourceLocks[type];
+		__ERROR.Throw(rwLock.IsReadHeld == false, errorMessage);
+		__ERROR.Throw(rwLock.IsWriteHeld, errorMessage);
+	}
 
 
 
@@ -459,7 +514,9 @@ public partial class EntityManager //entity creation
 
 	protected override Task OnUpdate(Frame frame)
 	{
+		_accessGuard._enabled = false;
 		ProcessEnqueued_Phase0();
+		_accessGuard._enabled = true;
 		//TryRepackEntities_Sync();
 		return Task.CompletedTask;
 	}

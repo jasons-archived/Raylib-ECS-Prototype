@@ -29,20 +29,26 @@ public class Engine : DisposeGuard
 
 	public World DefaultWorld { get; set; } = new() { Name="DefaultWorld"};
 
+	public ContainerNode Worlds { get; } = new() { Name = "Worlds" };
+
 	public IUpdatePump Updater;
 
 	public void Initialize()
 	{
 		__ERROR.Throw(Updater != null, "you must set the Updater property before calling Initialize()");
 
-		Updater.OnUpdate += OnUpdate;
 
+
+		RootNode.AddChild(Worlds);
 
 		if (DefaultWorld != null)
 		{
 			DefaultWorld.Initialize();
-			RootNode.AddChild(DefaultWorld);
+			Worlds.AddChild(DefaultWorld);
 		}
+
+		Updater.OnUpdate += OnUpdate;
+
 	}
 
 	protected async ValueTask OnUpdate(TimeSpan elapsed)
