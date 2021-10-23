@@ -131,7 +131,7 @@ Logical object structure is
     - https://docs.microsoft.com/en-us/windows/communitytoolkit/nuget-packages
 - physics: https://github.com/bepu/bepuphysics2
   - physics, intersection: https://www.realtimerendering.com/intersections.html
-
+  - https://github.com/stilldesign/PhysX.Net
 - math helper libs: Silk.net
   - - spatial maths: https://github.com/reeseschultz/ReeseUnityDemos/blob/master/Packages/com.reese.math/README.md#reeses-dots-math-extensions
 - input and other platform libs: Silk.net
@@ -167,7 +167,13 @@ Logical object structure is
 - perlin / noise generation
   - https://github.com/Auburn/FastNoiseLite
 
-
+- **CPP INTEROP**
+  - generate pinvoke / extern bindings for clang/cpp projects
+    - https://github.com/microsoft/clangsharp#generating-bindings
+    - could be useful if `raylib-cs` bindings are incomplete
+  - inspect C/C# dll's for api signature
+    - https://github.com/lucasg/Dependencies
+    - 
 
 - free art assets
   - https://opengameart.org/content/ui-pack
