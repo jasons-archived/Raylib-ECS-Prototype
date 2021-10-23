@@ -23,7 +23,7 @@ namespace NotNot.Bcl.Diagnostics
 	[ThreadSafety(ThreadSituation.Always)]
 	public static class InstanceNameHelper
 	{
-		private static Dictionary<Type, ulong> _countTracker = new();
+		private static Dictionary<string, ulong> _countTracker = new();
 
 		/// <summary>
 		/// uses Type.Name, eg return: "Int_42"
@@ -31,18 +31,23 @@ namespace NotNot.Bcl.Diagnostics
 		public static string CreateName<T>()
 		{
 			var type = typeof(T);
+			var name = type.Name;
 			lock (_countTracker)
 			{
-				ref var counter = ref _countTracker._GetValueRefOrAddDefault_Unsafe(type, out _);
-				return $"{type.Name}_{counter++}";
+				ref var counter = ref _countTracker._GetValueRefOrAddDefault_Unsafe(name, out _);
+				return $"{name}_{counter++}";
 			}
 		}
+		/// <summary>
+		/// uses Type.Name, eg return: "Int_42"
+		/// </summary>
 		public static string CreateName(Type type)
 		{
+			var name = type.Name;
 			lock (_countTracker)
 			{
-				ref var counter = ref _countTracker._GetValueRefOrAddDefault_Unsafe(type, out _);
-				return $"{type.Name}_{counter++}";
+				ref var counter = ref _countTracker._GetValueRefOrAddDefault_Unsafe(name, out _);
+				return $"{name}_{counter++}";
 			}
 		}
 		/// <summary>
@@ -51,10 +56,11 @@ namespace NotNot.Bcl.Diagnostics
 		public static string CreateNameFull<T>()
 		{
 			var type = typeof(T);
+			var name = type.FullName;
 			lock (_countTracker)
 			{
-				ref var counter = ref _countTracker._GetValueRefOrAddDefault_Unsafe(type, out _);
-				return $"{type.FullName}_{counter++}";
+				ref var counter = ref _countTracker._GetValueRefOrAddDefault_Unsafe(name, out _);
+				return $"{name}_{counter++}";
 			}
 		}
 
