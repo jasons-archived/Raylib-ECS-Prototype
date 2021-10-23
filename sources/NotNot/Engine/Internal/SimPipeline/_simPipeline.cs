@@ -690,6 +690,10 @@ public abstract partial class SimNode //update logic
 			//}
 			return OnUpdate(frame, nodeState);
 		}
+		catch (Exception e)
+		{
+			throw e;
+		}
 		finally
 		{
 
@@ -1077,6 +1081,7 @@ public partial class Frame ////node graph setup and execution
 						nodeState._status = FrameStatus.FINISHED_WAITING_FOR_CHILDREN;
 						nodeState._updateTime = nodeState._updateStopwatch.Elapsed;
 						nodeState._updateTcs.SetFromTask(updateTask);
+						//return updateTask;
 					};
 
 					if (node is IIgnoreUpdate)
@@ -1088,7 +1093,13 @@ public partial class Frame ////node graph setup and execution
 					else
 					{
 						//node update() may be async, so need to monitor it to track when it completes.
-						var updateTask = Task.Run(() => node.DoUpdate(this, nodeState)).ContinueWith(doneUpdateTask);
+						var updateTask = Task.Run(async () =>
+						{
+							var _task = node.DoUpdate(this, nodeState);
+							await _task;
+							doneUpdateTask(_task);
+							return _task;
+						});//.ContinueWith(doneUpdateTask);
 						currentTasks.Add(updateTask);
 						DEBUG_startedThisPass++;
 
@@ -1124,8 +1135,13 @@ public partial class Frame ////node graph setup and execution
 			//remove done
 			for (var i = currentTasks.Count - 1; i >= 0; i--)
 			{
-				if (currentTasks[i].IsCompleted)
+				var currentTask = currentTasks[i];
+				if (currentTask.IsFaulted)
 				{
+					throw currentTask.Exception!;
+				}
+				if (currentTask.IsCompleted)
+				{					
 					//NOTE: task may complete LONG AFTER the actual update() is finished.
 					//so we have a counter to help debuggers understand this.
 					DEBUG_finishedNodeUpdate++;
@@ -1143,6 +1159,7 @@ public partial class Frame ////node graph setup and execution
 				{
 					continue;
 				}
+
 				//node is finished, free resource locks
 				UnlockResources(nodeState._node);
 
