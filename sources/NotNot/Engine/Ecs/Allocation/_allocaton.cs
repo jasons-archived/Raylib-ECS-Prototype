@@ -407,11 +407,14 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 	//		return "PageAccessToken [NOT INITIALIZED]";
 	//	}
 	//}
+
+	//public GetChunkTag<TTag>()
 }
 
 
 /// <summary>
-/// chunk -> chunk => slot
+/// <para>Components are stored via a page --> column -> chunk -> slot</para>
+/// <para>This tracks the chunkIndex and slotIndex</para>
 /// on it's own, this is not enough to access an entities components, you need the alocator.   See <see cref="AccessToken"/>.
 /// </summary>
 [StructLayout(LayoutKind.Explicit)]
@@ -442,12 +445,12 @@ public record struct SlotRef : IComparable<SlotRef>
 	public int chunkIndex;
 
 	public SlotRef(//short pageId, 
-		int columnIndex, int chunkChunkIndex)
+		int chunkIndex, int slotIndex)
 	{
 		this = default;
 		//this.pageId = pageId;
-		this.chunkIndex = columnIndex;
-		this.slotIndex = chunkChunkIndex;
+		this.chunkIndex = chunkIndex;
+		this.slotIndex = slotIndex;
 	}
 
 	public long GetChunkLookupId(int pageId)
@@ -969,6 +972,9 @@ public interface IPageOwner
 /// </summary>
 public partial class Page : IDisposable //init logic
 {
+	/// <summary>
+	/// the archetype.  abstracted as <see cref="IPageOwner"/> for Seperation of Concerns (SoC)
+	/// </summary>
 	public IPageOwner _owner;
 
 	public EntityRegistry _entityRegistry;
@@ -2112,7 +2118,7 @@ public struct AllocPositionTracker
 /// <summary>
 /// use the Generic version of this class.
 /// </summary>
-public abstract class Chunk : IDisposable
+public abstract partial class Chunk : IDisposable
 {
 	//public long _chunkLookupId = -1;
 
@@ -2127,7 +2133,7 @@ public abstract class Chunk : IDisposable
 	/// <summary>
 	/// the offset down the column this chunk is in (when referencing <see cref="Chunk{TComponent}._GLOBAL_LOOKUP"/>)
 	/// </summary>
-	public int columnIndex = -1;
+	public int chunkIndex = -1;
 	/// <summary>
 	/// how many entities are currently in this chunk
 	/// </summary>
@@ -2157,7 +2163,7 @@ public abstract class Chunk : IDisposable
 	/// <summary>
 	/// using the given _chunkId, allocate self a slot on the global chunk store for Chunk[T]
 	/// </summary>
-	public abstract void Initialize(int length, Page page, int columnIndex);
+	public abstract void Initialize(int length, Page page, int chunkIndex);
 	internal abstract void OnAllocSlot(ref AccessToken pageToken);
 	/// <summary>
 	/// overload used internally for packing
@@ -2165,6 +2171,8 @@ public abstract class Chunk : IDisposable
 	internal abstract void OnPackSlot(ref AccessToken pageToken, ref AccessToken moveComponentDataFrom);
 	internal abstract void OnFreeSlot(ref AccessToken pageToken);
 }
+
+
 [StructLayout(LayoutKind.Explicit)]
 public record struct ChunkLookupId
 {
@@ -2243,12 +2251,12 @@ public class Chunk<TComponent> : Chunk
 		//	var result = _GLOBAL_LOOKUP._TryRemove(_chunkLookupId, out _);
 		//	__ERROR.Throw(result);
 		//}
-		__CHECKED.Throw(_GLOBAL_LOOKUP[pageId][columnIndex] == this, "ref mismatch");
-		_GLOBAL_LOOKUP[pageId][columnIndex] = null;
+		__CHECKED.Throw(_GLOBAL_LOOKUP[pageId][chunkIndex] == this, "ref mismatch");
+		_GLOBAL_LOOKUP[pageId][chunkIndex] = null;
 
 		pageId = -1;
 		pageVersion = -1;
-		columnIndex = -1;
+		chunkIndex = -1;
 
 
 
@@ -2260,13 +2268,13 @@ public class Chunk<TComponent> : Chunk
 		_storageRaw = default;
 	}
 
-	public override void Initialize(int length, Page page, int columnIndex)
+	public override void Initialize(int length, Page page, int chunkIndex)
 	{
 		//	_chunkLookupId = chunkLookupId;
 		__DEBUG.Throw(this.pageId == -1, "already init");
 		pageId = page._pageId;
 		pageVersion = page._version;
-		this.columnIndex = columnIndex;
+		this.chunkIndex = chunkIndex;
 		_isAutoPack = page.AutoPack;
 
 
@@ -2280,8 +2288,8 @@ public class Chunk<TComponent> : Chunk
 		//	__ERROR.Throw(result);
 		//}
 		var column = _GLOBAL_LOOKUP.GetOrSet(pageId, () => new());
-		__CHECKED.Throw(column.Count <= columnIndex || column[columnIndex] == null);
-		column._ExpandAndSet(columnIndex, this);
+		__CHECKED.Throw(column.Count <= chunkIndex || column[chunkIndex] == null);
+		column._ExpandAndSet(chunkIndex, this);
 
 		//_storage = MemoryOwner<TComponent>.Allocate(_length, AllocationMode.Clear); //TODO: maybe no need to clear?
 		_storageRaw = Mem<TComponent>.Allocate(_length, true);
@@ -2373,7 +2381,7 @@ public class Chunk<TComponent> : Chunk
 		{
 			pageToken.GetPage().__CHECKED_INTERNAL_VerifyPageAccessToken(ref pageToken);
 			//__DEBUG.Throw(pageToken.GetChunkLookupId() == _chunkLookupId, "pageToken does not belong to this chunk");
-			__DEBUG.Throw(pageToken.pageId == pageId && pageToken.pageVersion == pageVersion && pageToken.slotRef.chunkIndex == columnIndex, "pageToken does not belong to this chunk");
+			__DEBUG.Throw(pageToken.pageId == pageId && pageToken.pageVersion == pageVersion && pageToken.slotRef.chunkIndex == base.chunkIndex, "pageToken does not belong to this chunk");
 
 			//var result = Chunk<TComponent>._GLOBAL_LOOKUP.TryGetValue(_chunkLookupId, out var chunk);
 			//__ERROR.Throw(result);

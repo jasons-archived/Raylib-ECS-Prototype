@@ -562,15 +562,15 @@ public class QueryOptions
 	/// <summary>
 	/// as long as one or more of these components exist on an archetype, it (all it's entities) are included in the query.  otherwise the archetype is rejected.
 	/// </summary>
-	public HashSet<Type> Any { get; set; } = new();
+	public HashSet<Type> any = new();
 	/// <summary>
 	/// all of these components must exist on an archetype, otherwise the archetype (all it's entities) are rejected from the query.
 	/// </summary>
-	public HashSet<Type> All { get; set; } = new();
+	public HashSet<Type> all  = new();
 	/// <summary>
 	/// If any of the specified Component Types are included on an archetype, that archetype (all it's entities) are rejected from this query.
 	/// </summary>
-	public HashSet<Type> None { get; set; } = new();
+	public HashSet<Type> none = new();
 	/// <summary>
 	/// an optional delegate to let you add/remove archetypes from the query.
 	/// </summary>
@@ -583,16 +583,16 @@ public class QueryOptions
 	/// <remarks>default is false, added archetypes causes will cause the query to re-aquire on it's next call.
 	/// Setting to true means that when archetypes are added that match your query, they won't be included until you Manually call <see cref="EntityQuery.RefreshQuery"/>.
 	/// <para>You might want to set to True for better performance, if you have a specialized query and you know no other archetypes added will impact it.</para></remarks>
-	public bool DisableAutoRefresh { get; set; }
+	public bool disableAutoRefresh;
 
 	public QueryOptions() { }
 	public QueryOptions(QueryOptions cloneFrom)
 	{
-		Any.UnionWith(cloneFrom.Any);
-		All.UnionWith(cloneFrom.All);
-		None.UnionWith(cloneFrom.None);
+		any.UnionWith(cloneFrom.any);
+		all.UnionWith(cloneFrom.all);
+		none.UnionWith(cloneFrom.none);
 		custom = cloneFrom.custom;
-		DisableAutoRefresh = cloneFrom.DisableAutoRefresh;
+		disableAutoRefresh = cloneFrom.disableAutoRefresh;
 	}
 
 
@@ -643,15 +643,15 @@ public class EntityQuery
 			var archetype = archetypes[i];
 			var toRemove = false;
 			//apply option filters
-			if (_options.All != null && _options.All.Count > 0 && archetype._componentTypes.IsSupersetOf(_options.All) == false)
+			if (_options.all != null && _options.all.Count > 0 && archetype._componentTypes.IsSupersetOf(_options.all) == false)
 			{
 				toRemove = true;
 			}
-			else if (_options.None != null && _options.None.Count > 0 && archetype._componentTypes.Overlaps(_options.None))
+			else if (_options.none != null && _options.none.Count > 0 && archetype._componentTypes.Overlaps(_options.none))
 			{
 				toRemove = true;
 			}
-			else if (_options.Any != null && _options.Any.Count > 0 && archetype._componentTypes.Overlaps(_options.Any) != true)
+			else if (_options.any != null && _options.any.Count > 0 && archetype._componentTypes.Overlaps(_options.any) != true)
 			{
 				toRemove = true;
 			}
@@ -668,7 +668,7 @@ public class EntityQuery
 	}
 	private void _TryAutoRefresh()
 	{
-		if (IsOutOfDate && _options.DisableAutoRefresh != true)
+		if (IsOutOfDate && _options.disableAutoRefresh != true)
 		{
 			RefreshQuery();
 		}
