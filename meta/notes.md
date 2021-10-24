@@ -351,5 +351,9 @@ maths
 
 
 current in progress
-- remove Chunk.UnsafeArray (use via StorageSlice or _storageRaw instead)
-- make simPipeline aware of Component read/write locks
+- create basic round-trip for entity mesh/material visualization
+- Add ChunkComponent and SharedComponent workflows so rendering can build directly off of ecs instead of creating it's own one-off solution
+  - rendering loop should calculate a chunkComponent renderBounds every frame, used for hint on next frame
+  - RenderMesh should be a SharedComponent, meaning chunks partition based on this
+- 
+

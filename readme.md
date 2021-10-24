@@ -38,6 +38,7 @@ To meet this "practical" validation, the BepuPhysics engine will be used as a ph
 - [Licensing](#licensing)
 - [Contributing](#contributing)
 - [Funding](#funding)
+- [ChangeLog Summary](#changelog-summary)
 
 # NotNot?
 [!!] It's not not an ECS Framework. 🙃
@@ -70,14 +71,13 @@ The goal of the NotNot project is to create a modern, open-source C# game tech i
 - [X] SimPipeline (multithreaded execution)
 - [X] OSS Project organization
 ## In progress
-- [ ] Validate End-to-End by implementing a Physics Module via [BepuPhysics](https://github.com/bepu/bepuphysics2)
-
+- [ ] A "Reference" Renderer to help visualize things like Physics and Spatial work
 
 ## Up Next?
+- [ ] Validate End-to-End by implementing a Physics Module via [BepuPhysics](https://github.com/bepu/bepuphysics2)
 - [ ] SourceCode Polish (conform to api guidelines: make it easy for you to use!)
 - [ ] SceneGraph
 - [ ] Github polish (wiki, roadmap, sponsors, etc)
-- [ ] Rendering?
 
 # Licensing
 By *default*, this repository is licensed to you under the **AGPL-3.0**.  See [LICENSE.md](LICENSE.md)
@@ -93,3 +93,15 @@ Contributions are welcome!  See [CONTRIBUTING.md](./meta/CONTRIBUTING.md)
 # Funding
 NotNot is a grand experiment in open source: Is there room for another open source ECS Framework?  Can it be made sustainable?  Your financial support will help make this a reality.  Sponsor NotNot through [Jason (Novaleaf)](https://github.com/sponsors/jasonswearingen?frequency=recurring).
 
+# ChangeLog Summary
+A short summary of work done each day
+
+- 2021.10.23
+  - added basic scafolding for a reference renderer based on Raylib
+- 2021.10.22
+  - Verified and created tests for:
+    - ecs multithreading, component read/write locks
+    - System roundtrip for entity create, edit, and delete
+- 2021.10.21 and earlier
+  - see the commit history.  
+  

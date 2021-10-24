@@ -1,4 +1,4 @@
-﻿// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
+// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
 // [!!] Copyright ©️ NotNot Project and Contributors. 
 // [!!] By default, this file is licensed to you under the AGPL-3.0.
 // [!!] However a Private Commercial License is available. 
@@ -17,6 +17,17 @@ using System.Threading.Tasks;
 
 namespace NotNot.Bcl.Collections.Advanced;
 
+/// <summary>
+/// can be applied as part of [<see cref="DebuggerTypeProxyAttribute"/>] to have a nice debug view of collections.
+/// <para>
+/// For Example:
+/// <example>
+/// [DebuggerTypeProxy(typeof(CollectionDebugView{}))]
+/// [DebuggerDisplay("{ToString(),raw}")]
+/// public sealed class MemoryOwner_Custom{T} : IMemoryOwner{T}
+/// </example>
+/// </para>
+/// </summary>
 public sealed class CollectionDebugView<T>
 {
     public CollectionDebugView(IEnumerable<T>? collection)
