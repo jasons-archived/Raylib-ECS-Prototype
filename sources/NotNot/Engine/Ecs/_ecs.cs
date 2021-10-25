@@ -23,8 +23,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-
-
+using System.Diagnostics.CodeAnalysis;
 
 namespace NotNot.Engine.Ecs;
 
@@ -61,7 +60,7 @@ public class World : SystemBase
 /// <summary>
 /// a node meant to be used as a container for other nodes
 /// </summary>
-public class ContainerNode: SystemBase
+public class ContainerNode : SystemBase
 {
 	protected override Task OnUpdate(Frame frame)
 	{
@@ -94,14 +93,15 @@ public abstract class System : SystemBase
 {
 	public World world;
 	public EntityManager entityManager;
-	
+
 	protected override void OnRegister()
 	{
 		try
 		{
 			world = GetHierarchy().DangerousGetArray().OfType<World>().First();
 			entityManager = world.entityManager;
-		}catch(Exception ex)
+		}
+		catch (Exception ex)
 		{
 			throw new ApplicationException("could not find world in hiearchy. a WorldSystem should be registered as a child of a World", ex);
 		}
@@ -142,7 +142,8 @@ public class AccessGuard
 	/// </summary>
 	/// <typeparam name="TComponent"></typeparam>
 	[Conditional("DEBUG")]
-	public void ReadNotify<TComponent>() {
+	public void ReadNotify<TComponent>()
+	{
 		if (_enabled == false)
 		{
 			return;
@@ -155,18 +156,19 @@ public class AccessGuard
 		}
 		var errorMessage = $"Unregistered Component Access.  You are reading a '{type.Name}' component but have not registered your System for shared-read access. Add the Following to your System.OnInitialize():  RegisterReadLock<{type.Name}>();";
 
-		
-		__ERROR.Throw(_entityManager.manager._resourceLocks.ContainsKey(type),errorMessage);
+
+		__ERROR.Throw(_entityManager.manager._resourceLocks.ContainsKey(type), errorMessage);
 		var rwLock = _entityManager.manager._resourceLocks[type];
 		__ERROR.Throw(rwLock.IsReadHeld, errorMessage);
-		__ERROR.Throw(rwLock.IsWriteHeld==false, errorMessage);
+		__ERROR.Throw(rwLock.IsWriteHeld == false, errorMessage);
 	}
 	/// <summary>
 	/// for internal use only.  informs that a write is about to occur
 	/// </summary>
 	/// <typeparam name="TComponent"></typeparam>
 	[Conditional("DEBUG")]
-	public void WriteNotify<TComponent>() {
+	public void WriteNotify<TComponent>()
+	{
 		if (_enabled == false)
 		{
 			return;
@@ -394,16 +396,21 @@ public partial class EntityManager //archetype management
 
 public partial class EntityManager //entity creation
 {
-	public record struct EnqueueCreateArgs(int count, Archetype archetype, Mem<object> partitionComponents, CreateEntitiesCallback doneCallback);
+	public record struct EnqueueCreateArgs(int count, Archetype archetype, Mem<IPartitionComponent> partitionComponents, CreateEntitiesCallback doneCallback);
+	internal record struct _EnqueueCreateArgs_Internal(int count, Archetype archetype, PartitionGroup partitionComponents, CreateEntitiesCallback doneCallback);
 
-	private global::System.Collections.Concurrent.ConcurrentQueue<EnqueueCreateArgs> _createQueue = new();
+	private global::System.Collections.Concurrent.ConcurrentQueue<_EnqueueCreateArgs_Internal> _createQueue = new();
 
 
 	//public void EnqueueCreateEntity(int count, Archetype archetype, Action<Mem<AccessToken>, Mem<EntityHandle>, Archetype> doneCallback)
 
 
-	public void EnqueueCreateEntity(int count, Archetype archetype, CreateEntitiesCallback doneCallback)=>EnqueueCreateEntity(count,archetype,Mem<object>.Empty,doneCallback);
-	public void EnqueueCreateEntity(int count, Archetype archetype, Mem<object> partitionComponents, CreateEntitiesCallback doneCallback)
+	public void EnqueueCreateEntity(int count, Archetype archetype, CreateEntitiesCallback doneCallback) => EnqueueCreateEntity(count, archetype, Mem<IPartitionComponent>.Empty, doneCallback);
+	public void EnqueueCreateEntity(int count, Archetype archetype, Mem<IPartitionComponent> partitionComponents, CreateEntitiesCallback doneCallback)
+	{
+		_createQueue.Enqueue(new(count, archetype, PartitionGroup.GetOrCreate(partitionComponents), doneCallback));
+	}
+	public void EnqueueCreateEntity(int count, Archetype archetype, PartitionGroup partitionComponents, CreateEntitiesCallback doneCallback)
 	{
 		_createQueue.Enqueue(new(count, archetype, partitionComponents, doneCallback));
 	}
@@ -498,7 +505,7 @@ public partial class EntityManager //entity creation
 
 	}
 
-	private void DoCreateEntities_Phase0(ref EnqueueCreateArgs args)
+	private void DoCreateEntities_Phase0(ref _EnqueueCreateArgs_Internal args)
 	{
 		//int count, Archetype archetype, Mem<object> partitionComponents, CreateEntitiesCallback doneCallback
 		//var(count, archetype,partitionComponents, doneCallback) = tuple;
@@ -569,7 +576,7 @@ public class QueryOptions
 	/// <summary>
 	/// all of these components must exist on an archetype, otherwise the archetype (all it's entities) are rejected from the query.
 	/// </summary>
-	public HashSet<Type> all  = new();
+	public HashSet<Type> all = new();
 	/// <summary>
 	/// If any of the specified Component Types are included on an archetype, that archetype (all it's entities) are rejected from this query.
 	/// </summary>
@@ -714,7 +721,7 @@ public class EntityQuery
 		//for all our archetypes, get the columns requested
 		foreach (var archetype in archetypes)
 		{
-			if (archetype.IsDisposed || archetype.Count==0)
+			if (archetype.IsDisposed || archetype.Count == 0)
 			{
 				continue;
 			}
@@ -741,7 +748,7 @@ public class EntityQuery
 		//for all our archetypes, get the columns requested
 		foreach (var archetype in archetypes)
 		{
-			if (archetype.IsDisposed || archetype.Count==0)
+			if (archetype.IsDisposed || archetype.Count == 0)
 			{
 				continue;
 			}
@@ -768,7 +775,7 @@ public class EntityQuery
 		//for all our archetypes, get the columns requested
 		foreach (var archetype in archetypes)
 		{
-			if (archetype.IsDisposed || archetype.Count==0)
+			if (archetype.IsDisposed || archetype.Count == 0)
 			{
 				continue;
 			}
@@ -796,7 +803,7 @@ public class EntityQuery
 		//for all our archetypes, get the columns requested
 		foreach (var archetype in archetypes)
 		{
-			if (archetype.IsDisposed || archetype.Count==0)
+			if (archetype.IsDisposed || archetype.Count == 0)
 			{
 				continue;
 			}
@@ -997,13 +1004,13 @@ public partial class Archetype : IPageOwner
 
 public partial class Archetype //passthrough of page stuff
 {
-
-	public Page _page;
+	public Dictionary<PartitionGroup, Page> _pages;
+	//public Page defaultPage;
 	public short ArchtypeId { get => _page._pageId; }
 	public int Version { get => _page._version; }
 	public int Count { get => _page.Count; }
 
-	internal void DoCreateEntities_Phase0(ref EntityManager.EnqueueCreateArgs args)
+	internal void DoCreateEntities_Phase0(ref EntityManager._EnqueueCreateArgs_Internal args)
 	{
 		var (count, archetype, partitionComponents, doneCallback) = args;
 		__DEBUG.Assert(this == archetype);
@@ -1011,18 +1018,16 @@ public partial class Archetype //passthrough of page stuff
 
 		//need to get a unique page per partitionComponent grouping
 
-
-
 		//create entityHandles
-		var entityHandlesMem = Mem<EntityHandle>.Allocate(count,false);
+		var entityHandlesMem = Mem<EntityHandle>.Allocate(count, false);
 		var entityHandles = entityHandlesMem.Span;
-		var accessTokensMem = Mem<AccessToken>.Allocate(count,false);
+		var accessTokensMem = Mem<AccessToken>.Allocate(count, false);
 		var accessTokens = accessTokensMem.Span;
 		_entityRegistry.Alloc(entityHandles);
 
 		_page.AllocEntityNew(accessTokens, entityHandles);
 
-		doneCallback((accessTokensMem.AsReadMem(),entityHandlesMem.AsReadMem(), this));
+		doneCallback((accessTokensMem.AsReadMem(), entityHandlesMem.AsReadMem(), this));
 	}
 	internal void DoDeleteEntities_Phase0(Span<AccessToken> toDelete, DeleteEntitiesCallback doneCallback)
 	{
@@ -1031,6 +1036,185 @@ public partial class Archetype //passthrough of page stuff
 		var pageMem = ReadMem<AccessToken>.Allocate(toDelete, false);
 		doneCallback((pageMem, this));
 	}
+
+}
+
+
+public interface IPartitionComponent: IEquatable<IPartitionComponent>
+{
+	public int GetHashCode();
+}
+
+/// <summary>
+/// Provides a way of splitting an archetype's entities into chunks based on the unique grouping of partition components
+/// <para>for example, having a RenderMesh as an item in this will split entiies so that only those with the same renderMesh will be in the same chunk.
+/// this is useful for building the rendering system off of, to aid in batching instances</para>
+/// </summary>
+[ThreadSafety(ThreadSituation.Always)]
+public class PartitionGroup
+{
+	public long hashSum;
+
+	public Dictionary<Type, IPartitionComponent> storage = new();
+
+
+	private PartitionGroup(long hashSum, ref Mem<IPartitionComponent> components)
+	{
+		this.hashSum = hashSum;
+		foreach (var component in components)
+		{
+			storage.Add(component.GetType(), component);
+		}
+	}
+
+	protected static long _ComputeHashSum(ref Mem<IPartitionComponent> components)
+	{
+		var objHashSum = 0;
+		var typeHashSum = 0;
+		foreach (var component in components)
+		{
+			objHashSum += component.GetHashCode();
+			typeHashSum += component.GetType().GetHashCode();
+		}
+		var toReturn = ((long)typeHashSum << 32) | (uint)objHashSum;
+		return toReturn;
+	}
+
+	/// <summary>
+	/// when an instance is collected by the GC, it's hash is put here so that next call to .GetOrCreate() we remove the slot from _GLOBAL_STORAGE
+	/// </summary>
+	private static ConcurrentQueue<long> _gcCollected = new();
+
+	~PartitionGroup()
+	{
+		_gcCollected.Enqueue(hashSum);
+	}
+
+	/// <summary>
+	/// pool of all instances
+	/// key is a hashcode.  but because hashcodes can collide, we use a list as value
+	/// </summary>
+	private static ConcurrentDictionary<long,List<WeakReference<PartitionGroup>>> _GLOBAL_STORAGE = new();
+
+	/// <summary>
+	/// factory method, either returns an existing, or creates a new object from the given parameters
+	/// </summary>
+	public static PartitionGroup GetOrCreate(Mem<IPartitionComponent> components)
+	{
+		//cleanup disposed ParitionComponents, if any
+		if (_gcCollected.Count > 0)
+		{
+			lock (_gcCollected)
+			{
+				while (_gcCollected.TryDequeue(out var keyToDelete))
+				{
+					if (_GLOBAL_STORAGE.TryRemove(keyToDelete, out var deletedList))
+					{
+						//removed successfully, but need to make sure all weakRefs are deallocated
+						for(var i=deletedList.Count-1; i>=0; i--)
+						{
+							var deletedWR = deletedList[i];
+							if (deletedWR == null || deletedWR.TryGetTarget(out var deletedPC)==false)
+							{
+								//truely dead
+								deletedList.RemoveAt(i);
+								
+							}
+						}
+						if(deletedList.Count != 0)
+						{
+							//it's not actually dead, so put it back
+							var result = _GLOBAL_STORAGE.TryAdd(keyToDelete, deletedList);
+							__DEBUG.Throw(result);
+						}
+					}
+				}
+			}
+		}
+
+
+		var hash = _ComputeHashSum(ref components);
+		WeakReference<PartitionGroup> weakRef;
+
+		//first get list, optimal path requires no locking
+		if (_GLOBAL_STORAGE.TryGetValue(hash, out var listWR))
+		{
+			//get from list
+			for(var i = listWR.Count - 1; i >= 0; i--)
+			{
+				var maybeWeakRef = listWR[i];
+
+			}
+			foreach (var maybeWeakRef in listWR)
+			{
+				if (maybeWeakRef.TryGetTarget(out var maybePC))
+				{
+					if (maybePC.Matches(components))
+					{
+						return maybePC;
+					}
+				}
+			}
+		}
+		//if here, lock and try again, creating as we go, if needed
+		lock (_gcCollected)
+		{
+			//get or create list
+			if (!_GLOBAL_STORAGE.TryGetValue(hash, out listWR))
+			{
+				listWR = new List<WeakReference<PartitionGroup>>();				
+				var result = _GLOBAL_STORAGE.TryAdd(hash, listWR);
+				__DEBUG.Throw(result);
+				
+			}
+			//have list
+			foreach (var maybeWeakRef in listWR)
+			{
+				if (maybeWeakRef.TryGetTarget(out var maybePC))
+				{
+					if (maybePC.Matches(components))
+					{
+						return maybePC;
+					}
+				}
+			}
+			//create and add to list
+			var newPC = new PartitionGroup(hash, ref components);
+			weakRef = new(newPC);
+			listWR.Add(weakRef);
+			return newPC;
+		}
+	}
+
+	private bool Matches(Mem<IPartitionComponent> components)
+	{
+		if(storage.Count != components.length)
+		{
+			return false;
+		}
+		//var computedHash = _ComputeHashSum(ref components);
+		//if(hashSum != computedHash)
+		//{
+		//	return false;
+		//}
+
+		foreach (var component in components)
+		{
+			var type = component.GetType();
+			if (!storage[type].Equals(component))
+			{
+				return false;
+			}			
+		}
+		return true;
+	}
+}
+
+/// <summary>
+/// functionality to pool instances for discovery later
+/// </summary>
+public abstract class PooledBase : DisposeGuard
+{
 
 }
 
