@@ -17,8 +17,8 @@
     - [rendering?](#rendering)
       - [raylib](#raylib)
     - [Spatial partitioning notes](#spatial-partitioning-notes)
-- [TODO:](#todo)
 - [ecs review notes](#ecs-review-notes)
+- [TODO:](#todo)
 
 
 
@@ -280,12 +280,38 @@ raylib seems most complete.  meaning least work to get a working renderer out-of
   - https://github.com/gradientspace/geometry3Sharp
   - 
 
+
+
+# ecs review notes
+- Systems Roots
+  - start 
+    - inputs
+    - SYNC
+      - updateFrame    
+      - ecsDatabase
+  - start
+    - inputs
+  - simulation
+  - presentation
+  - end
+
+
+maths
+- dot product:  (scalar product)
+  - gives similarity
+- cross product: (vector product)
+  - gives normal
+- game related libraries with maths:
+  - https://github.com/tgjones/nexus
+  - https://github.com/ykafia/stride/blob/master/sources/core/Stride.Core.Mathematics/Matrix.cs
+  - https://github.com/RonenNess/MonoGame-SceneGraph
+  - https://github.com/craftworkgames/MonoGame.Extended
+  - 
+
 # TODO:
 
 
 
-- need to create a custom MemoryOwner that clears ref types on dispose	
-- Component Read/Write sentinels should just track when reads/writes are permitted.  if they occur outside of those times, assert.   This way we don't need to track who does all writes.
 - //TODO: add expected cost of update metrics for current frame and past frames (to SimNode/Frame)
 - SimNode Register/Unregister writes to the SimManager.nodeRegistry lookup.  This doesn't handle hiearchy chains added/removed, plus still need to discover the name somehow.  
   - maybe remove this.
@@ -321,39 +347,13 @@ handle MemoryOwner clear on dispose!
 Frame.FromPool() should recycle old frames, make chain for inspection of old state
 
 
-# ecs review notes
-- Systems Roots
-  - start 
-    - inputs
-    - SYNC
-      - updateFrame    
-      - ecsDatabase
-  - start
-    - inputs
-  - simulation
-  - presentation
-  - end
-
-
-maths
-- dot product:  (scalar product)
-  - gives similarity
-- cross product: (vector product)
-  - gives normal
-- game related libraries with maths:
-  - https://github.com/tgjones/nexus
-  - https://github.com/ykafia/stride/blob/master/sources/core/Stride.Core.Mathematics/Matrix.cs
-  - https://github.com/RonenNess/MonoGame-SceneGraph
-  - https://github.com/craftworkgames/MonoGame.Extended
-  - 
-
-
-
 
 current in progress
 - create basic round-trip for entity mesh/material visualization
 - Add ChunkComponent and SharedComponent workflows so rendering can build directly off of ecs instead of creating it's own one-off solution
   - rendering loop should calculate a chunkComponent renderBounds every frame, used for hint on next frame
   - RenderMesh should be a SharedComponent, meaning chunks partition based on this
-- 
+- Mem/ReadMem should have an allocationOptions enum, not take in boolean.
+  - also the default should be to clear on dispose for non-unmanaged types (anything with refs)
+  - 
 

@@ -392,18 +392,20 @@ public partial class EntityManager //archetype management
 
 
 
-
 public partial class EntityManager //entity creation
 {
-	private global::System.Collections.Concurrent.ConcurrentQueue<(int count, Archetype archetype, CreateEntitiesCallback doneCallback)> _createQueue = new();
+	public record struct EnqueueCreateArgs(int count, Archetype archetype, Mem<object> partitionComponents, CreateEntitiesCallback doneCallback);
+
+	private global::System.Collections.Concurrent.ConcurrentQueue<EnqueueCreateArgs> _createQueue = new();
 
 
 	//public void EnqueueCreateEntity(int count, Archetype archetype, Action<Mem<AccessToken>, Mem<EntityHandle>, Archetype> doneCallback)
 
 
-	public void EnqueueCreateEntity(int count, Archetype archetype, CreateEntitiesCallback doneCallback)
+	public void EnqueueCreateEntity(int count, Archetype archetype, CreateEntitiesCallback doneCallback)=>EnqueueCreateEntity(count,archetype,Mem<object>.Empty,doneCallback);
+	public void EnqueueCreateEntity(int count, Archetype archetype, Mem<object> partitionComponents, CreateEntitiesCallback doneCallback)
 	{
-		_createQueue.Enqueue((count, archetype, doneCallback));
+		_createQueue.Enqueue(new(count, archetype, partitionComponents, doneCallback));
 	}
 	private global::System.Collections.Concurrent.ConcurrentQueue<(EntityHandle[] toDelete, DeleteEntitiesCallback doneCallback)> _deleteQueue = new();
 	public void EnqueueDeleteEntity(ReadOnlySpan<EntityHandle> toDelete, DeleteEntitiesCallback doneCallback)
@@ -426,11 +428,10 @@ public partial class EntityManager //entity creation
 				var (toDelete, doneCallback) = tuple;
 				_DoDeleteEntities_Phase0(toDelete, doneCallback);
 			}
-			while (_createQueue.TryDequeue(out var tuple))
+			while (_createQueue.TryDequeue(out var args))
 			{
 				didWork = true;
-				var (count, archetype, doneCallback) = tuple;
-				DoCreateEntities_Phase0(count, archetype, doneCallback);
+				DoCreateEntities_Phase0(ref args);
 			}
 		}
 	}
@@ -497,9 +498,11 @@ public partial class EntityManager //entity creation
 
 	}
 
-	private void DoCreateEntities_Phase0(int count, Archetype archetype, CreateEntitiesCallback doneCallback)
+	private void DoCreateEntities_Phase0(ref EnqueueCreateArgs args)
 	{
-		archetype.DoCreateEntities_Phase0(count, doneCallback);
+		//int count, Archetype archetype, Mem<object> partitionComponents, CreateEntitiesCallback doneCallback
+		//var(count, archetype,partitionComponents, doneCallback) = tuple;
+		args.archetype.DoCreateEntities_Phase0(ref args);
 	}
 
 	//private void TryRepackEntities_Sync()
@@ -933,10 +936,6 @@ public partial class Archetype : DisposeGuard //initialization
 {
 	//internal int _hashId;
 
-	public Page _page;
-
-	public short ArchtypeId { get => _page._pageId; }
-	public int Version { get => _page._version; }
 
 	public HashSet<Type> _componentTypes;
 	public string Name { get; set; }
@@ -998,9 +997,21 @@ public partial class Archetype : IPageOwner
 
 public partial class Archetype //passthrough of page stuff
 {
-	internal void DoCreateEntities_Phase0(int count, CreateEntitiesCallback doneCallback)
+
+	public Page _page;
+	public short ArchtypeId { get => _page._pageId; }
+	public int Version { get => _page._version; }
+	public int Count { get => _page.Count; }
+
+	internal void DoCreateEntities_Phase0(ref EntityManager.EnqueueCreateArgs args)
 	{
-		
+		var (count, archetype, partitionComponents, doneCallback) = args;
+		__DEBUG.Assert(this == archetype);
+
+
+		//need to get a unique page per partitionComponent grouping
+
+
 
 		//create entityHandles
 		var entityHandlesMem = Mem<EntityHandle>.Allocate(count,false);
@@ -1023,127 +1034,130 @@ public partial class Archetype //passthrough of page stuff
 
 }
 
-/// <summary>
-/// callback used when querying components
-/// </summary>
-public delegate void ComponentQueryCallback_w<TComponent>(in AccessToken accessTokens, ref TComponent c1);
-public delegate void ComponentQueryCallback_r<TComponent>(in AccessToken accessTokens, in TComponent c1);
-public delegate void ComponentQueryCallback_writeAll<TC1, TC2>(in AccessToken accessTokens, ref TC1 c1, ref TC2 c2);
-public delegate void ComponentQueryCallback<TC1, TC2, TC3>(in AccessToken accessTokens, ref TC1 c1, ref TC2 c2, ref TC3 c3);
+///// <summary>
+///// callback used when querying components
+///// </summary>
+//public delegate void ComponentQueryCallback_w<TComponent>(in AccessToken accessTokens, ref TComponent c1);
+//public delegate void ComponentQueryCallback_r<TComponent>(in AccessToken accessTokens, in TComponent c1);
+//public delegate void ComponentQueryCallback_writeAll<TC1, TC2>(in AccessToken accessTokens, ref TC1 c1, ref TC2 c2);
+//public delegate void ComponentQueryCallback<TC1, TC2, TC3>(in AccessToken accessTokens, ref TC1 c1, ref TC2 c2, ref TC3 c3);
 
-public partial class Archetype  //query entities owned by this archetype
+//public partial class Archetype  //query entities owned by this archetype
+//{
+
+
+//	/// <summary>
+//	/// efficient query of entities owned by this archetype.
+//	/// </summary>
+//	public void Query<TComponent>(Mem<AccessToken> accessTokens, ComponentQueryCallback_w<TComponent> callback)
+//	{
+//		var span = accessTokens.Span;
+//		foreach (ref var token in span)
+//		{
+//			ref var c1 = ref token.GetComponentWriteRef<TComponent>();
+//			callback(in token, ref c1);
+//		}
+//	}
+//	public unsafe async Task QueryAsnyc<TComponent>(Mem<AccessToken> accessTokens, ComponentQueryCallback_w<TComponent> callback)
+//	{
+//		var array = accessTokens.DangerousGetArray();
+
+//		fixed (AccessToken* _pArray = &array.Array![0])
+//		{
+//			var pArray = _pArray;
+//			ParallelFor.Range(0, array.Count, (start, end) =>
+//			{
+
+//				for (var i = start; i < end; i++)
+//				{
+//					ref var token = ref pArray[i];
+//					ref var c1 = ref token.GetComponentWriteRef<TComponent>();
+//					callback(in token, ref c1);
+//				}
+//			});
+//		}
+
+//	}
+
+//	/// <summary>
+//	/// given a column and token, return a ref to component
+//	/// </summary>
+//	private static ref TC __QueryHelper<TC>(Span<Chunk<TC>> column, ref AccessToken token)
+//	{
+//		return ref column[token.slotRef.chunkIndex].UnsafeArray[token.slotRef.slotIndex];
+//	}
+
+//	public unsafe void QueryAsync<TC1, TC2>(Mem<AccessToken> accessTokens, ComponentQueryCallback_writeAll<TC1, TC2> callback)
+//	{
+//		//ComponentQueryCallback_w<int> test1 = (in AccessToken accessToken, ref int c1) => { };
+//		//Query<int>(null, (in AccessToken accessToken, ref int c1) => {
+
+//		//});
+
+//		//OPTIMIZE LATER: assumign input is sorted, can get the current chunk and itterate through, then move to the next chunk.
+//		//currently each chunk is re-aquired from the column for each element.   maybe that is okay perfwise tho.
+
+//		//var array = accessTokens.ArraySegment();
+//		fixed (AccessToken* _pArray = accessTokens.Span)
+//		{
+//			var pArray = _pArray;
+//			ParallelFor.Range(0, accessTokens.length, (start, end) =>
+//			{
+//				var col1 = Chunk<TC1>._GLOBAL_LOOKUP[ArchtypeId]._AsSpan_Unsafe();
+//				var col2 = Chunk<TC2>._GLOBAL_LOOKUP[ArchtypeId]._AsSpan_Unsafe();
+
+//				for (var i = start; i < end; i++)
+//				{
+//					ref var pageToken = ref pArray[i];
+//					var chunkIndex = pageToken.slotRef.chunkIndex;
+//					var slotIndex = pageToken.slotRef.slotIndex;
+//					//ref var c1 = ref token.GetComponentWriteRef<TC1>();
+//					callback(in pageToken, ref __QueryHelper(col1, ref pageToken), ref __QueryHelper(col2, ref pageToken));
+//				}
+//			});
+//		}
+//	}
+//	public unsafe void QueryAsync<TC1, TC2>(ComponentQueryCallback_writeAll<TC1, TC2> callback)
+//	{
+//		var colMeta = Chunk<EntityMetadata>._GLOBAL_LOOKUP[ArchtypeId];
+
+//		ParallelFor.Range(0, colMeta.Count, (start, end) =>
+//		{
+//			var col0 = colMeta._AsSpan_Unsafe();
+
+//			var col1 = Chunk<TC1>._GLOBAL_LOOKUP[ArchtypeId]._AsSpan_Unsafe(); ;
+//			var col2 = Chunk<TC2>._GLOBAL_LOOKUP[ArchtypeId]._AsSpan_Unsafe(); ;
+//			for (var chunkIndex = start; chunkIndex < end; chunkIndex++)
+//			{
+//				var metaChunk = col0[chunkIndex];
+//				var metaArray = metaChunk.UnsafeArray;
+
+//				if (metaChunk._count == 0)
+//				{
+//					continue;
+//				}
+
+//				for (var slotIndex = 0; slotIndex < metaChunk._length; slotIndex++)
+//				{
+//					var entityToken = metaArray[slotIndex];
+//					var pageToken = entityToken.accessToken;
+//					if (entityToken.IsAlive == false)
+//					{
+//						continue;
+//					}
+//					callback(in pageToken, ref __QueryHelper(col1, ref pageToken), ref __QueryHelper(col2, ref pageToken));
+//				}
+//			}
+//		});
+
+//	}
+
+
+
+//}
+
+
+public interface IGroupByComponent<TSelf> where TSelf : class
 {
-	public int Count { get => _page.Count; }
-
-
-	/// <summary>
-	/// efficient query of entities owned by this archetype.
-	/// </summary>
-	public void Query<TComponent>(Mem<AccessToken> accessTokens, ComponentQueryCallback_w<TComponent> callback)
-	{
-		var span = accessTokens.Span;
-		foreach (ref var token in span)
-		{
-			ref var c1 = ref token.GetComponentWriteRef<TComponent>();
-			callback(in token, ref c1);
-		}
-	}
-	public unsafe async Task QueryAsnyc<TComponent>(Mem<AccessToken> accessTokens, ComponentQueryCallback_w<TComponent> callback)
-	{
-		var array = accessTokens.DangerousGetArray();
-
-		fixed (AccessToken* _pArray = &array.Array![0])
-		{
-			var pArray = _pArray;
-			ParallelFor.Range(0, array.Count, (start, end) =>
-			{
-
-				for (var i = start; i < end; i++)
-				{
-					ref var token = ref pArray[i];
-					ref var c1 = ref token.GetComponentWriteRef<TComponent>();
-					callback(in token, ref c1);
-				}
-			});
-		}
-
-	}
-
-	/// <summary>
-	/// given a column and token, return a ref to component
-	/// </summary>
-	private static ref TC __QueryHelper<TC>(Span<Chunk<TC>> column, ref AccessToken token)
-	{
-		return ref column[token.slotRef.chunkIndex].UnsafeArray[token.slotRef.slotIndex];
-	}
-
-	public unsafe void QueryAsync<TC1, TC2>(Mem<AccessToken> accessTokens, ComponentQueryCallback_writeAll<TC1, TC2> callback)
-	{
-		//ComponentQueryCallback_w<int> test1 = (in AccessToken accessToken, ref int c1) => { };
-		//Query<int>(null, (in AccessToken accessToken, ref int c1) => {
-
-		//});
-
-		//OPTIMIZE LATER: assumign input is sorted, can get the current chunk and itterate through, then move to the next chunk.
-		//currently each chunk is re-aquired from the column for each element.   maybe that is okay perfwise tho.
-
-		//var array = accessTokens.ArraySegment();
-		fixed (AccessToken* _pArray = accessTokens.Span)
-		{
-			var pArray = _pArray;
-			ParallelFor.Range(0, accessTokens.length, (start, end) =>
-			{
-				var col1 = Chunk<TC1>._GLOBAL_LOOKUP[ArchtypeId]._AsSpan_Unsafe();
-				var col2 = Chunk<TC2>._GLOBAL_LOOKUP[ArchtypeId]._AsSpan_Unsafe();
-
-				for (var i = start; i < end; i++)
-				{
-					ref var pageToken = ref pArray[i];
-					var chunkIndex = pageToken.slotRef.chunkIndex;
-					var slotIndex = pageToken.slotRef.slotIndex;
-					//ref var c1 = ref token.GetComponentWriteRef<TC1>();
-					callback(in pageToken, ref __QueryHelper(col1, ref pageToken), ref __QueryHelper(col2, ref pageToken));
-				}
-			});
-		}
-	}
-	public unsafe void QueryAsync<TC1, TC2>(ComponentQueryCallback_writeAll<TC1, TC2> callback)
-	{
-		var colMeta = Chunk<EntityMetadata>._GLOBAL_LOOKUP[ArchtypeId];
-
-		ParallelFor.Range(0, colMeta.Count, (start, end) =>
-		{
-			var col0 = colMeta._AsSpan_Unsafe();
-
-			var col1 = Chunk<TC1>._GLOBAL_LOOKUP[ArchtypeId]._AsSpan_Unsafe(); ;
-			var col2 = Chunk<TC2>._GLOBAL_LOOKUP[ArchtypeId]._AsSpan_Unsafe(); ;
-			for (var chunkIndex = start; chunkIndex < end; chunkIndex++)
-			{
-				var metaChunk = col0[chunkIndex];
-				var metaArray = metaChunk.UnsafeArray;
-
-				if (metaChunk._count == 0)
-				{
-					continue;
-				}
-
-				for (var slotIndex = 0; slotIndex < metaChunk._length; slotIndex++)
-				{
-					var entityToken = metaArray[slotIndex];
-					var pageToken = entityToken.accessToken;
-					if (entityToken.IsAlive == false)
-					{
-						continue;
-					}
-					callback(in pageToken, ref __QueryHelper(col1, ref pageToken), ref __QueryHelper(col2, ref pageToken));
-				}
-			}
-		});
-
-	}
-
-
 
 }
-
-

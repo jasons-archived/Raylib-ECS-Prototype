@@ -277,6 +277,8 @@ public readonly struct Mem<T>
 	private readonly T[] _array;
 	private readonly int _offset;
 	public readonly int length;
+
+	public static readonly Mem<T> Empty = new(null, null, null, 0, 0);
 	internal Mem(MemoryOwner_Custom<T> owner, ArraySegment<T> segment, T[] array, int offset, int length)
 	{
 		_owner = owner;
@@ -423,6 +425,8 @@ public readonly struct ReadMem<T>
 	private readonly T[] _array;
 	private readonly int _offset;
 	public readonly int length;
+
+	public static readonly ReadMem<T> Empty = new(null, null, null, 0, 0);
 	internal ReadMem(MemoryOwner_Custom<T> owner, ArraySegment<T> segment, T[] array, int offset, int length)
 	{
 		_owner = owner;

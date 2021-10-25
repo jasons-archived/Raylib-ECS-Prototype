@@ -49,18 +49,6 @@ namespace NotNot;
 
 //system nodes
 
-public record struct RenderPrimitive
-{
-	bool showWireframe;
-	bool showSolid;
-	Primitive primitive;
-}
-
-public enum Primitive
-{
-
-	Box,
-}
 
 public class RaylibRendering : SystemBase
 {
@@ -69,7 +57,7 @@ public class RaylibRendering : SystemBase
 
 	Camera3D camera = new()
 	{
-		position = new Vector3(10.0f, 10.0f, 10.0f), // Camera3D position
+		position = new Vector3(0.0f, 10.0f, 10.0f), // Camera3D position
 		target = new Vector3(0.0f, 0.0f, 0.0f),      // Camera3D looking at point
 		up = new Vector3(0.0f, 1.0f, 0.0f),          // Camera3D up vector (rotation towards target)
 		fovy = 45.0f,                             // Camera3D field-of-view Y
@@ -125,9 +113,9 @@ public class RaylibRendering : SystemBase
 			}
 			Raylib.BeginDrawing();
 
-			Raylib.ClearBackground(Color.SKYBLUE);
+			Raylib.ClearBackground(Color.RAYWHITE);
 			Raylib.BeginMode3D(camera);
-			Raylib.DrawGrid(10, 10f);
+			Raylib.DrawGrid(10, 1.0f);
 			Raylib.EndMode3D();
 			Raylib.DrawText("RaylibRendering System", 10, 40, 20, Color.DARKGRAY);
 			Raylib.DrawFPS(10, 10);
@@ -143,13 +131,52 @@ public class RaylibRendering : SystemBase
 
 }
 
+public record struct RenderPrimitive
+{
+	bool showWireframe;
+	bool showSolid;
+	Primitive primitive;
+}
+
+public enum Primitive
+{
+
+	Box,
+}
 
 
+
+public record struct Transform
+{
+	private Vector3 _pos;
+	public Vector3 Pos { get => _pos; set { _pos = value; version++; } }
+	public Vector3 _scale;
+	public Vector3 Scale { get => _scale; set { _scale = value; version++; } }
+	public Quaternion _rotation;
+	public Quaternion Rotation { get => _rotation; set { _rotation = value; version++; } }
+	public short version;
+	//public Matrix4x4 _xform;
+}
+
+public record struct MeshRenderInfo
+{
+	public int meshId;
+	public int materialId;
+	public int renderSlot;
+	public short lastTransformVersion;
+}
+public record struct Scale
+{
+	public Vector3 value;
+}
+public record struct Rotation
+{
+	public Quaternion value;
+}
 public record struct Translation
 {
 	public Vector3 value;
 }
-
 public record struct PlayerInput
 {
 }
@@ -159,6 +186,12 @@ public record struct Move
 	public Vector3 value;
 }
 
+
+public class RenderMesh
+{
+	public Raylib_cs.Mesh mesh;
+	public Raylib_cs.Material material;
+}
 
 
 
@@ -170,7 +203,7 @@ public class PlayerInputSystem : NotNot.Engine.Ecs.System
 		base.OnInitialize();
 
 
-		playerMoveQuery = entityManager.Query(new() { All = { typeof(PlayerInput), typeof(Move) } });
+		playerMoveQuery = entityManager.Query(new() { all = { typeof(PlayerInput), typeof(Move) } });
 
 		RegisterWriteLock<Move>();
 		RegisterReadLock<PlayerInput>();
@@ -184,7 +217,6 @@ public class PlayerInputSystem : NotNot.Engine.Ecs.System
 	{
 		playerMoveQuery.Run((ReadMem<EntityMetadata> meta, Mem<Move> moves, ReadMem<PlayerInput> players) =>
 		{
-
 			var metaSpan = meta.Span;
 			for (var i = 0; i < meta.length; i++)
 			{
@@ -210,7 +242,7 @@ public class MoveSystem : NotNot.Engine.Ecs.System
 		base.OnInitialize();
 		//create a query that selects all entities that have a Move and Translation component
 		//for performance reasons this should be cached as a class member,
-		moveQuery = entityManager.Query(new() { All = { typeof(Move), typeof(Translation) } });
+		moveQuery = entityManager.Query(new() { all = { typeof(Move), typeof(Translation) } });
 
 		//notify our need for read/write access so systems can be multithreaded safely
 		RegisterWriteLock<Translation>();
