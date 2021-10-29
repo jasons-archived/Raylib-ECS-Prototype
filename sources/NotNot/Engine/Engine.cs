@@ -175,21 +175,28 @@ public class Phase0StateSync : SystemBase
 	/// <summary>
 	/// For use by rendering system.   obtain last frame's render packets by swapping out the queue with another blank one.
 	/// </summary>
-	public async ValueTask<ConcurrentQueue<IRenderPacket>> RenderPacketsSwapPrior(ConcurrentQueue<IRenderPacket> finishedPackets)
+	public async ValueTask<ConcurrentQueue<IRenderPacket>> RenderPacketsSwapPrior_New(ConcurrentQueue<IRenderPacket> finishedPackets)
 	{
 		//__DEBUG.Throw(toReturn.Count == 0, "should be empty");
-		//__DEBUG.Throw(_updateLock.CurrentCount != 0, "update occuring.  no other systems should be swapping/doing work");
-
-		await _updateLock.WaitAsync();
+		__DEBUG.Throw(_updateLock.CurrentCount != 0, "update occuring.  no other systems should be swapping/doing work");
+		
+		//await _updateLock.WaitAsync();
 		__DEBUG.WriteLine(SimNode._DEBUG_PRINT_TRACE != true, " ----- RENDER -----> RenderPacketsSwapPrior");
 		__DEBUG.Throw(finishedPackets != _renderPackets && finishedPackets != _renderPacketsPrior);
 		__DEBUG.Throw(_DEBUG_lastRenderPacketsPriorReturned != _renderPacketsPrior, "render thread is grabbing render packets twice in a row without the StateSync.OnUpdate() swapping out a fresh package.  that should not happen!");
-		var toReturn = _renderPacketsPrior;
-		finishedPackets.Clear();
-		_renderPacketsPrior = finishedPackets;
-		_DEBUG_lastRenderPacketsPriorReturned = finishedPackets;
 
-		_updateLock.Release();
+
+		finishedPackets.Clear();
+		var toReturn = Interlocked.Exchange(ref _renderPacketsPrior, finishedPackets);
+
+
+		__DEBUG.Throw(finishedPackets.Count == 0);
+		//var toReturn = _renderPacketsPrior;
+		//finishedPackets.Clear();
+		//_renderPacketsPrior = finishedPackets;
+		//_DEBUG_lastRenderPacketsPriorReturned = finishedPackets;
+
+		//_updateLock.Release();
 		return toReturn;
 	}
 	private ConcurrentQueue<IRenderPacket> _DEBUG_lastRenderPacketsPriorReturned;
@@ -214,7 +221,7 @@ public class Phase0StateSync : SystemBase
 #if CHECKED
 		_CHECKED_renderPackets.Clear();
 #endif
-		__DEBUG.Throw(_renderPacketsPrior.Count == currentCount, "race condition.  something writing to render packets during swap");
+		__DEBUG.Throw(_renderPacketsPrior.Count == currentCount, "race condition.  something writing to render packets during swap.  ensure the node.updateAfter is properly set");
 		_updateLock.Release();
 	}
 }

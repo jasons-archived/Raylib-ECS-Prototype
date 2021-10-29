@@ -84,7 +84,7 @@ public class RaylibRendering : SystemBase
 		base.OnRegister();
 
 		//start rendering on it's own thread
-		_renderTask = new Task(_RenderThread,TaskCreationOptions.LongRunning); //runs for entire app duration
+		_renderTask = new Task(_RenderThread, TaskCreationOptions.LongRunning); //runs for entire app duration
 		_renderTask.Start();
 
 		//_renderTask = new Task(() => StartRender2());
@@ -127,7 +127,7 @@ public class RaylibRendering : SystemBase
 			Console.WriteLine("DONE");
 		}
 		return Task.CompletedTask;
-		
+
 	}
 
 	private Task _renderTask;
@@ -151,47 +151,38 @@ public class RaylibRendering : SystemBase
 	/// </summary>
 	//private Nito.AsyncEx.AsyncAutoResetEvent _renderLoopAutoResetEvent = new(false);
 	private DotNext.Threading.AsyncAutoResetEvent _renderLoopAutoResetEvent = new(false);
-	private SemaphoreSlim _renderSyncCritialSectionLock = new(1, 1);
 
 	/// <summary>
 	/// temp collection used in the render thread, used to sort render packets before drawing
 	/// </summary>
 	List<IRenderPacket> _thread_renderPackets = new();
 
+
+	/// <summary>
+	/// render packets obtained from the P0SyncState 
+	/// </summary>
+	private ConcurrentQueue<IRenderPacket> _nextRenderPackets = new();
+
+
+	/// <summary>
+	/// used to synchronize the critical section that must not be raced by the main simulation's render update task and the render loop
+	/// <para>The protected section obtains the frame N-1 render packets and allows the render loop to run once.</para>
+	/// </summary>
+	private SemaphoreSlim _updateSyncCriticalSectionLock = new(1, 1);
+
 	protected override async Task OnUpdate(Frame frame)
 	{
-		//var x = new Nito.AsyncEx.AsyncAutoResetEvent(false);
-		//x.w
 
-
-		//await _swapPacketsLock.WaitAsync();
-		//try
-		//{
-
-		//	this.manager.engine.StateSync.RenderPacketsSwapPrior(_packetsPending, out var newPacketsPending);
-		//	_packetsPending = newPacketsPending;
-
-		//critical lock to prevent races with the rendering loop
-		await _renderSyncCritialSectionLock.WaitAsync();
+		await _updateSyncCriticalSectionLock.WaitAsync();
 		try
 		{
+			_nextRenderPackets = await manager.engine.StateSync.RenderPacketsSwapPrior_New(_nextRenderPackets);
 			_renderLoopAutoResetEvent.Set();
 		}
 		finally
 		{
-			_renderSyncCritialSectionLock.Release();
+			_updateSyncCriticalSectionLock.Release();
 		}
-		//}
-		//finally
-		//{
-		//	_swapPacketsLock.Release();
-		//}
-
-		////DotNext.Threading.AsyncAutoResetEvent autoResetEvent = new(false);
-
-
-
-		//return Task.CompletedTask;
 	}
 
 
@@ -208,7 +199,7 @@ public class RaylibRendering : SystemBase
 
 		if (_renderTask != null)
 		{
-			_renderLoopAutoResetEvent.Set();			
+			_renderLoopAutoResetEvent.Set();
 			_renderTask.Wait();
 		}
 		_renderTask = null;
@@ -223,7 +214,7 @@ public class RaylibRendering : SystemBase
 		var x = new SynchronizationContext();
 		Thread.BeginThreadAffinity();
 
-			
+
 		try
 		{
 			Raylib.InitWindow(screenSize.Width, screenSize.Height, windowTitle);
@@ -258,20 +249,19 @@ public class RaylibRendering : SystemBase
 				//}
 
 				//critical section that must not be raced by the main simulation's render update task
-				await _renderSyncCritialSectionLock.WaitAsync();
-				try
 				{
-
 					await _renderLoopAutoResetEvent.WaitAsync();
-
-					packetsCurrent = await manager.engine.StateSync.RenderPacketsSwapPrior(packetsCurrent);
-
+					await _updateSyncCriticalSectionLock.WaitAsync();
+					try
+					{
+						packetsCurrent = Interlocked.Exchange(ref _nextRenderPackets, packetsCurrent);
+						_renderLoopAutoResetEvent.Reset();
+					}
+					finally
+					{
+						_updateSyncCriticalSectionLock.Release();
+					}
 				}
-				finally
-				{
-					_renderSyncCritialSectionLock.Release();
-				}
-
 				//////obtain render packets for the most recent frame (N-1) in a locked fashion
 				////await _swapPacketsLock.WaitAsync();
 				////try
@@ -300,12 +290,12 @@ public class RaylibRendering : SystemBase
 
 				//draw renderpackets
 				{
-//#if CHECKED
+					//#if CHECKED
 					if (packetsCurrent.Count == 0)
 					{
 						Console.WriteLine("NO PACKETS");
 					}
-//#endif
+					//#endif
 					__DEBUG.Throw(_thread_renderPackets.Count == 0);
 					while (packetsCurrent.TryDequeue(out var renderPacket))
 					{

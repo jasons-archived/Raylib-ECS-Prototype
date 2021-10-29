@@ -247,7 +247,7 @@ public class RootNode : SimNode, IIgnoreUpdate
 /// </remarks>
 public abstract partial class SimNode   //tree logic
 {
-	public const bool _DEBUG_PRINT_TRACE = true;
+	public const bool _DEBUG_PRINT_TRACE = false;
 
 	private string _nameCached;
 	public string Name
