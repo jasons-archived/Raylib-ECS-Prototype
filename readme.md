@@ -6,7 +6,7 @@
 
 
 ![Status PRE-ALPHA](https://img.shields.io/badge/status-PRE--ALPHA-red)
-![Commit Activity](https://img.shields.io/github/commit-activity/m/NotNotTech/NotNot)
+[![Commit Activity](https://img.shields.io/github/commit-activity/m/NotNotTech/NotNot)](https://github.com/NotNotTech/NotNot/graphs/contributors)
 ![.NET 6.0](https://img.shields.io/badge/.NET-net6.0-%23512bd4)
 [![Join our Discord](https://img.shields.io/badge/chat%20on-discord-7289DA)](https://discord.gg/ZyCNM7wap8)
 
@@ -94,8 +94,10 @@ Contributions are welcome!  See [CONTRIBUTING.md](./meta/CONTRIBUTING.md)
 NotNot is a grand experiment in open source: Is there room for another open source ECS Framework?  Can it be made sustainable?  Your financial support will help make this a reality.  Sponsor NotNot through [Jason (Novaleaf)](https://github.com/sponsors/jasonswearingen?frequency=recurring).
 
 # ChangeLog Summary
-A short summary of work done each day
-
+A short summary of work done every few days
+- 2021.10.28
+  - rendering thread and renderpacket workflow+foundations coded and bugs ironed out. 
+  - wip: add async/task synchronization 
 - 2021.10.23
   - added basic scafolding for a reference renderer based on Raylib
 - 2021.10.22
