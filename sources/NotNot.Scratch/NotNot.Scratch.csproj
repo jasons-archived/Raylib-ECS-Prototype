@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <PackageReference Include="BepuPhysics" Version="2.4.0-beta7" />
+    <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
     <PackageReference Include="Raylib-cs" Version="3.7.0.1" />
   </ItemGroup>
 

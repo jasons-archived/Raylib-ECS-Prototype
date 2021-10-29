@@ -34,7 +34,7 @@ public class Engine : DisposeGuard
 	public World DefaultWorld { get; set; } = new() { Name= "!!_DefaultWorld" };
 
 	public ContainerNode Rendering { get; } = new() { Name = "!!_Rendering", _updateAfter = { "!!_StateSync" } };
-	public ContainerNode Worlds { get; } = new() { Name = "!!_Worlds", _updateAfter = { "!!_StateSync" } };
+	public ContainerNode Worlds { get; } = new() { Name = "!!_Worlds", _updateAfter = { "!!_Rendering" } };
 
 	public IUpdatePump Updater;
 
@@ -164,21 +164,35 @@ public class Phase0StateSync : SystemBase
 
 	public void EnqueueRenderPacket(IRenderPacket renderPacket)
 	{
-		__DEBUG.Throw(_updateLock.CurrentCount == 0, "update occuring.  no other systems should be enqueing");
+		var tempCheck = _renderPackets;
+		//__DEBUG.Throw(_updateLock.CurrentCount != 0, "update occuring.  no other systems should be enqueing");
 		__CHECKED.Throw(_CHECKED_renderPackets.Add(renderPacket), "the same render packet is already added.  why?");
 		_renderPackets.Enqueue(renderPacket);
+		__DEBUG.Throw(tempCheck == _renderPackets,"all simPipeline systems should run after the phase0SyncState.  something is serious wrong if this occurs!");
+
 	}
 
 	/// <summary>
 	/// For use by rendering system.   obtain last frame's render packets by swapping out the queue with another blank one.
 	/// </summary>
-	public void RenderPacketsSwapPrior(ConcurrentQueue<IRenderPacket> toReturn, out ConcurrentQueue<IRenderPacket> prior)
+	public async ValueTask<ConcurrentQueue<IRenderPacket>> RenderPacketsSwapPrior(ConcurrentQueue<IRenderPacket> finishedPackets)
 	{
-		__DEBUG.Throw(toReturn.Count == 0, "should be empty");
-		__DEBUG.Throw(_updateLock.CurrentCount == 0, "update occuring.  no other systems should be swapping/doing work");
-		prior = _renderPacketsPrior;
-		_renderPacketsPrior = toReturn;
+		//__DEBUG.Throw(toReturn.Count == 0, "should be empty");
+		//__DEBUG.Throw(_updateLock.CurrentCount != 0, "update occuring.  no other systems should be swapping/doing work");
+
+		await _updateLock.WaitAsync();
+		__DEBUG.WriteLine(SimNode._DEBUG_PRINT_TRACE != true, " ----- RENDER -----> RenderPacketsSwapPrior");
+		__DEBUG.Throw(finishedPackets != _renderPackets && finishedPackets != _renderPacketsPrior);
+		__DEBUG.Throw(_DEBUG_lastRenderPacketsPriorReturned != _renderPacketsPrior, "render thread is grabbing render packets twice in a row without the StateSync.OnUpdate() swapping out a fresh package.  that should not happen!");
+		var toReturn = _renderPacketsPrior;
+		finishedPackets.Clear();
+		_renderPacketsPrior = finishedPackets;
+		_DEBUG_lastRenderPacketsPriorReturned = finishedPackets;
+
+		_updateLock.Release();
+		return toReturn;
 	}
+	private ConcurrentQueue<IRenderPacket> _DEBUG_lastRenderPacketsPriorReturned;
 
 
 
@@ -186,29 +200,33 @@ public class Phase0StateSync : SystemBase
 
 	protected override async Task OnUpdate(Frame frame)
 	{
-		var currentCount = _renderPackets.Count;
 
 		await _updateLock.WaitAsync();
+		var currentCount = _renderPackets.Count;
 
 		//clear and swap
-		_renderPacketsPrior.Clear();
+		_renderPacketsPrior.Clear(); //clear in case rendering is running slower than sim
 		var temp = _renderPacketsPrior;
 		_renderPacketsPrior = _renderPackets;
 		_renderPackets = temp;
+		_DEBUG_lastRenderPacketsPriorReturned = null;
 
 #if CHECKED
 		_CHECKED_renderPackets.Clear();
 #endif
-		_updateLock.Release();
 		__DEBUG.Throw(_renderPacketsPrior.Count == currentCount, "race condition.  something writing to render packets during swap");
+		_updateLock.Release();
 	}
 }
 
-public interface IRenderPacket : IComparable<IRenderPacket>, IEnumerable<IRenderPacket>
+public interface IRenderPacket : IComparable<IRenderPacket>
 {
 	/// <summary>
 	/// lower numbers get rendered first
 	/// </summary>
 	public int RenderLayer { get; }
 	public void DoDraw();
+
+	public bool IsInitialized { get; }
+	public void Initialize();
 }

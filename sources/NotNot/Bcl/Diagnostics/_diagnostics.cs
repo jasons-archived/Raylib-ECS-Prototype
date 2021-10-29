@@ -97,33 +97,45 @@ namespace NotNot.Bcl.Diagnostics
 		{
 			_internal.DiagHelper.WriteLine(message);
 		}
+		[DebuggerNonUserCode, DebuggerHidden]
+		[Conditional("CHECKED")]
+		public static void WriteLine(bool condition, string message)
+		{
+			_internal.DiagHelper.WriteLine(condition, message);
+		}
 	}
 	[DebuggerNonUserCode]
 	public static class __DEBUG
 	{
-		[Conditional("DEBUG")]
+		[Conditional("DEBUG"), Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
 		public static void Assert(bool condition, string message=null)
 		{
 			_internal.DiagHelper.Assert(condition, message);
 		}
-		[Conditional("DEBUG")]
+		[Conditional("DEBUG"), Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
 		public static void AssertOnce(bool condition, string message)
 		{
 			_internal.DiagHelper.AssertOnce(condition, message);
 		}
-		[Conditional("DEBUG")]
+		[Conditional("DEBUG"), Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
 		public static void Throw(bool condition, string message = null)
 		{
 			_internal.DiagHelper.Throw(condition, message);
 		}
 		[DebuggerNonUserCode, DebuggerHidden]
-		[Conditional("DEBUG")]
+		[Conditional("DEBUG"), Conditional("CHECKED")]
 		public static void WriteLine(string message)
 		{
 			_internal.DiagHelper.WriteLine(message);
+		}
+		[DebuggerNonUserCode, DebuggerHidden]
+		[Conditional("DEBUG"), Conditional("CHECKED")]
+		public static void WriteLine(bool condition, string message)
+		{
+			_internal.DiagHelper.WriteLine(condition, message);
 		}
 	}
 	[DebuggerNonUserCode]
@@ -146,11 +158,16 @@ namespace NotNot.Bcl.Diagnostics
 		{
 			_internal.DiagHelper.Throw(condition, message);
 		}
-	
+
 		[DebuggerNonUserCode, DebuggerHidden]
 		public static void WriteLine(string message)
 		{
 			_internal.DiagHelper.WriteLine(message);
+		}
+		[DebuggerNonUserCode, DebuggerHidden]
+		public static void WriteLine(bool condition, string message)
+		{
+			_internal.DiagHelper.WriteLine(condition, message);
 		}
 	}
 
@@ -211,9 +228,19 @@ namespace NotNot.Bcl.Diagnostics
 				throw new(message);
 			}
 
-			[DebuggerNonUserCode]
+			[DebuggerNonUserCode, DebuggerHidden]
 			public static void WriteLine(string message)
 			{
+				Console.WriteLine(message);
+			}
+
+			[DebuggerNonUserCode, DebuggerHidden]
+			public static void WriteLine(bool condition, string message)
+			{
+				if (condition == true)
+				{
+					return;
+				}
 				Console.WriteLine(message);
 			}
 		}

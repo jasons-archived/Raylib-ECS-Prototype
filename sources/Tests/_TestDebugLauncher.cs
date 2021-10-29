@@ -17,7 +17,32 @@ public static class _TestDebugLauncher
 {
 	public static async Task Main(params string[] args)
 	{
+		//var task = new Task(() => { }).ContinueWith((task)=>Test());
+
+
+		//await Task.Delay(10000);
+
+
+
+		//await task;
+
+		//var testBcl = new Tests.Internals.BclBasic();
+		//await testBcl.DotNextAsyncAutoResetEvent();
+
 		var test = new Tests.End2End.End2End();
 		await test.EcsWorldWithRendering();
+	}
+
+
+
+
+
+
+
+	public static async Task Test()
+	{
+		await Task.Delay(100);
+		Console.WriteLine("HI");
+
 	}
 }

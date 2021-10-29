@@ -71,10 +71,11 @@ namespace Tests.End2End
 				engine.Initialize();
 				//engine.DefaultWorld.AddChild(new TimestepNodeTest() { TargetFps = 10 });
 
-				engine.DefaultWorld.AddChild(new MoveSystem());
-				engine.DefaultWorld.AddChild(new PlayerInputSystem());
+				engine.DefaultWorld.Phase2_Simulation.AddChild(new MoveSystem());
+				engine.DefaultWorld.Phase2_Simulation.AddChild(new PlayerInputSystem());
 				engine.Rendering.AddChild(new RaylibRendering());
 
+				engine.DefaultWorld.Phase2_Simulation.AddChild(new VisibilitySystem());
 				engine.Updater.Start();
 				await Task.Delay(10);
 
@@ -94,7 +95,7 @@ namespace Tests.End2End
 					}
 				});
 				
-				await Task.WhenAny(engine.RunningTask,Task.Delay(10000));
+				await Task.WhenAny(engine.RunningTask,Task.Delay(100000000));
 				await engine.Updater.Stop();
 			}
 

@@ -52,6 +52,15 @@ public unsafe static class __
 			return _rand;
 		}
 	}
+
+	public static string NameVal<T>(T tuple)
+	{
+		if (tuple == null)
+		{
+			return string.Empty;
+		}
+		return $"{typeof(T).GetProperties()[0].Name}={tuple}";
+	}
 }
 
 

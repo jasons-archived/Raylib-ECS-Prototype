@@ -247,6 +247,7 @@ public class RootNode : SimNode, IIgnoreUpdate
 /// </remarks>
 public abstract partial class SimNode   //tree logic
 {
+	public const bool _DEBUG_PRINT_TRACE = true;
 
 	private string _nameCached;
 	public string Name
@@ -394,6 +395,20 @@ public abstract partial class SimNode   //tree logic
 		this.manager = manager;
 		var result = this.manager._nodeRegistry.TryAdd(Name, this);
 		__DEBUG.Throw(result);
+
+		if (HierarchyDepth !=-1)
+		{
+			__DEBUG.AssertOnce(this is RootNode, "expect only root node to have it's hiearchy depth preset.");
+			__DEBUG.AssertOnce(parent==null, "expect only root node to have it's hiearchy depth preset, and it to not have a parent");
+			//no op
+
+		}
+		else
+		{
+			__DEBUG.Throw(this.parent != null && HierarchyDepth == -1);
+			HierarchyDepth = parent.HierarchyDepth + 1;
+		}
+
 		OnRegister();
 		if (IsInitialized == false)
 		{
@@ -459,9 +474,10 @@ public abstract partial class SimNode   //tree logic
 
 	private void Added(SimNode parent)
 	{
-		__DEBUG.Throw(this.parent == null && HierarchyDepth == -1);
+		__DEBUG.Throw(this.parent == null //&& HierarchyDepth == -1
+			);
 		this.parent = parent;
-		HierarchyDepth = parent.HierarchyDepth + 1;
+		//HierarchyDepth = parent.HierarchyDepth + 1;
 		OnAdded();
 	}
 	/// <summary>
@@ -686,6 +702,7 @@ public abstract partial class SimNode //update logic
 	{
 		try
 		{
+			__DEBUG.WriteLine(_DEBUG_PRINT_TRACE!=true, $"{frame._stats._frameId}  :  {GetHierarchyName()}");
 			//if (IsInitialized == false)
 			//{
 			//	Initialize();
@@ -1048,6 +1065,8 @@ public partial class Frame ////node graph setup and execution
 		var waitingOnChildrenNodes = new List<NodeFrameState>();
 		var finishedNodes = new List<NodeFrameState>();
 
+
+		__DEBUG.WriteLine(SimNode._DEBUG_PRINT_TRACE!=true, $"[[[[[=================------- {this._stats._frameId} -------=================]]]]]");
 		while (_allNodesToProcess.Count > 0 || currentTasks.Count > 0)
 		{
 			var DEBUG_startedThisPass = 0;
@@ -1102,7 +1121,7 @@ public partial class Frame ////node graph setup and execution
 							await _task;
 							doneUpdateTask(_task);
 							return _task;
-						});//.ContinueWith(doneUpdateTask);
+						});//.ContinueWith(doneUpdateTask);						
 						currentTasks.Add(updateTask);
 						nodeState.UpdateTask = updateTask;
 						DEBUG_startedThisPass++;
