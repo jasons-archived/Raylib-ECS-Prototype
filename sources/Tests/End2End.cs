@@ -73,7 +73,7 @@ namespace Tests.End2End
 
 				engine.DefaultWorld.Phase2_Simulation.AddChild(new MoveSystem());
 				engine.DefaultWorld.Phase2_Simulation.AddChild(new PlayerInputSystem());
-				engine.Rendering.AddChild(new RaylibRendering());
+				engine.Rendering.AddChild(new RenderReferenceImplementationSystem());
 
 				engine.DefaultWorld.Phase2_Simulation.AddChild(new VisibilitySystem());
 				engine.Updater.Start();

@@ -244,6 +244,10 @@ public class RootNode : SimNode, IIgnoreUpdate
 /// This is acceptable in situations when the World is shutdown.
 /// For the Parent/Child hiearchy, parents get initialized/added/registered before children.  children get unregistered/removed/disposed before parents.
 /// </para>
+/// <para>Long running tasks:   All SimNodes execute according to a dependency tree, with those able to execute in-parallel (multithreaded) able to do so.
+/// But before the next execution frame starts (Frame N), all prior frame SimNodes must complete (Frame N-1).
+/// Because a frame of execution should be as short as possible (perhaps 5ms) you should put potentially long-running work in a seperate thread
+/// that coordinates/synchronizes with your SimNode.  Take a look at the RenderReferenceImplementationSystem for an example of how to do this.</para>
 /// </remarks>
 public abstract partial class SimNode   //tree logic
 {

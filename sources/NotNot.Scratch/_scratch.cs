@@ -62,8 +62,17 @@ namespace NotNot;
 
 
 
-
-public class RaylibRendering : SystemBase
+/// <summary>
+/// An example Rendering System you should use for reference when building a better rendering system.
+/// <para>This Rendering System utilizes RayLib, which is a great "toy renderer".
+/// Raylib is very easy to use but is not designed for the high demands of a 3d game engine.
+/// </para>
+/// <para>This Reference Renderer shows how to coordinate the rendering work with the rest of the engine, especially showing how the engine/game can schedule
+/// "RenderPackets" to be drawn by the render loop thread.
+/// </para>
+/// <para>Raylib was chosen because it's the easiest for jason to get working, without needing to know a lot of low-level rendering knowledge.</para>
+/// </summary>
+public class RenderReferenceImplementationSystem : SystemBase
 {
 	System.Drawing.Size screenSize = new(1920, 1080);
 	string windowTitle;
@@ -159,7 +168,7 @@ public class RaylibRendering : SystemBase
 
 
 	/// <summary>
-	/// render packets obtained from the P0SyncState 
+	/// render packets obtained from the Phase0_SyncState system
 	/// </summary>
 	private ConcurrentQueue<IRenderPacket> _nextRenderPackets = new();
 
@@ -168,6 +177,26 @@ public class RaylibRendering : SystemBase
 	/// used to synchronize the critical section that must not be raced by the main simulation's render update task and the render loop
 	/// <para>The protected section obtains the frame N-1 render packets and allows the render loop to run once.</para>
 	/// </summary>
+	/// <remarks>
+	/// <para>The original problem was that there was flickering every so often with the packet rendering.
+	/// More analysis showed that maybe 1/10000 loops the renderLoopThread did not have any packets to render, causing a blank frame to be shown.
+	/// A lazy solution would have been to skip rendering that frame, but that would lead to jitters and so I needed to solve the root cause.
+	/// It turns out that I was having system A (rendering loop) synchronizing with system B (rendering system) but reading data from system C (frame start cache of render packets).
+	/// This meant that occasionally, the render thread gets behind, then catches up, effectively running twice in a frame.
+	/// In more detail:
+	/// The frame would start, provide renderPackets(Frame N-1).
+	/// The renderLoopThread would aquire those renderPackets(N-1) and render.
+	/// The renderSystem would run, unblocking renderLoopThread to run.
+	/// That same frame, renderLoopThread would loop again, aquiring renderPackets again.
+	/// But since the next frame didn't start, there would be no new renderPackets.  so no work to do, resulting in the blank frame.
+	/// </para>
+	/// <para> The solution was to have A read and synchronize from B, and B reads from C.
+	/// Since RenderSystem is part of the SimPipeline, it's order is gurenteed to run once per frame, after the Phase0StateSync.
+	/// RenderSystem reads the renderPackets(N-1), then allows RenderLoopThread to run once.
+	/// RenderLoopThread aquires renderPackets(N-1) then blocks itself from running until next RenderSystem update unblocks it.
+	/// This last statement (blocks itself) is very important to avoid the race condition that is the original problem.</para>
+	/// <para>Basically this is just a long-winded way of me saying it took 3 days to get a cube rendering without flickering</para>
+	/// </remarks>
 	private SemaphoreSlim _updateSyncCriticalSectionLock = new(1, 1);
 
 	protected override async Task OnUpdate(Frame frame)

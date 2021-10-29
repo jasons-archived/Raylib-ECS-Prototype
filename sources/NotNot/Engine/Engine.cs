@@ -29,7 +29,7 @@ public class Engine : DisposeGuard
 
 	public RootNode RootNode { get => _simManager.root; }
 
-	public Phase0StateSync StateSync { get; set; } = new() { Name = "!!_StateSync" };
+	public Phase0_StateSync StateSync { get; set; } = new() { Name = "!!_StateSync" };
 
 	public World DefaultWorld { get; set; } = new() { Name= "!!_DefaultWorld" };
 
@@ -147,7 +147,10 @@ public class HeadlessUpdater : DisposeGuard, IUpdatePump
 
 
 
-public class Phase0StateSync : SystemBase
+/// <summary>
+/// This system runs at the very start of every frame, in exclusive mode (no other systems running yet).   
+/// </summary>
+public class Phase0_StateSync : SystemBase
 {
 
 	/// <summary>
@@ -188,7 +191,6 @@ public class Phase0StateSync : SystemBase
 
 		finishedPackets.Clear();
 		var toReturn = Interlocked.Exchange(ref _renderPacketsPrior, finishedPackets);
-
 
 		__DEBUG.Throw(finishedPackets.Count == 0);
 		//var toReturn = _renderPacketsPrior;
