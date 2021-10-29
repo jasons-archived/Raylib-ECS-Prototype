@@ -411,6 +411,11 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 	//public GetChunkTag<TTag>()
 }
 
+//shared component needs to partition chunks based on component value/hashcode.   easiest way is to require shared components to be object
+//store as a per-page value, so partition by pages, not chunks
+//api:  
+
+
 
 /// <summary>
 /// <para>Components are stored via a page --> column -> chunk -> slot</para>

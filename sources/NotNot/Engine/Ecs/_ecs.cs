@@ -40,10 +40,29 @@ public class World : SystemBase
 {
 	public EntityManager entityManager = new();
 
+	public ContainerNode Phase0_EntityMaint = new();
+	public ContainerNode Phase1_Physics = new() { };
+	public ContainerNode Phase2_Simulation = new();
+	public ContainerNode Phase3_End = new();
+
 	protected override void OnInitialize()
 	{
-		entityManager.Initialize();
-		AddChild(entityManager);
+		Phase1_Physics._updateAfter.Add(Phase0_EntityMaint.Name);
+		Phase2_Simulation._updateAfter.Add(Phase1_Physics.Name);
+		Phase3_End._updateAfter.Add(Phase2_Simulation.Name);
+
+
+
+
+		Phase0_EntityMaint.AddChild(entityManager);
+		AddChild(Phase0_EntityMaint);
+		AddChild(Phase1_Physics);
+		AddChild(Phase2_Simulation);
+		AddChild(Phase3_End);
+
+
+		//entityManager.Initialize();
+		//AddChild(entityManager);
 		base.OnInitialize();
 	}
 
@@ -1004,8 +1023,8 @@ public partial class Archetype : IPageOwner
 
 public partial class Archetype //passthrough of page stuff
 {
-	public Dictionary<PartitionGroup, Page> _pages;
-	//public Page defaultPage;
+	//public Dictionary<PartitionGroup, Page> _pages;
+	public Page _page;
 	public short ArchtypeId { get => _page._pageId; }
 	public int Version { get => _page._version; }
 	public int Count { get => _page.Count; }

@@ -6,6 +6,17 @@ using NotNot.Engine.Ecs;
 using NotNot.Engine.Ecs.Allocation;
 using NotNot.Engine.Internal.SimPipeline;
 using Raylib_cs;
+using static Raylib_cs.Raylib;
+using static Raylib_cs.ConfigFlags;
+using static Raylib_cs.Color;
+using static Raylib_cs.CameraProjection;
+using static Raylib_cs.ShaderLocationIndex;
+using static Raylib_cs.ShaderUniformDataType;
+using static Raylib_cs.MaterialMapIndex;
+using static Raylib_cs.CameraMode;
+using static Raylib_cs.KeyboardKey;
+using System.Collections.Concurrent;
+using NotNot.Engine;
 
 namespace NotNot;
 
@@ -50,6 +61,8 @@ namespace NotNot;
 //system nodes
 
 
+
+
 public class RaylibRendering : SystemBase
 {
 	System.Drawing.Size screenSize = new(1920, 1080);
@@ -70,11 +83,58 @@ public class RaylibRendering : SystemBase
 		_renderTask = Task.Run(_RenderThread);
 	}
 	private Task _renderTask;
-	protected override Task OnUpdate(Frame frame)
+
+	private SemaphoreSlim _swapPacketsLock = new(1, 1);
+
+	/// <summary>
+	/// packets obtained from the Engine.SyncState  (packets from frame N-1)
+	/// <para>this is swapped back-and-forth with <see cref="_packetsPending"/></para>
+	/// </summary>
+	private ConcurrentQueue<IRenderPacket> _packetsPending = new();
+	/// <summary>
+	/// the packets used by the render thread loop   (consumed by each pass of that loop)
+	/// <para>this is swapped back-and-forth with <see cref="_packetsPending"/></para>
+	/// </summary>
+	private ConcurrentQueue<IRenderPacket> _packetsCurrent = new();
+
+	/// <summary>
+	/// sync point that prevents the render thread from running faster than the simulation frame rate
+	/// <para>render thread can run slower without impacting performance of the simulation</para>
+	/// </summary>
+	private DotNext.Threading.AsyncAutoResetEvent _renderLoopAutoResetEvent = new(false);
+
+	/// <summary>
+	/// temp collection used in the render thread, used to sort render packets before drawing
+	/// </summary>
+	List<IRenderPacket> _thread_renderPackets = new();
+
+	protected override async Task OnUpdate(Frame frame)
 	{
-		//throw new NotImplementedException();
-		return Task.CompletedTask;
+
+	
+		await _swapPacketsLock.WaitAsync();
+		try
+		{
+			this.manager.engine.StateSync.RenderPacketsSwapPrior(_packetsPending,out _packetsPending);
+			_renderLoopAutoResetEvent.Set();
+
+		}
+		finally
+		{
+			_swapPacketsLock.Release();
+		}
+
+		//DotNext.Threading.AsyncAutoResetEvent autoResetEvent = new(false);
+
+
+
+		//return Task.CompletedTask;
 	}
+
+
+
+
+
 	protected override void OnDispose()
 	{
 
@@ -96,8 +156,35 @@ public class RaylibRendering : SystemBase
 	{
 		Raylib.InitWindow(screenSize.Width, screenSize.Height, windowTitle);
 
+		Mesh cube = Raylib.GenMeshCube(1.0f, 1.0f, 1.0f);
+		Shader shader = Raylib.LoadShader("resources/shaders/glsl330/base_lighting.vs", "resources/shaders/glsl330/lighting.fs");
+		// Get some shader loactions
+		unsafe
+		{
+			int* locs = (int*)shader.locs;
+			locs[(int)SHADER_LOC_MATRIX_MVP] = GetShaderLocation(shader, "mvp");
+			locs[(int)SHADER_LOC_VECTOR_VIEW] = GetShaderLocation(shader, "viewPos");
+			locs[(int)SHADER_LOC_MATRIX_MODEL] = GetShaderLocationAttrib(shader, "instanceTransform");
+		}
+		// Ambient light level
+		int ambientLoc = GetShaderLocation(shader, "ambient");
+		Utils.SetShaderValue(shader, ambientLoc, new float[] { 0.2f, 0.2f, 0.2f, 1.0f }, SHADER_UNIFORM_VEC4);
+
+		Rlights.CreateLight(0, LightType.LIGHT_DIRECTIONAL, new Vector3(50, 50, 0), Vector3.Zero, WHITE, shader);
+
+		Material material = LoadMaterialDefault();
+		material.
+		
+		unsafe
+		{
+			MaterialMap* maps = (MaterialMap*)material.maps.ToPointer();
+			maps[(int)MATERIAL_MAP_DIFFUSE].color = RED;
+		}
+
+		
 		while (!Raylib.WindowShouldClose() && IsRegistered && IsDisposed == false)
 		{
+			//if disabled, wait until we are not disabled
 			if (IsDisabled)
 			{
 				var updateTask = _lastUpdateState.UpdateTask;
@@ -111,13 +198,60 @@ public class RaylibRendering : SystemBase
 				}
 				continue;
 			}
+			//wait until released from main system.update method
+			var isSuccess = await _renderLoopAutoResetEvent.WaitAsync(TimeSpan.FromMilliseconds(1));
+			if (!isSuccess)
+			{
+				//our main system update isn't done yet, so delay rendering until it is ready (when we have new render data)
+				continue;
+			}
+
+			//obtain our render packets in a locked fashion
+			await _swapPacketsLock.WaitAsync();
+			try
+			{
+				__DEBUG.Throw(_packetsCurrent.Count == 0);
+				var temp = _packetsCurrent;
+				_packetsPending = _packetsCurrent;
+				_packetsCurrent = temp;
+			}
+			finally
+			{
+				_swapPacketsLock.Release();
+			}
+
+
+			
+
+			//Utils.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, new Vector3[] { camera.position }, SHADER_UNIFORM_VEC3);
+			Utils.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, camera.position, SHADER_UNIFORM_VEC3);
+
 			Raylib.BeginDrawing();
 
 			Raylib.ClearBackground(Color.RAYWHITE);
 			Raylib.BeginMode3D(camera);
+			//Matrix4x4[] transforms = new[]{ Matrix4x4.Identity };
+			//DrawMeshInstanced(cube, material,new[]{ Matrix4x4.Identity }, 1);
+			//DrawMesh(cube, material, Matrix4x4.Identity);
+
+			//draw renderpackets
+			{
+				__DEBUG.Throw(_thread_renderPackets.Count == 0);
+				while (_packetsCurrent.TryDequeue(out var renderPacket))
+				{
+					_thread_renderPackets.Add(renderPacket);
+				}
+				_thread_renderPackets.Sort((first, second) => first.RenderLayer.CompareTo(second.RenderLayer));
+				foreach (var renderPacket in _thread_renderPackets)
+				{
+					renderPacket.DoDraw();
+				}
+				_thread_renderPackets.Clear();
+			}
+
 			Raylib.DrawGrid(10, 1.0f);
 			Raylib.EndMode3D();
-			Raylib.DrawText("RaylibRendering System", 10, 40, 20, Color.DARKGRAY);
+			Raylib.DrawText("Reference Rendering", 10, 40, 20, Color.DARKGRAY);
 			Raylib.DrawFPS(10, 10);
 
 
@@ -130,6 +264,28 @@ public class RaylibRendering : SystemBase
 	}
 
 }
+
+public class BatchedRenderMesh : IRenderPacket
+{
+	public int RenderLayer { get; } = 0;
+
+	public RenderMesh renderMesh;
+	public Mem<Matrix4x4> instances;
+
+	public void DoDraw()
+	{
+		var xforms = instances.Span;
+		var mesh = renderMesh.mesh;
+		var material = renderMesh.material;
+		//TODO: when raylib 4 is released change to use instanced based.   right now (3.7.x) there's a bug where it doesn't render instances=1
+		for (var i = 0; i < xforms.Length; i++)
+		{
+			Raylib.DrawMesh(mesh, material, xforms[i]);
+		}
+	}
+}
+
+
 
 public record struct RenderPrimitive
 {
@@ -252,7 +408,7 @@ public class MoveSystem : NotNot.Engine.Ecs.System
 
 	protected override async Task OnUpdate(Frame frame)
 	{
-		Console.WriteLine($"-------------------- {frame._stats._frameId}");
+		//Console.WriteLine($"-------------------- {frame._stats._frameId}");
 
 		//run the query, selecting all entities and doing work on them.
 		moveQuery.Run((
@@ -269,8 +425,48 @@ public class MoveSystem : NotNot.Engine.Ecs.System
 			{
 				//apply move vector onto translation vector
 				translations[i].value += moves[i].value;
-				Console.WriteLine($"entity={meta[i]}, pos={translations[i].value}, move={moves[i].value}");
+				//Console.WriteLine($"entity={meta[i]}, pos={translations[i].value}, move={moves[i].value}");
 			}
+
+		});
+	}
+}
+
+public class VisibilitySystem : NotNot.Engine.Ecs.System
+{
+	EntityQuery positionQuery;
+	protected override void OnInitialize()
+	{
+		base.OnInitialize();
+		//create a query that selects all entities that have a Move and Translation component
+		//for performance reasons this should be cached as a class member,
+		positionQuery = entityManager.Query(new() { all = { typeof(Translation) } });
+
+		//notify our need for read/write access so systems can be multithreaded safely
+		RegisterReadLock<Translation>();
+	}
+	protected override Task OnUpdate(Frame frame)
+	{
+		positionQuery.Run((
+		//metadata about the entity
+		ReadMem<EntityMetadata> meta,
+		//write access to Translation component
+		ReadMem<Translation> translations
+		) =>
+		{
+			
+
+			var instances = Mem<Matrix4x4>.Allocate(meta.length,false);
+			for (var i = 0; i < meta.length; i++)
+			{				
+				//Console.WriteLine($"entity={meta[i]}, pos={translations[i].value}, move={moves[i].value}");
+				instances[i] = Matrix4x4.CreateTranslation(translations[i].value);
+			}
+			var renderPacket = new BatchedRenderMesh();			
+			renderPacket.instances = instances;
+
+			this.manager.engine.StateSync.EnqueueRenderPacket(renderPacket);
+
 
 		});
 	}

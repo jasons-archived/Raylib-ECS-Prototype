@@ -15,9 +15,12 @@
     - [funding](#funding)
     - [important feature needs:](#important-feature-needs)
     - [rendering?](#rendering)
+      - [occlusion culling](#occlusion-culling)
       - [raylib](#raylib)
     - [Spatial partitioning notes](#spatial-partitioning-notes)
+      - [approach](#approach)
 - [ecs review notes](#ecs-review-notes)
+- [visual design style](#visual-design-style)
 - [TODO:](#todo)
 
 
@@ -167,6 +170,7 @@ Logical object structure is
 - perlin / noise generation
   - https://github.com/Auburn/FastNoiseLite
 
+
 - **CPP INTEROP**
   - generate pinvoke / extern bindings for clang/cpp projects
     - https://github.com/microsoft/clangsharp#generating-bindings
@@ -238,6 +242,11 @@ review these tutorials if need to do basic things like camera/frustum: https://g
 - super low level projects, just in case:
   - https://github.com/mellinoe/veldrid
 
+#### occlusion culling
+- software occlusion culling
+  - https://github.com/GameTechDev/MaskedOcclusionCulling
+  - https://www.intel.com/content/www/us/en/developer/articles/technical/masked-software-occlusion-culling.html
+  - 
 
 #### raylib
 raylib seems most complete.  meaning least work to get a working renderer out-of-the-box for a "reference" renderer.
@@ -278,7 +287,9 @@ raylib seems most complete.  meaning least work to get a working renderer out-of
 - see also: https://github.com/Auios/Auios.QuadTree for object based
 - other not really optimized math lib
   - https://github.com/gradientspace/geometry3Sharp
-  - 
+#### approach
+- use a existing approach
+- if need better, create a native alloc version https://docs.microsoft.com/en-us/dotnet/api/system.runtime.interopservices.nativememory.alloc?view=net-6.0
 
 
 
@@ -307,6 +318,21 @@ maths
   - https://github.com/RonenNess/MonoGame-SceneGraph
   - https://github.com/craftworkgames/MonoGame.Extended
   - 
+
+# visual design style
+
+- Color palate
+  - https://coolors.co/ffffff-f5f5f5-ffdd33-dc1a21-446688-202020-000000
+  - background: f5f5f5 (soft white)
+  - background-alt: ffffff (hard white)
+  - detail soft: 202020 (dark gray)
+  - detail-hard: 000000 (black)
+  - primary: dc1a21 (red)
+  - accent: ffdd33 (yellow)
+  - opposing: 446688 (gray blue)
+
+- logo
+  - primary: dc1a21 (red)
 
 # TODO:
 
@@ -356,4 +382,26 @@ current in progress
 - Mem/ReadMem should have an allocationOptions enum, not take in boolean.
   - also the default should be to clear on dispose for non-unmanaged types (anything with refs)
   - 
+
+need to figure out frame lifecycle
+- sync_block: swap render state (n-1, n)
+  - async: render state compute render packets (n-1)
+    - render (n-1)
+- ???: worlds update
+  - sync_block: await physics (n-1)    
+  - sync_block: entityManager add/remove
+  - async: start physics (n)  
+  - async: spatial query start (n);
+  - async: game systems
+  - async: spatial query complete (n)
+    - submit scene to render state (n)
+
+
+"render state swap" -> "compute render packets"
+
+need to copy render mesh/material into 
+need to include shader in RenderPacket, and include shader setup/transitions
+
+group by shader->material->mesh
+- https://www.soft8soft.com/docs/manual/en/introduction/Optimizing-WebGL-performance.html#number_of_shaders
 

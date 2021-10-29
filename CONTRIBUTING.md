@@ -1,3 +1,9 @@
+# Contributions Guarantee Citizenship!
+- 50% of funding is distributed to significant Contributors
+- All contributors (including filing bugs) qualify for a Private Commercial License (PCL)
+- 
+
+
 # Reporting bugs
 
 You can use the issues tab on github.

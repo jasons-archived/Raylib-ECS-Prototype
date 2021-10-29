@@ -348,3 +348,6 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+sources/App.Scratch/resources/
+sources/NotNot.Scratch/resources/
+sources/Tests/resources/

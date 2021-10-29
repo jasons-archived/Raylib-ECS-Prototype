@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -8,6 +8,8 @@
       <LangVersion>Preview</LangVersion>
       <EnablePreviewFeatures>True</EnablePreviewFeatures>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+      <RunWorkingDirectory>$(MSBuildThisFileDirectory)</RunWorkingDirectory>
+    <Configurations>Debug;Release;Checked</Configurations>
   </PropertyGroup>
 
   <ItemGroup>

@@ -8,9 +8,14 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <DebugType>portable</DebugType>
+    <Configurations>Debug;Release;Checked</Configurations>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DefineConstants>$(DefineConstants);CHECKED;TEST</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Checked|AnyCPU'">
     <DefineConstants>$(DefineConstants);CHECKED;TEST</DefineConstants>
   </PropertyGroup>
 

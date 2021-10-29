@@ -22,7 +22,10 @@ Some ECS Intro videos that are mostly applicable to !!.Ecs
 # Graphics Programming
 - https://github.com/lettier/3d-game-shaders-for-beginners  beginner guides to shader dev
 - https://vksegfault.github.io/posts/gentle-intro-gpu-inner-workings/   inner workings of the modern gpu
-
+- multithread rendering
+  - https://vkguide.dev/docs/extra-chapter/multithreading/
+  - https://www.youtube.com/watch?v=0nTDFLMLX9k
+  - https://www.youtube.com/watch?v=v2Q_zHG3vqg
 
 
 
@@ -43,3 +46,9 @@ Some ECS Intro videos that are mostly applicable to !!.Ecs
 
 
 - row major traversal of matrix vs column major traversal
+
+
+# OSS gamedev
+- https://gist.github.com/raysan5/bd8c0293d8b8da1e9e44d8ac435e9304
+
+

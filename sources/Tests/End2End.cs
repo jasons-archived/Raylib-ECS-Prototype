@@ -44,7 +44,7 @@ namespace Tests.End2End
 						ref var translation = ref accessToken.GetComponentWriteRef<Translation>();
 						ref var move = ref accessToken.GetComponentWriteRef<Move>();
 						translation = new Translation() { value = Vector3.One };
-						move = new() { value = Vector3.Zero };
+						move = new() { value = Vector3.Zero };						
 					}
 				});
 
@@ -57,6 +57,8 @@ namespace Tests.End2End
 
 
 		}
+
+	
 
 
 
@@ -104,4 +106,6 @@ namespace Tests.End2End
 
 
 	}
+
+
 }
