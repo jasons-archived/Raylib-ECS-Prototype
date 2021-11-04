@@ -453,7 +453,7 @@ public class BatchedRenderMesh : IRenderPacket
 		//TODO: when raylib 4 is released change to use instanced based.   right now (3.7.x) there's a bug where it doesn't render instances=1
 		for (var i = 0; i < xforms.Length; i++)
 		{
-			Raylib.DrawMesh(asset.mesh, asset.material, xforms[i]);
+			Raylib.DrawMesh(asset.mesh, asset.material,Matrix4x4.Transpose(xforms[i])); //IMPORTANT: raylib is row-major.   need to transpose dotnet (column major) to match
 		}
 		if (xforms.Length == 0)
 		{
@@ -558,13 +558,18 @@ public class PlayerInputSystem : NotNot.Engine.Ecs.System
 		playerMoveQuery.Run((ReadMem<EntityMetadata> meta, Mem<Move> moves, ReadMem<PlayerInput> players) =>
 		{
 			var metaSpan = meta.Span;
+			var totalSeconds =(float) frame._stats._wallTime.TotalSeconds;
+
+
 			for (var i = 0; i < meta.length; i++)
 			{
 				__ERROR.Throw(metaSpan[i].IsAlive, "why dead being enumerated?  we are forcing autopack");
 				//moves[i].value =Vector3.Normalize(__.Rand._NextVector3());
-				var vec = __.Rand._NextVector3();
-				var norm = Vector3.Normalize(vec);
-				moves[i].value = norm;
+				//var vec = __.Rand._NextVector3();
+				//var norm = Vector3.Normalize(vec);
+
+				var norm = new Vector3(MathF.Sin(totalSeconds), 0f, MathF.Cos(totalSeconds));
+				moves[i].value = norm * (float)frame._stats._frameElapsed.TotalSeconds*3;
 
 			}
 
@@ -644,8 +649,17 @@ public class VisibilitySystem : NotNot.Engine.Ecs.System
 			var instances = Mem<Matrix4x4>.Allocate(meta.length, false);
 			for (var i = 0; i < meta.length; i++)
 			{
+				instances[i] = Matrix4x4.Identity;
 				//Console.WriteLine($"entity={meta[i]}, pos={translations[i].value}, move={moves[i].value}");
-				instances[i] = Matrix4x4.Identity;// Matrix4x4.CreateTranslation(translations[i].value);
+				//Console.WriteLine($"entity={meta[i]}, pos={translations[i].value}");
+				//instances[i] = Matrix4x4.Identity;// Matrix4x4.CreateTranslation(translations[i].value);
+				//instances[i] =  Matrix4x4.CreateTranslation(translations[i].value);
+				instances[i].Translation = translations[i].value;
+				//instances[i].Translation = new Vector3(0,0,1.1f);
+				//instances[i] = Raymath.MatrixTranslate(0, 0, 1);
+				
+
+
 			}
 			var renderPacket = new BatchedRenderMesh(asset);
 			renderPacket.instances = instances;
