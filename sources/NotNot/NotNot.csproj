@@ -22,13 +22,14 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Checked|AnyCPU'">
     <Deterministic>False</Deterministic>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-    <DefineConstants>$(DefineConstants);CHECKED;TEST</DefineConstants>
+    <DefineConstants>$(DefineConstants);DEBUG;CHECKED;TEST</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <Deterministic>False</Deterministic>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <DefineConstants>$(DefineConstants);TEST</DefineConstants>
+    <Optimize>True</Optimize>
   </PropertyGroup>
 
   <ItemGroup>

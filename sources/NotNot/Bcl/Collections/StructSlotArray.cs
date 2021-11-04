@@ -1,4 +1,4 @@
-﻿// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
+// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
 // [!!] Copyright ©️ NotNot Project and Contributors. 
 // [!!] By default, this file is licensed to you under the AGPL-3.0.
 // [!!] However a Private Commercial License is available. 
@@ -50,7 +50,7 @@ namespace NotNot.Bcl.Collections._unused
 		public StructSlotArray(int capacity)
 		{
 			this._storage = new TData[capacity];
-			this._freeSlots = new();			
+			this._freeSlots = new(capacity);			
 #if CHECKED
 			this._CHECKED_allocationTracker = new();
 #endif

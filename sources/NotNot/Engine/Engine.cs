@@ -209,7 +209,6 @@ public class Phase0_StateSync : SystemBase
 
 	protected override async Task OnUpdate(Frame frame)
 	{
-
 		await _updateLock.WaitAsync();
 		var currentCount = _renderPackets.Count;
 

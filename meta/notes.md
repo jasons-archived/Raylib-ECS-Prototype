@@ -19,6 +19,7 @@
       - [raylib](#raylib)
     - [Spatial partitioning notes](#spatial-partitioning-notes)
       - [approach](#approach)
+- [native allocator](#native-allocator)
 - [ecs review notes](#ecs-review-notes)
 - [visual design style](#visual-design-style)
 - [TODO:](#todo)
@@ -291,7 +292,9 @@ raylib seems most complete.  meaning least work to get a working renderer out-of
 - use a existing approach
 - if need better, create a native alloc version https://docs.microsoft.com/en-us/dotnet/api/system.runtime.interopservices.nativememory.alloc?view=net-6.0
 
-
+# native allocator
+- https://github.com/terrafx/terrafx.interop.mimalloc
+  - use that for native memory allocations
 
 # ecs review notes
 - Systems Roots

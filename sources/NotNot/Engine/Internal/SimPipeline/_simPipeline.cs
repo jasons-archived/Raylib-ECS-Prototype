@@ -1026,7 +1026,7 @@ public partial class Frame ////node graph setup and execution
 				beforeNodeState._updateAfter.Add(nodeState);
 			}
 
-			var lockTest = new DotNext.Threading.AsyncReaderWriterLock();
+			//var lockTest = new DotNext.Threading.AsyncReaderWriterLock();
 
 
 
@@ -1069,6 +1069,21 @@ public partial class Frame ////node graph setup and execution
 		var waitingOnChildrenNodes = new List<NodeFrameState>();
 		var finishedNodes = new List<NodeFrameState>();
 
+		//helper to update our nodeState when the update method is done running
+		static void doneUpdateTask_Helper(Task updateTask, NodeFrameState nodeState)
+		{
+			__DEBUG.Assert(nodeState._status == FrameStatus.RUNNING);
+			nodeState._status = FrameStatus.FINISHED_WAITING_FOR_CHILDREN;
+			nodeState._updateTime = nodeState._updateStopwatch.Elapsed;
+		}
+		//var doneUpdateTask = (Task updateTask) =>
+		//{
+		//	__DEBUG.Assert(nodeState._status == FrameStatus.RUNNING);
+		//	nodeState._status = FrameStatus.FINISHED_WAITING_FOR_CHILDREN;
+		//	nodeState._updateTime = nodeState._updateStopwatch.Elapsed;
+		//	//nodeState._updateTcs.SetFromTask(updateTask);
+		//	//return updateTask;
+		//};
 
 		__DEBUG.WriteLine(SimNode._DEBUG_PRINT_TRACE!=true, $"[[[[[=================------- {this._stats._frameId} -------=================]]]]]");
 		while (_allNodesToProcess.Count > 0 || currentTasks.Count > 0)
@@ -1099,33 +1114,34 @@ public partial class Frame ////node graph setup and execution
 					activeNodes.Add(nodeState);
 
 
-					//helper to update our nodeState when the update method is done running
-					var doneUpdateTask = (Task updateTask) =>
+					static async Task taskRunner(SimNode node, NodeFrameState nodeState,Frame _this)
 					{
-						__DEBUG.Assert(nodeState._status == FrameStatus.RUNNING);
-						nodeState._status = FrameStatus.FINISHED_WAITING_FOR_CHILDREN;
-						nodeState._updateTime = nodeState._updateStopwatch.Elapsed;
-						//nodeState._updateTcs.SetFromTask(updateTask);
-						//return updateTask;
-					};
+						var _task = node.DoUpdate(_this, nodeState);
+						await _task;
+						doneUpdateTask_Helper(_task, nodeState);
+						//return _task;
+					}
 
 					if (node is IIgnoreUpdate)
 					{
 						//node has no update loop, it's done immediately.
-						doneUpdateTask(Task.CompletedTask);
+						doneUpdateTask_Helper(Task.CompletedTask, nodeState);
 						nodeState.UpdateTask = Task.CompletedTask;
 						DEBUG_finishedNodeUpdate++;
 					}
 					else
-					{
+					{						
 						//node update() may be async, so need to monitor it to track when it completes.
 						var updateTask = Task.Run(async () =>
 						{
 							var _task = node.DoUpdate(this, nodeState);
 							await _task;
-							doneUpdateTask(_task);
-							return _task;
-						});//.ContinueWith(doneUpdateTask);						
+							doneUpdateTask_Helper(_task,nodeState);
+							//return _task;
+						});//.ContinueWith(doneUpdateTask);
+
+						//Task.Run(taskRunner(node,nodeState,this))
+
 						currentTasks.Add(updateTask);
 						nodeState.UpdateTask = updateTask;
 						DEBUG_startedThisPass++;

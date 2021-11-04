@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net6.0</TargetFramework>
@@ -10,6 +10,16 @@
         <RunWorkingDirectory>$(MSBuildThisFileDirectory)</RunWorkingDirectory>
 
         <Configurations>Debug;Release;Checked</Configurations>
+
+        <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+      <DefineConstants>$(DefineConstants);DEBUG;TRACE</DefineConstants>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Checked|AnyCPU'">
+      <DefineConstants>$(DefineConstants);CHECKED;DEBUG;TRACE</DefineConstants>
     </PropertyGroup>
 
     <ItemGroup>
