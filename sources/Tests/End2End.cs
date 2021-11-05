@@ -34,17 +34,17 @@ namespace Tests.End2End
 
 				var em = engine.DefaultWorld.entityManager;
 
-				var archetype = em.GetOrCreateArchetype(new() { typeof(PlayerInput), typeof(Translation), typeof(Move) });
+				var archetype = em.GetOrCreateArchetype(new() { typeof(PlayerInput), typeof(WorldXform), typeof(Move) });
 
 				em.EnqueueCreateEntity(1, archetype, (args) =>
 				{
 					var (accessTokens, entityHandles, archetype) = args;
 					foreach (var accessToken in accessTokens)
 					{
-						ref var translation = ref accessToken.GetComponentWriteRef<Translation>();
+						ref var transform = ref accessToken.GetComponentWriteRef<WorldXform>();
 						ref var move = ref accessToken.GetComponentWriteRef<Move>();
-						translation = new Translation() { value = Vector3.One };
-						move = new() { value = Vector3.Zero };						
+						transform = new WorldXform();// { value = Vector3.One };
+						move = new() { pos = Vector3.Zero };						
 					}
 				});
 
@@ -81,17 +81,17 @@ namespace Tests.End2End
 
 				var em = engine.DefaultWorld.entityManager;
 
-				var archetype = em.GetOrCreateArchetype(new() { typeof(PlayerInput), typeof(Translation), typeof(Move) });
+				var archetype = em.GetOrCreateArchetype(new() { typeof(PlayerInput), typeof(WorldXform), typeof(Move) });
 
 				em.EnqueueCreateEntity(1, archetype, (args) =>
 				{
 					var (accessTokens, entityHandles, archetype) = args;
 					foreach (var accessToken in accessTokens)
 					{
-						ref var translation = ref accessToken.GetComponentWriteRef<Translation>();
+						ref var transform = ref accessToken.GetComponentWriteRef<WorldXform>();
 						ref var move = ref accessToken.GetComponentWriteRef<Move>();
-						translation = new Translation() { value = Vector3.One };
-						move = new() { value = Vector3.Zero };
+						transform = new WorldXform();// { value = Vector3.One };
+						move = new() { pos = Vector3.Zero };
 					}
 				});
 				

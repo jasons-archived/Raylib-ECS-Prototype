@@ -22,7 +22,7 @@ namespace NotNot;
 
 
 
-//public struct Transform
+//public struct WorldXform
 //{
 //    public Vector3 position;
 //    public Quaternion rotation;
@@ -338,7 +338,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 					_thread_renderPackets.Clear();
 				}
 
-				Raylib.DrawGrid(10, 1.0f);
+				Raylib.DrawGrid(100, 1.0f);
 				Raylib.EndMode3D();
 				Raylib.DrawText("Reference Rendering", 10, 40, 20, Color.DARKGRAY);
 				Raylib.DrawFPS(10, 10);
@@ -453,7 +453,7 @@ public class BatchedRenderMesh : IRenderPacket
 		//TODO: when raylib 4 is released change to use instanced based.   right now (3.7.x) there's a bug where it doesn't render instances=1
 		for (var i = 0; i < xforms.Length; i++)
 		{
-			Raylib.DrawMesh(asset.mesh, asset.material,Matrix4x4.Transpose(xforms[i])); //IMPORTANT: raylib is row-major.   need to transpose dotnet (column major) to match
+			Raylib.DrawMesh(asset.mesh, asset.material, Matrix4x4.Transpose(xforms[i])); //IMPORTANT: raylib is row-major.   need to transpose dotnet (column major) to match
 		}
 		if (xforms.Length == 0)
 		{
@@ -486,16 +486,70 @@ public enum Primitive
 
 
 
-public record struct Transform
+public record struct WorldXform
 {
-	private Vector3 _pos;
-	public Vector3 Pos { get => _pos; set { _pos = value; version++; } }
-	public Vector3 _scale;
-	public Vector3 Scale { get => _scale; set { _scale = value; version++; } }
-	public Quaternion _rotation;
-	public Quaternion Rotation { get => _rotation; set { _rotation = value; version++; } }
 	public short version;
-	//public Matrix4x4 _xform;
+	private Vector3 _position = Vector3.Zero;
+	public Vector3 Position
+	{
+		get => _position; set
+		{
+			_position = value;
+			version++;
+			xformMatrix.Translation = value;
+		}
+	}
+	private Vector3 _scale = Vector3.One;
+	public Vector3 Scale
+	{
+		get => _scale; set
+		{
+
+			_scale = value;
+			version++;
+			_RecalculateMatrix();
+
+		}
+	}
+	private Quaternion _rotation = Quaternion.Identity;
+	public Quaternion Rotation
+	{
+		get => _rotation; set
+		{
+			_rotation = value;
+			version++;
+			_RecalculateMatrix();
+		}
+	}
+
+	private void _RecalculateMatrix()
+	{
+		xformMatrix = Matrix4x4.CreateScale(_scale) * Matrix4x4.CreateFromQuaternion(_rotation);
+		xformMatrix.Translation = _position;
+	}
+	public Matrix4x4 xformMatrix = Matrix4x4.Identity;
+
+	/// <summary>
+	/// set this xform from a matrix.   the matrix needs to be decomposable so we can obtain the position/rotation/scale components
+	/// </summary>
+	/// <param name="toDecompose"></param>
+	/// <returns></returns>
+	public bool FromMatrix(ref Matrix4x4 toDecompose)
+	{
+		var result = Matrix4x4.Decompose(toDecompose, out var scale, out var rotation, out var translation);
+		if (!result)
+		{
+			return false;
+		}
+		_scale = scale;
+		_position = translation;
+		_rotation = rotation;
+		xformMatrix = toDecompose;
+		version++;
+		return true;
+	}
+
+
 }
 
 public record struct MeshRenderInfo
@@ -505,25 +559,26 @@ public record struct MeshRenderInfo
 	public int renderSlot;
 	public short lastTransformVersion;
 }
-public record struct Scale
-{
-	public Vector3 value;
-}
-public record struct Rotation
-{
-	public Quaternion value;
-}
-public record struct Translation
-{
-	public Vector3 value;
-}
+//public record struct Scale
+//{
+//	public Vector3 value;
+//}
+//public record struct Rotation
+//{
+//	public Quaternion value;
+//}
+//public record struct Translation
+//{
+//	public Vector3 value;
+//}
 public record struct PlayerInput
 {
 }
 
 public record struct Move
 {
-	public Vector3 value;
+	public Vector3 pos;
+	public Quaternion rot;
 }
 
 
@@ -558,18 +613,17 @@ public class PlayerInputSystem : NotNot.Engine.Ecs.System
 		playerMoveQuery.Run((ReadMem<EntityMetadata> meta, Mem<Move> moves, ReadMem<PlayerInput> players) =>
 		{
 			var metaSpan = meta.Span;
-			var totalSeconds =(float) frame._stats._wallTime.TotalSeconds;
+			var totalSeconds = (float)frame._stats._wallTime.TotalSeconds;
 
 
 			for (var i = 0; i < meta.length; i++)
 			{
 				__ERROR.Throw(metaSpan[i].IsAlive, "why dead being enumerated?  we are forcing autopack");
-				//moves[i].value =Vector3.Normalize(__.Rand._NextVector3());
-				//var vec = __.Rand._NextVector3();
-				//var norm = Vector3.Normalize(vec);
+
 
 				var norm = new Vector3(MathF.Sin(totalSeconds), 0f, MathF.Cos(totalSeconds));
-				moves[i].value = norm * (float)frame._stats._frameElapsed.TotalSeconds*3;
+				moves[i].pos = norm * (float)frame._stats._frameElapsed.TotalSeconds * 3;
+				//moves[i].
 
 			}
 
@@ -587,10 +641,10 @@ public class MoveSystem : NotNot.Engine.Ecs.System
 		base.OnInitialize();
 		//create a query that selects all entities that have a Move and Translation component
 		//for performance reasons this should be cached as a class member,
-		moveQuery = entityManager.Query(new() { all = { typeof(Move), typeof(Translation) } });
+		moveQuery = entityManager.Query(new() { all = { typeof(Move), typeof(WorldXform) } });
 
 		//notify our need for read/write access so systems can be multithreaded safely
-		RegisterWriteLock<Translation>();
+		RegisterWriteLock<WorldXform>();
 		RegisterReadLock<Move>();
 
 	}
@@ -604,16 +658,20 @@ public class MoveSystem : NotNot.Engine.Ecs.System
 			//metadata about the entity
 			ReadMem<EntityMetadata> meta,
 			//write access to Translation component
-			Mem<Translation> translations,
+			Mem<WorldXform> transforms,
 			//read access to Move component
 			ReadMem<Move> moves
 			) =>
 		{
 
+			var elapsed =(float) frame._stats._wallTime.TotalSeconds *2;
+
 			for (var i = 0; i < meta.length; i++)
 			{
 				//apply move vector onto translation vector
-				translations[i].value += moves[i].value;
+				transforms[i].Position += moves[i].pos;
+				transforms[i].Rotation = Quaternion.CreateFromYawPitchRoll(0, 0, elapsed);
+				transforms[i].Scale = Vector3.One * MathF.Cos(elapsed);
 				//Console.WriteLine($"entity={meta[i]}, pos={translations[i].value}, move={moves[i].value}");
 			}
 
@@ -630,10 +688,10 @@ public class VisibilitySystem : NotNot.Engine.Ecs.System
 		base.OnInitialize();
 		//create a query that selects all entities that have a Move and Translation component
 		//for performance reasons this should be cached as a class member,
-		positionQuery = entityManager.Query(new() { all = { typeof(Translation) } });
+		positionQuery = entityManager.Query(new() { all = { typeof(WorldXform) } });
 
 		//notify our need for read/write access so systems can be multithreaded safely
-		RegisterReadLock<Translation>();
+		RegisterReadLock<WorldXform>();
 	}
 	protected override Task OnUpdate(Frame frame)
 	{
@@ -641,7 +699,7 @@ public class VisibilitySystem : NotNot.Engine.Ecs.System
 		//metadata about the entity
 		ReadMem<EntityMetadata> meta,
 		//write access to Translation component
-		ReadMem<Translation> translations
+		ReadMem<WorldXform> transforms
 		) =>
 		{
 
@@ -649,15 +707,15 @@ public class VisibilitySystem : NotNot.Engine.Ecs.System
 			var instances = Mem<Matrix4x4>.Allocate(meta.length, false);
 			for (var i = 0; i < meta.length; i++)
 			{
-				instances[i] = Matrix4x4.Identity;
+				//instances[i] = Matrix4x4.Identity;
 				//Console.WriteLine($"entity={meta[i]}, pos={translations[i].value}, move={moves[i].value}");
 				//Console.WriteLine($"entity={meta[i]}, pos={translations[i].value}");
 				//instances[i] = Matrix4x4.Identity;// Matrix4x4.CreateTranslation(translations[i].value);
-				//instances[i] =  Matrix4x4.CreateTranslation(translations[i].value);
-				instances[i].Translation = translations[i].value;
+				instances[i] = transforms[i].xformMatrix;//Matrix4x4.CreateTranslation(transforms[i].xformMatrix);
+				//instances[i].Translation = translations[i].value;
 				//instances[i].Translation = new Vector3(0,0,1.1f);
 				//instances[i] = Raymath.MatrixTranslate(0, 0, 1);
-				
+
 
 
 			}
