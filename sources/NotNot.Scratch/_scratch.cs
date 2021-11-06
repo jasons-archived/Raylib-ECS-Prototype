@@ -240,10 +240,8 @@ public class RenderReferenceImplementationSystem : SystemBase
 	{
 		ConcurrentQueue<IRenderPacket> packetsCurrent = new();
 
-		var x = new SynchronizationContext();
+		//var x = new SynchronizationContext();
 		Thread.BeginThreadAffinity();
-
-
 		try
 		{
 			Raylib.InitWindow(screenSize.Width, screenSize.Height, windowTitle);

@@ -194,6 +194,10 @@ Logical object structure is
 ## oss community notes
 
 - blog
+  - tools for pr/marketing
+    - ScreenToGif
+    - `WIN-SHFT-S` (take screenshot)
+    - 
 - discord
 - Q&A / KB site  (stack exchange like)
 - docs
