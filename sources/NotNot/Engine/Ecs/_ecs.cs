@@ -416,7 +416,7 @@ public partial class EntityManager //archetype management
 public partial class EntityManager //entity creation
 {
 	public record struct EnqueueCreateArgs(int count, Archetype archetype, Mem<IPartitionComponent> partitionComponents, CreateEntitiesCallback doneCallback);
-	internal record struct _EnqueueCreateArgs_Internal(int count, Archetype archetype, PartitionGroup partitionComponents, CreateEntitiesCallback doneCallback);
+	internal record struct _EnqueueCreateArgs_Internal(int count, Archetype archetype, PartitionGroup partitionGroup, CreateEntitiesCallback doneCallback);
 
 	private global::System.Collections.Concurrent.ConcurrentQueue<_EnqueueCreateArgs_Internal> _createQueue = new();
 
@@ -429,9 +429,9 @@ public partial class EntityManager //entity creation
 	{
 		_createQueue.Enqueue(new(count, archetype, PartitionGroup.GetOrCreate(partitionComponents), doneCallback));
 	}
-	public void EnqueueCreateEntity(int count, Archetype archetype, PartitionGroup partitionComponents, CreateEntitiesCallback doneCallback)
+	public void EnqueueCreateEntity(int count, Archetype archetype, PartitionGroup partitionGroup, CreateEntitiesCallback doneCallback)
 	{
-		_createQueue.Enqueue(new(count, archetype, partitionComponents, doneCallback));
+		_createQueue.Enqueue(new(count, archetype, partitionGroup, doneCallback));
 	}
 	private global::System.Collections.Concurrent.ConcurrentQueue<(EntityHandle[] toDelete, DeleteEntitiesCallback doneCallback)> _deleteQueue = new();
 	public void EnqueueDeleteEntity(ReadOnlySpan<EntityHandle> toDelete, DeleteEntitiesCallback doneCallback)
@@ -498,7 +498,7 @@ public partial class EntityManager //entity creation
 			//all owners are archetypes, so leap of faith cast
 			var archetype = pageSpan[0].GetOwner() as Archetype;
 			//let archetype invoke the required callback function
-			archetype.DoDeleteEntities_Phase0(pageSpan, doneCallback);
+			archetype.DoDeleteEntities_Phase0(pageSpan, doneCallback, pageSpan[0].GetPage());
 		}
 
 		for (var i = 0; i < accessTokens.Length; i++)
@@ -605,6 +605,11 @@ public class QueryOptions
 	/// </summary>
 	/// <remarks>be sure that added archetypes have all TComponents you may request in <see cref="EntityQuery.SelectRange"/> otherwise an exception will be thrown</remarks>
 	public Action<List<Archetype>> custom;
+
+	/// <summary>
+	/// filters returned chunks to only include those with the all specified partitionComponents
+	/// </summary>
+	public List<IPartitionComponent> partitionComponents = new();
 
 	/// <summary>
 	/// Disables the automatic requery when archetypes are added to the world.
@@ -744,16 +749,41 @@ public class EntityQuery
 			{
 				continue;
 			}
-			var page = archetype._page;
-			var entityMetaCol = page.GetColumn<EntityMetadata>();
 
-			for (var i = 0; i < entityMetaCol.Count; i++)
+
+			foreach (var (partitionComponents, page) in archetype._pages)
 			{
-				helperCallback(
-					entityMetaCol[i] as Chunk<EntityMetadata>
-					, page.GetColumn<TC1>()[i] as Chunk<TC1>
+				//filter by partitionComponents (skip pages that do not match)
+				{
+					var usePage = true;
+					foreach (var componentToFind in _options.partitionComponents)
+					{
+						if (partitionComponents.Contains(componentToFind) == false)
+						{
+							usePage = false;
+							break;
+						}
+					}
+
+					if (usePage == false)
+					{
+						continue;
+					}
+				}
+
+				//return the page's entities to the caller
+				var entityMetaCol = page.GetColumn<EntityMetadata>();
+
+				for (var i = 0; i < entityMetaCol.Count; i++)
+				{
+					helperCallback(
+						entityMetaCol[i] as Chunk<EntityMetadata>
+						, page.GetColumn<TC1>()[i] as Chunk<TC1>
 					);
+				}
+
 			}
+
 		}
 	}
 
@@ -771,16 +801,38 @@ public class EntityQuery
 			{
 				continue;
 			}
-			var page = archetype._page;
-			var entityMetaCol = page.GetColumn<EntityMetadata>();
 
-			for (var i = 0; i < entityMetaCol.Count; i++)
+			foreach (var (partitionComponents, page) in archetype._pages)
 			{
-				helperCallback(
-					entityMetaCol[i] as Chunk<EntityMetadata>
-					, page.GetColumn<TC1>()[i] as Chunk<TC1>
-					, page.GetColumn<TC2>()[i] as Chunk<TC2>
+				//filter by partitionComponents (skip pages that do not match)
+				{
+					var usePage = true;
+					foreach (var componentToFind in _options.partitionComponents)
+					{
+						if (partitionComponents.Contains(componentToFind) == false)
+						{
+							usePage = false;
+							break;
+						}
+					}
+
+					if (usePage == false)
+					{
+						continue;
+					}
+				}
+
+				//return the page's entities to the caller
+				var entityMetaCol = page.GetColumn<EntityMetadata>();
+
+				for (var i = 0; i < entityMetaCol.Count; i++)
+				{
+					helperCallback(
+						entityMetaCol[i] as Chunk<EntityMetadata>
+						, page.GetColumn<TC1>()[i] as Chunk<TC1>
+						, page.GetColumn<TC2>()[i] as Chunk<TC2>
 					);
+				}
 			}
 		}
 	}
@@ -798,17 +850,39 @@ public class EntityQuery
 			{
 				continue;
 			}
-			var page = archetype._page;
-			var entityMetaCol = page.GetColumn<EntityMetadata>();
 
-			for (var i = 0; i < entityMetaCol.Count; i++)
+			foreach (var (partitionComponents, page) in archetype._pages)
 			{
-				helperCallback(
-					entityMetaCol[i] as Chunk<EntityMetadata>
-					, page.GetColumn<TC1>()[i] as Chunk<TC1>
-					, page.GetColumn<TC2>()[i] as Chunk<TC2>
-					, page.GetColumn<TC3>()[i] as Chunk<TC3>
+				//filter by partitionComponents (skip pages that do not match)
+				{
+					var usePage = true;
+					foreach (var componentToFind in _options.partitionComponents)
+					{
+						if (partitionComponents.Contains(componentToFind) == false)
+						{
+							usePage = false;
+							break;
+						}
+					}
+
+					if (usePage == false)
+					{
+						continue;
+					}
+				}
+
+				//return the page's entities to the caller
+				var entityMetaCol = page.GetColumn<EntityMetadata>();
+
+				for (var i = 0; i < entityMetaCol.Count; i++)
+				{
+					helperCallback(
+						entityMetaCol[i] as Chunk<EntityMetadata>
+						, page.GetColumn<TC1>()[i] as Chunk<TC1>
+						, page.GetColumn<TC2>()[i] as Chunk<TC2>
+						, page.GetColumn<TC3>()[i] as Chunk<TC3>
 					);
+				}
 			}
 		}
 	}
@@ -826,18 +900,40 @@ public class EntityQuery
 			{
 				continue;
 			}
-			var page = archetype._page;
-			var entityMetaCol = page.GetColumn<EntityMetadata>();
 
-			for (var i = 0; i < entityMetaCol.Count; i++)
+			foreach (var (partitionComponents, page) in archetype._pages)
 			{
-				helperCallback(
-					entityMetaCol[i] as Chunk<EntityMetadata>
-					, page.GetColumn<TC1>()[i] as Chunk<TC1>
-					, page.GetColumn<TC2>()[i] as Chunk<TC2>
-					, page.GetColumn<TC3>()[i] as Chunk<TC3>
-					, page.GetColumn<TC4>()[i] as Chunk<TC4>
+				//filter by partitionComponents (skip pages that do not match)
+				{
+					var usePage = true;
+					foreach (var componentToFind in _options.partitionComponents)
+					{
+						if (partitionComponents.Contains(componentToFind) == false)
+						{
+							usePage = false;
+							break;
+						}
+					}
+
+					if (usePage == false)
+					{
+						continue;
+					}
+				}
+
+				//return the page's entities to the caller
+				var entityMetaCol = page.GetColumn<EntityMetadata>();
+
+				for (var i = 0; i < entityMetaCol.Count; i++)
+				{
+					helperCallback(
+						entityMetaCol[i] as Chunk<EntityMetadata>
+						, page.GetColumn<TC1>()[i] as Chunk<TC1>
+						, page.GetColumn<TC2>()[i] as Chunk<TC2>
+						, page.GetColumn<TC3>()[i] as Chunk<TC3>
+						, page.GetColumn<TC4>()[i] as Chunk<TC4>
 					);
+				}
 			}
 		}
 	}
@@ -988,19 +1084,26 @@ public partial class Archetype : DisposeGuard //initialization
 
 		_entityManager = entityManager;
 
-		if (_page == null)
-		{
-			_page = new Page(true, ChunkSize, _componentTypes);
-		}
+		//if (_page == null)
+		//{
+		//	_page = new Page(true, ChunkSize, _componentTypes);
+		//}
 		_entityRegistry = entityRegistry;
-		_page.Initialize(this, entityRegistry);
+		//_page.Initialize(this, entityRegistry);
 	}
 
 
 
 	protected override void OnDispose()
 	{
-		_page.Dispose();
+		//_page.Dispose();
+
+		foreach (var pair in _pages)
+		{
+			pair.Value.Dispose();
+		}
+		_pages.Clear();
+		_pages = null;
 
 		base.OnDispose();
 	}
@@ -1023,15 +1126,33 @@ public partial class Archetype : IPageOwner
 
 public partial class Archetype //passthrough of page stuff
 {
-	//public Dictionary<PartitionGroup, Page> _pages;
-	public Page _page;
-	public short ArchtypeId { get => _page._pageId; }
-	public int Version { get => _page._version; }
-	public int Count { get => _page.Count; }
+	public Dictionary<PartitionGroup, Page> _pages = new();
+	//public Page _page;
+	//public short ArchtypeId { get => _page._pageId; }
+	//public int Version { get => _page._version; }
+	public int Count
+	{
+		get
+		{
+#if CHECKED
+			var tempCount = 0;
+			foreach (var (partitionGroup, page) in _pages)
+			{
+				tempCount += page.Count;
+			}
+
+			__CHECKED.Throw(tempCount == _count);
+#endif
+
+			return _count;
+		}
+	}
+
+	private int _count;
 
 	internal void DoCreateEntities_Phase0(ref EntityManager._EnqueueCreateArgs_Internal args)
 	{
-		var (count, archetype, partitionComponents, doneCallback) = args;
+		var (count, archetype, partitionGroup, doneCallback) = args;
 		__DEBUG.Assert(this == archetype);
 
 
@@ -1044,22 +1165,40 @@ public partial class Archetype //passthrough of page stuff
 		var accessTokens = accessTokensMem.Span;
 		_entityRegistry.Alloc(entityHandles);
 
-		_page.AllocEntityNew(accessTokens, entityHandles);
+		var page = _pages._GetOrAdd(partitionGroup, () =>
+		{
+			var page = new Page(true, ChunkSize, _componentTypes, partitionGroup);
+			page.Initialize(this, _entityRegistry);
+			return page;
+		});
 
+		page.AllocEntityNew(accessTokens, entityHandles);
+
+		_count += entityHandles.Length;
 		doneCallback((accessTokensMem.AsReadMem(), entityHandlesMem.AsReadMem(), this));
 	}
-	internal void DoDeleteEntities_Phase0(Span<AccessToken> toDelete, DeleteEntitiesCallback doneCallback)
+	/// <summary>
+	/// deletes entities from a specific page
+	/// </summary>
+	/// <param name="toDelete"></param>
+	/// <param name="doneCallback"></param>
+	/// <param name="containingPage"></param>
+	internal void DoDeleteEntities_Phase0(Span<AccessToken> toDelete, DeleteEntitiesCallback doneCallback, Page containingPage)
 	{
-		_page.Free(toDelete);
-
+		__DEBUG.Throw(_pages.ContainsValue(containingPage), "the specified page should be part of this archetype, otherwise the following logic is invalid");
+		containingPage.Free(toDelete);
+		//call the callback to notify
 		var pageMem = ReadMem<AccessToken>.Allocate(toDelete, false);
+		_count-=toDelete.Length;
 		doneCallback((pageMem, this));
+
+
 	}
 
 }
 
 
-public interface IPartitionComponent: IEquatable<IPartitionComponent>
+public interface IPartitionComponent : IEquatable<IPartitionComponent>
 {
 	public int GetHashCode();
 }
@@ -1074,6 +1213,9 @@ public class PartitionGroup
 {
 	public long hashSum;
 
+	/// <summary>
+	/// stores the components shared by all entities in the partition
+	/// </summary>
 	public Dictionary<Type, IPartitionComponent> storage = new();
 
 
@@ -1113,7 +1255,7 @@ public class PartitionGroup
 	/// pool of all instances
 	/// key is a hashcode.  but because hashcodes can collide, we use a list as value
 	/// </summary>
-	private static ConcurrentDictionary<long,List<WeakReference<PartitionGroup>>> _GLOBAL_STORAGE = new();
+	private static ConcurrentDictionary<long, List<WeakReference<PartitionGroup>>> _GLOBAL_STORAGE = new();
 
 	/// <summary>
 	/// factory method, either returns an existing, or creates a new object from the given parameters
@@ -1130,17 +1272,17 @@ public class PartitionGroup
 					if (_GLOBAL_STORAGE.TryRemove(keyToDelete, out var deletedList))
 					{
 						//removed successfully, but need to make sure all weakRefs are deallocated
-						for(var i=deletedList.Count-1; i>=0; i--)
+						for (var i = deletedList.Count - 1; i >= 0; i--)
 						{
 							var deletedWR = deletedList[i];
-							if (deletedWR == null || deletedWR.TryGetTarget(out var deletedPC)==false)
+							if (deletedWR == null || deletedWR.TryGetTarget(out var deletedPC) == false)
 							{
 								//truely dead
 								deletedList.RemoveAt(i);
-								
+
 							}
 						}
-						if(deletedList.Count != 0)
+						if (deletedList.Count != 0)
 						{
 							//it's not actually dead, so put it back
 							var result = _GLOBAL_STORAGE.TryAdd(keyToDelete, deletedList);
@@ -1159,7 +1301,7 @@ public class PartitionGroup
 		if (_GLOBAL_STORAGE.TryGetValue(hash, out var listWR))
 		{
 			//get from list
-			for(var i = listWR.Count - 1; i >= 0; i--)
+			for (var i = listWR.Count - 1; i >= 0; i--)
 			{
 				var maybeWeakRef = listWR[i];
 
@@ -1181,10 +1323,10 @@ public class PartitionGroup
 			//get or create list
 			if (!_GLOBAL_STORAGE.TryGetValue(hash, out listWR))
 			{
-				listWR = new List<WeakReference<PartitionGroup>>();				
+				listWR = new List<WeakReference<PartitionGroup>>();
 				var result = _GLOBAL_STORAGE.TryAdd(hash, listWR);
 				__DEBUG.Throw(result);
-				
+
 			}
 			//have list
 			foreach (var maybeWeakRef in listWR)
@@ -1207,7 +1349,7 @@ public class PartitionGroup
 
 	private bool Matches(Mem<IPartitionComponent> components)
 	{
-		if(storage.Count != components.length)
+		if (storage.Count != components.length)
 		{
 			return false;
 		}
@@ -1223,9 +1365,19 @@ public class PartitionGroup
 			if (!storage[type].Equals(component))
 			{
 				return false;
-			}			
+			}
 		}
 		return true;
+	}
+
+	public bool Contains(IPartitionComponent componentToFind)
+	{
+		var type = componentToFind.GetType();
+		if (storage.TryGetValue(type, out var foundComponent))
+		{
+			return componentToFind.Equals(foundComponent);
+		}
+		return false;
 	}
 }
 

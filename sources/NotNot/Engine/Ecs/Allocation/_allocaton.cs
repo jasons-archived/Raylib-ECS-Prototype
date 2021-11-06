@@ -567,7 +567,7 @@ public partial class Page //unit test
 
 	private static unsafe Page _TEST_HELPER_CreatePage(EntityRegistry entityRegistry)
 	{
-		var page = new Page(__.Rand._NextBoolean(), __.Rand.Next(1, 100), new() { typeof(int), typeof(string) });
+		var page = new Page(__.Rand._NextBoolean(), __.Rand.Next(1, 100), new() { typeof(int), typeof(string) },null);
 		//{
 		//	AutoPack = __.Rand._NextBoolean(),
 		//	ChunkSize = __.Rand.Next(1, 100),
@@ -622,7 +622,7 @@ public partial class Page //unit test
 		//HashSet<EntityHandle> oddSet;
 
 
-		var page = new Page(autoPack, chunkSize, new() { typeof(int), typeof(Vector3), typeof(bool) });
+		var page = new Page(autoPack, chunkSize, new() { typeof(int), typeof(Vector3), typeof(bool) },null);
 		//{
 		//	AutoPack = autoPack,
 		//	ChunkSize = chunkSize,
@@ -1042,12 +1042,15 @@ public partial class Page : IDisposable //init logic
 	/// how many entities are stored in this Page
 	/// </summary>
 	public int Count { get => _entityLookup.Count; }
-	public Page(bool autoPack, int chunkSize, HashSet<Type> componentTypes)
+
+	public PartitionGroup PartitionGroup { get; init; }
+	public Page(bool autoPack, int chunkSize, HashSet<Type> componentTypes, PartitionGroup partitionGroup)
 	{
 		AutoPack = autoPack;
 		//_entityRegistry = entityRegistry;
 		ChunkSize = chunkSize;
 		ComponentTypes = componentTypes;
+		PartitionGroup = partitionGroup;
 	}
 
 	public void Initialize(IPageOwner owner, EntityRegistry entityRegistry)
