@@ -176,6 +176,8 @@ Logical object structure is
   - generate pinvoke / extern bindings for clang/cpp projects
     - https://github.com/microsoft/clangsharp#generating-bindings
     - could be useful if `raylib-cs` bindings are incomplete
+  - another option for generating binding from c header files:
+    - https://github.com/raysan5/raylib/tree/master/parser
   - inspect C/C# dll's for api signature
     - https://github.com/lucasg/Dependencies
     - 
