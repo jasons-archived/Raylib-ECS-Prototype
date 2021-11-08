@@ -8,6 +8,8 @@
 // [!!] Would you like to know more? https://github.com/NotNotTech/NotNot 
 // [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!]  [!!] [!!] [!!] [!!]
 
+using NotNot.Rendering;
+
 namespace Tests.End2End
 {
 	[TestClass]
@@ -22,7 +24,7 @@ namespace Tests.End2End
 		{
 			{
 				var engine = new Engine();
-				engine.Updater = new NotNot.Engine.HeadlessUpdater();
+				//engine.Updater = new NotNot.HeadlessUpdater();
 				engine.Initialize();
 				//engine.DefaultWorld.AddChild(new TimestepNodeTest() { TargetFps = 10 });
 
@@ -67,7 +69,7 @@ namespace Tests.End2End
 		{
 			{
 				var engine = new Engine();
-				engine.Updater = new NotNot.Engine.HeadlessUpdater();
+				//engine.Updater = new NotNot.HeadlessUpdater();
 				engine.Initialize();
 				//engine.DefaultWorld.AddChild(new TimestepNodeTest() { TargetFps = 10 });
 

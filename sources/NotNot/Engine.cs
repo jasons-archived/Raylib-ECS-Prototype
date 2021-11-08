@@ -10,8 +10,8 @@
 
 using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
-using NotNot.Engine.Ecs;
-using NotNot.Engine.Internal.SimPipeline;
+using NotNot.Ecs;
+using NotNot.SimPipeline;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -21,7 +21,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace NotNot.Engine;
+namespace NotNot;
 
 public class Engine : DisposeGuard
 {
@@ -31,12 +31,12 @@ public class Engine : DisposeGuard
 
 	public Phase0_StateSync StateSync { get; set; } = new() { Name = "!!_StateSync" };
 
-	public World DefaultWorld { get; set; } = new() { Name= "!!_DefaultWorld" };
+	public World DefaultWorld { get; set; } = new() { Name = "!!_DefaultWorld" };
 
 	public ContainerNode Rendering { get; } = new() { Name = "!!_Rendering", _updateAfter = { "!!_StateSync" } };
 	public ContainerNode Worlds { get; } = new() { Name = "!!_Worlds", _updateAfter = { "!!_Rendering" } };
 
-	public IUpdatePump Updater;
+	public IUpdatePump Updater = new HeadlessUpdater();
 
 	public Task RunningTask { get => Updater.MainLoop; }
 
@@ -67,14 +67,14 @@ public class Engine : DisposeGuard
 		//return ValueTask.CompletedTask;
 	}
 
-	
+
 
 	protected override void OnDispose()
 	{
 		Updater.Dispose();
 		Updater = null;
 		_simManager.Dispose();
-		__ERROR.Throw(DefaultWorld.IsDisposed == true,"disposing simManager should have disposed all nodes inside");
+		__ERROR.Throw(DefaultWorld.IsDisposed == true, "disposing simManager should have disposed all nodes inside");
 		DefaultWorld = null;
 		_simManager = null;
 
@@ -91,7 +91,7 @@ public interface IUpdatePump : IDisposable
 	public Task MainLoop { get; }
 	public bool ShouldStop { get; set; }
 
-	
+
 
 
 }
@@ -118,7 +118,7 @@ public class HeadlessUpdater : DisposeGuard, IUpdatePump
 
 			var loop = 0;
 			//await runningLock.WaitAsync();
-			while (ShouldStop==false)
+			while (ShouldStop == false)
 			{
 				loop++;
 				lastElapsed = Stopwatch.GetTimestamp() - start;
@@ -137,7 +137,7 @@ public class HeadlessUpdater : DisposeGuard, IUpdatePump
 
 	public async Task Stop()
 	{
-		ShouldStop=true;
+		ShouldStop = true;
 		await MainLoop;
 		//await runningLock.WaitAsync();
 		//IsRunning= false;
@@ -171,7 +171,7 @@ public class Phase0_StateSync : SystemBase
 		//__DEBUG.Throw(_updateLock.CurrentCount != 0, "update occuring.  no other systems should be enqueing");
 		__CHECKED.Throw(_CHECKED_renderPackets.Add(renderPacket), "the same render packet is already added.  why?");
 		_renderPackets.Enqueue(renderPacket);
-		__DEBUG.Throw(tempCheck == _renderPackets,"all simPipeline systems should run after the phase0SyncState.  something is serious wrong if this occurs!");
+		__DEBUG.Throw(tempCheck == _renderPackets, "all simPipeline systems should run after the phase0SyncState.  something is serious wrong if this occurs!");
 
 	}
 
@@ -182,9 +182,9 @@ public class Phase0_StateSync : SystemBase
 	{
 		//__DEBUG.Throw(toReturn.Count == 0, "should be empty");
 		__DEBUG.Throw(_updateLock.CurrentCount != 0, "update occuring.  no other systems should be swapping/doing work");
-		
+
 		//await _updateLock.WaitAsync();
-		__DEBUG.WriteLine(SimNode._DEBUG_PRINT_TRACE != true, " ----- RENDER -----> RenderPacketsSwapPrior");
+		__DEBUG.WriteLine(_DEBUG_PRINT_TRACE != true, " ----- RENDER -----> RenderPacketsSwapPrior");
 		__DEBUG.Throw(finishedPackets != _renderPackets && finishedPackets != _renderPacketsPrior);
 		__DEBUG.Throw(_DEBUG_lastRenderPacketsPriorReturned != _renderPacketsPrior, "render thread is grabbing render packets twice in a row without the StateSync.OnUpdate() swapping out a fresh package.  that should not happen!");
 

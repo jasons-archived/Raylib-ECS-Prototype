@@ -1,25 +1,3 @@
-﻿
-
-# todo
-
-- fixup files/namespaces ("runtime" namespace)
-- generic node exclusion (read/write) policy
-- time based skipping of nodes
-- gc optimization pass
-- ecs
-
-# done
-
-- multithread execution framework
-- node execution order constraints (before/after another node)
-
-
-
-
-
-
-
-
 
 
 

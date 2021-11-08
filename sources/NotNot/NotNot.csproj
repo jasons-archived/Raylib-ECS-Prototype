@@ -33,7 +33,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Engine\Ecs\Scheduling\" />
+    <Folder Include="Ecs\Scheduling\" />
+    <Folder Include="EngineOld\Internal\" />
   </ItemGroup>
 
   <ItemGroup>

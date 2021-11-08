@@ -23,7 +23,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace NotNot.Engine.Ecs.Allocation;
+namespace NotNot.Ecs.Allocation;
 
 [StructLayout(LayoutKind.Explicit)]
 public readonly struct EntityHandle : IComparable<EntityHandle>

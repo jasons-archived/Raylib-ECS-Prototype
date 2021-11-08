@@ -18,9 +18,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
-using NotNot.Engine.Ecs;
+using NotNot.Ecs;
 
-namespace NotNot.Engine.Internal.SimPipeline;
+namespace NotNot.SimPipeline;
 
 /// <summary>
 /// Manages execution of <see cref="SimNode"/> in parallel based on order-of-execution requirements (see <see cref="SimNode._updateBefore"/>) and resource requirements (see <see cref="SimNode._registeredReadLocks"/> and <see cref="SimNode._registeredWriteLocks"/>)

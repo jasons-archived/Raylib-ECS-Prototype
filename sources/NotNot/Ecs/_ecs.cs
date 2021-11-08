@@ -11,8 +11,8 @@
 using NotNot.Bcl;
 using NotNot.Bcl.Collections._unused;
 using NotNot.Bcl.Diagnostics;
-using NotNot.Engine.Ecs.Allocation;
-using NotNot.Engine.Internal.SimPipeline;
+using NotNot.Ecs.Allocation;
+using NotNot.SimPipeline;
 using Microsoft.Toolkit.HighPerformance.Buffers;
 using System;
 using System.Collections.Concurrent;
@@ -25,7 +25,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics.CodeAnalysis;
 
-namespace NotNot.Engine.Ecs;
+namespace NotNot.Ecs;
 
 
 //public delegate void CreateEntitiesCallback(ReadOnlySpan<AccessToken> accessTokens, ReadOnlySpan<EntityHandle> entities, Archetype archetype);

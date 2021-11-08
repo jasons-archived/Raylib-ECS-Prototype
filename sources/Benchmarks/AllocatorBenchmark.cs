@@ -1,5 +1,5 @@
 using BenchmarkDotNet.Attributes;
-using NotNot.Engine.Ecs.Allocation;
+using NotNot.Ecs.Allocation;
 
 namespace MyBenchmarks;
 

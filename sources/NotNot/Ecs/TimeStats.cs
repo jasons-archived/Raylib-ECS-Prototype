@@ -1,4 +1,4 @@
-﻿// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
+// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
 // [!!] Copyright ©️ NotNot Project and Contributors. 
 // [!!] By default, this file is licensed to you under the AGPL-3.0.
 // [!!] However a Private Commercial License is available. 
@@ -10,7 +10,7 @@
 
 using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
-using NotNot.Engine.Internal.SimPipeline;
+using NotNot.SimPipeline;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -20,7 +20,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace NotNot.Engine.Ecs;
+namespace NotNot.Ecs;
 
 /// <summary>
 /// Time stats about the execution of a frame.

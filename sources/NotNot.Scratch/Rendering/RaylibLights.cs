@@ -3,7 +3,7 @@ using Raylib_cs;
 using static Raylib_cs.Raylib;
 using static Raylib_cs.ShaderUniformDataType;
 
-namespace NotNot
+namespace NotNot.Rendering
 {
 	public struct Light
 	{
@@ -70,7 +70,7 @@ namespace NotNot
 			Utils.SetShaderValue(shader, light.targetLoc, target, SHADER_UNIFORM_VEC3);
 
 			// Send to shader light color values
-			float[] color = new[] { (float)light.color.r / (float)255, (float)light.color.g / (float)255, (float)light.color.b / (float)255, (float)light.color.a / (float)255 };
+			float[] color = new[] { light.color.r / (float)255, light.color.g / (float)255, light.color.b / (float)255, light.color.a / (float)255 };
 			Utils.SetShaderValue(shader, light.colorLoc, color, SHADER_UNIFORM_VEC4);
 		}
 	}

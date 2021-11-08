@@ -8,7 +8,7 @@
 // [!!] Would you like to know more? https://github.com/NotNotTech/NotNot 
 // [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!]  [!!] [!!] [!!] [!!]
 
-//////namespace NotNot.Engine.Ecs._graveyard;
+//////namespace NotNot.Ecs._graveyard;
 
 
 

@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Raylib_cs;
 
-namespace NotNot
+namespace NotNot.Rendering
 {
 	/*
 	Utility functions for parts of the api that are not easy to interact with via pinvoke.

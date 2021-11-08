@@ -7,8 +7,8 @@ public class EngineBasic
 	[TestMethod]
 	public async Task Engine_StartStop()
 	{
-		var engine = new NotNot.Engine.Engine();
-		engine.Updater = new NotNot.Engine.HeadlessUpdater();
+		var engine = new NotNot.Engine();
+		engine.Updater = new NotNot.HeadlessUpdater();
 		engine.Initialize();
 
 		engine.Updater.Start();
@@ -79,8 +79,8 @@ public class EngineBasic
 	[TestMethod]
 	public async Task Engine_WorldWithChild()
 	{
-		var engine = new NotNot.Engine.Engine();
-		engine.Updater = new NotNot.Engine.HeadlessUpdater();
+		var engine = new NotNot.Engine();
+		engine.Updater = new NotNot.HeadlessUpdater();
 		engine.Initialize();
 
 
@@ -109,8 +109,8 @@ public class EngineBasic
 	[TestMethod]
 	public async Task Ecs_CreateEntity()
 	{
-		var engine = new NotNot.Engine.Engine();
-		engine.Updater = new NotNot.Engine.HeadlessUpdater();
+		var engine = new NotNot.Engine();
+		engine.Updater = new NotNot.HeadlessUpdater();
 		engine.Initialize();
 		engine.DefaultWorld.AddChild(new TimestepNodeTest() { TargetFps = 10 });
 		engine.Updater.Start();

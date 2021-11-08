@@ -152,6 +152,8 @@ Logical object structure is
    - https://github.com/NetFabric/NetFabric.Hyperlinq
    - It looks like HyperLinQ is the best bet: https://github.com/asc-community/HonkPerf.NET/blob/main/Benchmarks/PoorestWidestBenchmarks.cs
 - plinq: https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/introduction-to-plinq
+- cancelation tokens for tasks
+  - https://github.com/dotnet/runtime/issues/14991
 - ascii drawing tools: https://asciiflow.com/#/
 - github contributions CLA assistant:  https://github.com/cla-assistant/cla-assistant
 - - dotnet API browser: https://source.dot.net/#System.Private.CoreLib/List.cs,39
