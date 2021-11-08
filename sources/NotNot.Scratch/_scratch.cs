@@ -364,42 +364,35 @@ public class TestRaylibAsset
 	{
 		IsInitialized = true;
 
-		//RaylibRendering.renderLock.Wait();
-		try
+		Mesh cube = Raylib.GenMeshCube(1.0f, 1.0f, 1.0f);
+		Shader shader = Raylib.LoadShader("resources/shaders/glsl330/base_lighting.vs", "resources/shaders/glsl330/lighting.fs");
+		// Get some shader loactions
+		unsafe
 		{
-			Mesh cube = Raylib.GenMeshCube(1.0f, 1.0f, 1.0f);
-			Shader shader = Raylib.LoadShader("resources/shaders/glsl330/base_lighting.vs", "resources/shaders/glsl330/lighting.fs");
-			// Get some shader loactions
-			unsafe
-			{
-				int* locs = (int*)shader.locs;
-				locs[(int)SHADER_LOC_MATRIX_MVP] = GetShaderLocation(shader, "mvp");
-				locs[(int)SHADER_LOC_VECTOR_VIEW] = GetShaderLocation(shader, "viewPos");
-				locs[(int)SHADER_LOC_MATRIX_MODEL] = GetShaderLocationAttrib(shader, "instanceTransform");
-			}
-			// Ambient light level
-			int ambientLoc = GetShaderLocation(shader, "ambient");
-			Utils.SetShaderValue(shader, ambientLoc, new float[] { 0.2f, 0.2f, 0.2f, 1.0f }, SHADER_UNIFORM_VEC4);
-
-			Rlights.CreateLight(0, LightType.LIGHT_DIRECTIONAL, new Vector3(50, 50, 0), Vector3.Zero, WHITE, shader);
-
-			Material material = LoadMaterialDefault();
-
-			unsafe
-			{
-				MaterialMap* maps = (MaterialMap*)material.maps.ToPointer();
-				maps[(int)MATERIAL_MAP_DIFFUSE].color = RED;
-			}
-
-
-			mesh = cube;
-			this.shader = shader;
-			this.material = material;
+			int* locs = (int*)shader.locs;
+			locs[(int)SHADER_LOC_MATRIX_MVP] = GetShaderLocation(shader, "mvp");
+			locs[(int)SHADER_LOC_VECTOR_VIEW] = GetShaderLocation(shader, "viewPos");
+			locs[(int)SHADER_LOC_MATRIX_MODEL] = GetShaderLocationAttrib(shader, "instanceTransform");
 		}
-		finally
+		// Ambient light level
+		int ambientLoc = GetShaderLocation(shader, "ambient");
+		Utils.SetShaderValue(shader, ambientLoc, new float[] { 0.2f, 0.2f, 0.2f, 1.0f }, SHADER_UNIFORM_VEC4);
+
+		Rlights.CreateLight(0, LightType.LIGHT_DIRECTIONAL, new Vector3(50, 50, 0), Vector3.Zero, WHITE, shader);
+
+		Material material = LoadMaterialDefault();
+
+		unsafe
 		{
-			//RaylibRendering.renderLock.Release();
+			MaterialMap* maps = (MaterialMap*)material.maps.ToPointer();
+			maps[(int)MATERIAL_MAP_DIFFUSE].color = RED;
 		}
+
+
+		mesh = cube;
+		this.shader = shader;
+		this.material = material;
+
 
 
 	}
@@ -407,6 +400,39 @@ public class TestRaylibAsset
 	public Mesh mesh;
 	public Shader shader;
 	public Material material;
+
+
+
+	public void DoDraw(BatchedRenderMesh renderPacket)
+	{
+		if (IsInitialized == false)
+		{
+			Initialize();
+		}
+		//__DEBUG.Throw(IsInitialized);
+
+		Utils.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, new Vector3[] { NotNot.RenderReferenceImplementationSystem.camera.position }, SHADER_UNIFORM_VEC3);
+		Utils.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, NotNot.RenderReferenceImplementationSystem.camera.position, SHADER_UNIFORM_VEC3);
+
+		var xforms = renderPacket.instances.Span;
+		//var mesh = renderMesh.mesh;
+		//var material = renderMesh.material;
+		//TODO: when raylib 4 is released change to use instanced based.   right now (3.7.x) there's a bug where it doesn't render instances=1
+		for (var i = 0; i < xforms.Length; i++)
+		{
+			Raylib.DrawMesh(mesh, material, Matrix4x4.Transpose(xforms[i])); //IMPORTANT: raylib is row-major.   need to transpose dotnet (column major) to match
+		}
+		if (xforms.Length == 0)
+		{
+			Console.WriteLine("Packet is EMPTY!!>?!?!");
+		}
+
+		//Console.WriteLine($"cpuId={Thread.GetCurrentProcessorId()}, mtId={Thread.CurrentThread.ManagedThreadId}");
+	}
+
+
+
+
 }
 public class BatchedRenderMesh : IRenderPacket
 {
@@ -436,27 +462,30 @@ public class BatchedRenderMesh : IRenderPacket
 
 	public void DoDraw()
 	{
-		if (asset.IsInitialized == false)
-		{
-			asset.Initialize();
-		}
-		//__DEBUG.Throw(IsInitialized);
 
-		//Utils.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, new Vector3[] { camera.position }, SHADER_UNIFORM_VEC3);
-		//Utils.SetShaderValue(asset.shader, (int)SHADER_LOC_VECTOR_VIEW, RaylibRendering.camera.position, SHADER_UNIFORM_VEC3);
+		asset.DoDraw(this);
 
-		var xforms = instances.Span;
-		//var mesh = renderMesh.mesh;
-		//var material = renderMesh.material;
-		//TODO: when raylib 4 is released change to use instanced based.   right now (3.7.x) there's a bug where it doesn't render instances=1
-		for (var i = 0; i < xforms.Length; i++)
-		{
-			Raylib.DrawMesh(asset.mesh, asset.material, Matrix4x4.Transpose(xforms[i])); //IMPORTANT: raylib is row-major.   need to transpose dotnet (column major) to match
-		}
-		if (xforms.Length == 0)
-		{
-			Console.WriteLine("Packet is EMPTY!!>?!?!");
-		}
+		//if (asset.IsInitialized == false)
+		//{
+		//	asset.Initialize();
+		//}
+		////__DEBUG.Throw(IsInitialized);
+
+		////Utils.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, new Vector3[] { camera.position }, SHADER_UNIFORM_VEC3);
+		////Utils.SetShaderValue(asset.shader, (int)SHADER_LOC_VECTOR_VIEW, RaylibRendering.camera.position, SHADER_UNIFORM_VEC3);
+
+		//var xforms = instances.Span;
+		////var mesh = renderMesh.mesh;
+		////var material = renderMesh.material;
+		////TODO: when raylib 4 is released change to use instanced based.   right now (3.7.x) there's a bug where it doesn't render instances=1
+		//for (var i = 0; i < xforms.Length; i++)
+		//{
+		//	Raylib.DrawMesh(asset.mesh, asset.material, Matrix4x4.Transpose(xforms[i])); //IMPORTANT: raylib is row-major.   need to transpose dotnet (column major) to match
+		//}
+		//if (xforms.Length == 0)
+		//{
+		//	Console.WriteLine("Packet is EMPTY!!>?!?!");
+		//}
 
 		//Console.WriteLine($"cpuId={Thread.GetCurrentProcessorId()}, mtId={Thread.CurrentThread.ManagedThreadId}");
 	}
@@ -584,8 +613,95 @@ public class RenderMesh
 {
 	public Raylib_cs.Mesh mesh;
 	public Raylib_cs.Material material;
+
+	public GroupHash groupHash;
+
+	public RenderMesh(Mesh mesh, Material material)
+	{
+		this.mesh = mesh;
+		this.material = material;
+	}
 }
 
+public class RenderInfo : IPartitionComponent
+{
+	public bool Equals(IPartitionComponent? other)
+	{
+		throw new NotImplementedException();
+	}
+
+	Dictionary<GroupHash, object> test;
+}
+
+/// <summary>
+/// support hashing of multiple items
+/// </summary>
+/// <remarks>
+/// to support hashing for a container object, that might have an arbitrary number of things inside.
+/// I want to generate a hash to check if two containers are the "same"  (meaning they store the same contents).
+/// some future perf improvements that could be made: 
+/// </remarks>
+public unsafe struct GroupHash : IComparable<GroupHash>, IEquatable<GroupHash>
+{
+	public const int SIZE = 8;
+	/// <summary>
+	/// some .GetHashCode() implementations are not psudoRandom, such as for int/long.
+	/// so to help prevent hash collisions these values are spread across the int spectrum
+	/// </summary>
+	private const int SALT_INCREMENT = (int)(uint.MaxValue / SIZE);
+
+	/// <summary>
+	/// 
+	/// </summary>
+	private int _compressedHash;
+	private fixed int _storage[SIZE];
+
+
+	public GroupHash(Span<int> hashes)
+	{
+		hashes.Sort();
+		var loopSalt = (int)(uint.MaxValue / hashes.Length / SIZE);
+		for (var i = 0; i < hashes.Length; i++)
+		{
+			var salt = loopSalt * (i / SIZE);
+			var value = hashes[i] + salt;
+			_storage[i % SIZE] += value;
+		}
+
+		_compressedHash = 0;
+		for (var i = 0; i < SIZE; i++)
+		{
+			_compressedHash += _storage[i] + (SALT_INCREMENT * i);
+		}
+	}
+
+	public int CompareTo(GroupHash other)
+	{
+		var result = _compressedHash.CompareTo(other._compressedHash);
+		if (result == 0)
+		{
+			for (var i = 0; i < SIZE; i++)
+			{
+				result = _storage[i].CompareTo(other._storage[i]);
+				if (result == 0)
+				{
+					continue;
+				}
+				return result;
+			}
+		}
+		return result;
+	}
+
+	public bool Equals(GroupHash other)
+	{
+		return this.CompareTo(other) == 0;
+	}
+	public override int GetHashCode()
+	{
+		return _compressedHash;
+	}
+}
 
 
 public class PlayerInputSystem : NotNot.Engine.Ecs.System
@@ -662,7 +778,7 @@ public class MoveSystem : NotNot.Engine.Ecs.System
 			) =>
 		{
 
-			var elapsed =(float) frame._stats._wallTime.TotalSeconds *2;
+			var elapsed = (float)frame._stats._wallTime.TotalSeconds * 2;
 
 			for (var i = 0; i < meta.length; i++)
 			{
@@ -710,9 +826,9 @@ public class VisibilitySystem : NotNot.Engine.Ecs.System
 				//Console.WriteLine($"entity={meta[i]}, pos={translations[i].value}");
 				//instances[i] = Matrix4x4.Identity;// Matrix4x4.CreateTranslation(translations[i].value);
 				instances[i] = transforms[i].xformMatrix;//Matrix4x4.CreateTranslation(transforms[i].xformMatrix);
-				//instances[i].Translation = translations[i].value;
-				//instances[i].Translation = new Vector3(0,0,1.1f);
-				//instances[i] = Raymath.MatrixTranslate(0, 0, 1);
+														 //instances[i].Translation = translations[i].value;
+														 //instances[i].Translation = new Vector3(0,0,1.1f);
+														 //instances[i] = Raymath.MatrixTranslate(0, 0, 1);
 
 
 
