@@ -98,9 +98,9 @@ public class EngineBasic
 		engine.Dispose();
 		__ERROR.Throw(engine.IsDisposed);
 
-        GC.Collect();
-        await Task.Delay(100);
-    }
+		GC.Collect();
+		await Task.Delay(100);
+	}
 
 
 
@@ -121,15 +121,15 @@ public class EngineBasic
 		var archetype = em.GetOrCreateArchetype(new(){typeof(int),typeof(bool)});
 
 		em.EnqueueCreateEntity(100, archetype, (args) => {
-            var (accessTokens, entityHandles, archetype) = args;
-            foreach(var accessToken in accessTokens)
-            {
-                ref var cInt = ref accessToken.GetComponentWriteRef<int>();
-                ref var cBool = ref accessToken.GetComponentWriteRef<bool>();
-                cInt = accessToken.entityHandle.id;
-                cBool = cInt % 2 == 0;
-            }
-        });
+			var (accessTokens, entityHandles, archetype) = args;
+			foreach(var accessToken in accessTokens)
+			{
+				ref var cInt = ref accessToken.GetComponentWriteRef<int>();
+				ref var cBool = ref accessToken.GetComponentWriteRef<bool>();
+				cInt = accessToken.entityHandle.id;
+				cBool = cInt % 2 == 0;
+			}
+		});
 
 
 		await Task.Delay(100);

@@ -5,19 +5,26 @@
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
     <Configurations>Debug;Release;Checked</Configurations>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DefineConstants>$(DefineConstants);CHECKED;TEST</DefineConstants>
+    <DefineConstants>$(DefineConstants);TEST</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Checked|AnyCPU'">
-    <DefineConstants>$(DefineConstants);CHECKED;TEST</DefineConstants>
+    <DefineConstants>$(DefineConstants);DEBUG;TEST</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <DefineConstants>$(DefineConstants);TEST</DefineConstants>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BepuPhysics" Version="2.4.0-beta8" />
+    <PackageReference Include="BepuUtilities" Version="2.4.0-beta8" />
+    <PackageReference Include="Raylib-cs" Version="3.7.0.1" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\NotNot\NotNot.csproj" />

@@ -1200,7 +1200,7 @@ public partial class Archetype //passthrough of page stuff
 
 public interface IPartitionComponent : IEquatable<IPartitionComponent>
 {
-	public int GetHashCode();
+	public abstract new int GetHashCode();
 }
 
 /// <summary>

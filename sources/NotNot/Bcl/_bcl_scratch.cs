@@ -621,44 +621,6 @@ public class DisposeGuard : IDisposable
 }
 
 
-[StructLayout(LayoutKind.Auto, Size = 64)]
-public unsafe struct CacheLineRef<T>
-{
-	//[FieldOffset(0)]
-	public T value;
-	//[FieldOffset(0)]
-	//private fixed byte _size[60];
-}
-
-/// <summary>
-/// DANGER. adapted from, and for inlining Array unbounded workflow: https://github.com/CommunityToolkit/WindowsCommunityToolkit/blob/059cf83f1fb02a4fbb4ce24249ea6e38f504983b/Microsoft.Toolkit.HighPerformance/Extensions/ArrayExtensions.cs#L86/// 
-/// If you store a reference to this, it must be recreated every array resize.
-/// </summary>
-/// <remarks>Do not change the layout of this.  it follows the current DotNet6 layout of Array.</remarks>
-[StructLayout(LayoutKind.Sequential)]
-public sealed class __UNSAFE_ArrayData<T>
-{
-	public IntPtr Length;
-	public byte Data;
-	/// <summary>
-	/// UNBOUNDED.  No array bounds are checked.  if you request an index past the end.... ???  Here be dragons.
-	/// </summary>
-	/// <param name="index"></param>
-	/// <returns></returns>	
-	public ref T this[int index]
-	{
-		[MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
-		get
-		{
-			ref T r0 = ref Unsafe.As<byte, T>(ref Data);
-			ref T ri = ref Unsafe.Add(ref r0, index);
-			return ref ri;
-		}
-	}
-}
-
-
-
 /// <summary>
 /// efficiently get/set a value for a given type. 
 /// <para>similar use as a <see cref="ThreadLocal{T}"/></para>

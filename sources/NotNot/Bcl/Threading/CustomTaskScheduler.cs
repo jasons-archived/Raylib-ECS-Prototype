@@ -15,11 +15,14 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace NotNot.Bcl;
+namespace NotNot.Bcl.Threading;
 
 /// <summary>
 /// A custom task scheduler, allowing control over what threads a task executes on 
 /// </summary>
+/// <remarks>from https://www.wisdomjobs.com/e-university/c-dot-net-tutorial-225/using-a-custom-task-schedular-542.html
+/// 
+/// </remarks>
 public class CustomTaskScheduler : TaskScheduler, IDisposable
 {
 	private BlockingCollection<Task> taskQueue;
@@ -96,13 +99,15 @@ public class CustomTaskScheduler : TaskScheduler, IDisposable
 		}
 	}
 }
-
-class Listing_22
+/// <summary>
+/// from https://www.wisdomjobs.com/e-university/c-dot-net-tutorial-225/using-a-custom-task-schedular-542.html
+/// </summary>
+internal class Listing_22_ExampleUsage
 {
 	static void Main(string[] args)
 	{
 		// get the processor count for the system
-		int procCount = System.Environment.ProcessorCount;
+		int procCount = Environment.ProcessorCount;
 		// create a custom scheduler
 		CustomTaskScheduler scheduler = new CustomTaskScheduler(procCount);
 		Console.WriteLine("Custom scheduler ID: {0}", scheduler.Id);
@@ -110,17 +115,20 @@ class Listing_22
 		// create a cancellation token source
 		CancellationTokenSource tokenSource = new CancellationTokenSource();
 		// create a task
-		Task task1 = new Task(() => {
+		Task task1 = new Task(() =>
+		{
 			Console.WriteLine("Task {0} executed by scheduler {1}",
 			Task.CurrentId, TaskScheduler.Current.Id);
 			// create a child task - this will use the same
 			// scheduler as its parent
-			Task.Factory.StartNew(() => {
+			Task.Factory.StartNew(() =>
+			{
 				Console.WriteLine("Task {0} executed by scheduler {1}",
 				Task.CurrentId, TaskScheduler.Current.Id);
 			});
 			// create a child and specify the default scheduler
-			Task.Factory.StartNew(() => {
+			Task.Factory.StartNew(() =>
+			{
 				Console.WriteLine("Task {0} executed by scheduler {1}",
 				Task.CurrentId, TaskScheduler.Current.Id);
 			}, tokenSource.Token, TaskCreationOptions.None, TaskScheduler.Default);
@@ -128,16 +136,18 @@ class Listing_22
 		// start the task using the custom scheduler
 		task1.Start(scheduler);
 		// create a continuation - this will use the default scheduler
-		task1.ContinueWith(antecedent => {
+		task1.ContinueWith(antecedent =>
+		{
 			Console.WriteLine("Task {0} executed by scheduler {1}",
 			Task.CurrentId, TaskScheduler.Current.Id);
 		});
 		// create a continuation using the custom scheduler
-		task1.ContinueWith(antecedent => {
+		task1.ContinueWith(antecedent =>
+		{
 			Console.WriteLine("Task {0} executed by scheduler {1}",
 			Task.CurrentId, TaskScheduler.Current.Id);
 		}, scheduler);
 
-		
+
 	}
 }

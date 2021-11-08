@@ -133,6 +133,8 @@ Logical object structure is
   - Windows Community Toolkit, High Performance package: https://docs.microsoft.com/en-us/windows/communitytoolkit/high-performance/introduction
     - https://github.com/CommunityToolkit/WindowsCommunityToolkit
     - https://docs.microsoft.com/en-us/windows/communitytoolkit/nuget-packages
+    - for example, array extension use: https://github.com/CommunityToolkit/WindowsCommunityToolkit/blob/059cf83f1fb02a4fbb4ce24249ea6e38f504983b/Microsoft.Toolkit.HighPerformance/Extensions/ArrayExtensions.cs#L86///
+    - 
 - physics: https://github.com/bepu/bepuphysics2
   - physics, intersection: https://www.realtimerendering.com/intersections.html
   - https://github.com/stilldesign/PhysX.Net
