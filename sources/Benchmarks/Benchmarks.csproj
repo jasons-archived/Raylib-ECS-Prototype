@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -7,6 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+      <EnablePreviewFeatures>true</EnablePreviewFeatures>
     <DebugType>portable</DebugType>
     <Configurations>Debug;Release;Checked</Configurations>
   </PropertyGroup>

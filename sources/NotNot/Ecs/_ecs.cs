@@ -415,8 +415,8 @@ public partial class EntityManager //archetype management
 
 public partial class EntityManager //entity creation
 {
-	public record struct EnqueueCreateArgs(int count, Archetype archetype, Mem<IPartitionComponent> partitionComponents, CreateEntitiesCallback doneCallback);
-	internal record struct _EnqueueCreateArgs_Internal(int count, Archetype archetype, PartitionGroup partitionGroup, CreateEntitiesCallback doneCallback);
+	public record struct EnqueueCreateArgs(int count, Archetype archetype, Mem<object> partitionComponents, CreateEntitiesCallback doneCallback);
+	internal record struct _EnqueueCreateArgs_Internal(int count, Archetype archetype, SharedComponentGroup partitionGroup, CreateEntitiesCallback doneCallback);
 
 	private global::System.Collections.Concurrent.ConcurrentQueue<_EnqueueCreateArgs_Internal> _createQueue = new();
 
@@ -424,15 +424,15 @@ public partial class EntityManager //entity creation
 	//public void EnqueueCreateEntity(int count, Archetype archetype, Action<Mem<AccessToken>, Mem<EntityHandle>, Archetype> doneCallback)
 
 
-	public void EnqueueCreateEntity(int count, Archetype archetype, CreateEntitiesCallback doneCallback) => EnqueueCreateEntity(count, archetype, Mem<IPartitionComponent>.Empty, doneCallback);
+	public void EnqueueCreateEntity(int count, Archetype archetype, CreateEntitiesCallback doneCallback) => EnqueueCreateEntity(count, archetype, Mem<object>.Empty, doneCallback);
 
 
-	public void EnqueueCreateEntity(int count, Archetype archetype, Mem<IPartitionComponent> partitionComponents, CreateEntitiesCallback doneCallback)
+	public void EnqueueCreateEntity(int count, Archetype archetype, Mem<object> partitionComponents, CreateEntitiesCallback doneCallback)
 	{
-		_createQueue.Enqueue(new(count, archetype, PartitionGroup.GetOrCreate(partitionComponents), doneCallback));
+		_createQueue.Enqueue(new(count, archetype, SharedComponentGroup.GetOrCreate(partitionComponents), doneCallback));
 	}
 
-	public void EnqueueCreateEntity(int count, Archetype archetype, PartitionGroup partitionGroup, CreateEntitiesCallback doneCallback)
+	public void EnqueueCreateEntity(int count, Archetype archetype, SharedComponentGroup partitionGroup, CreateEntitiesCallback doneCallback)
 	{
 		_createQueue.Enqueue(new(count, archetype, partitionGroup, doneCallback));
 	}
@@ -612,7 +612,7 @@ public class QueryOptions
 	/// <summary>
 	/// filters returned chunks to only include those with the all specified partitionComponents
 	/// </summary>
-	public List<IPartitionComponent> partitionComponents = new();
+	public List<object> partitionComponents = new();
 
 	/// <summary>
 	/// Disables the automatic requery when archetypes are added to the world.
@@ -1129,7 +1129,7 @@ public partial class Archetype : IPageOwner
 
 public partial class Archetype //passthrough of page stuff
 {
-	public Dictionary<PartitionGroup, Page> _pages = new();
+	public Dictionary<SharedComponentGroup, Page> _pages = new();
 	//public Page _page;
 	//public short ArchtypeId { get => _page._pageId; }
 	//public int Version { get => _page._version; }
@@ -1203,12 +1203,17 @@ public partial class Archetype //passthrough of page stuff
 
 
 /// <summary>
-/// Provides a way of splitting an archetype's entities into chunks based on the unique grouping of partition components
+/// A group of object-based components shared by multiple entities.  All entities in a chunk reference the same SharedComponentGroup.
+/// <para>use the static <see cref="GetOrCreate(object[])"/> function to obtain one</para>
+/// </summary>
+/// <remarks>
+/// While this object/pattern is named "Shared Component", internally it is more akin to a "Partition Group".
+/// Meaning, this provides a way of splitting an archetype's entities into chunks based on the unique grouping of partition components.
 /// <para>for example, having a RenderMesh as an item in this will split entiies so that only those with the same renderMesh will be in the same chunk.
 /// this is useful for building the rendering system off of, to aid in batching instances</para>
-/// </summary>
+/// </remarks>
 [ThreadSafety(ThreadSituation.Always)]
-public class PartitionGroup
+public class SharedComponentGroup
 {
 	public long hashSum;
 
@@ -1218,7 +1223,7 @@ public class PartitionGroup
 	public Dictionary<Type, object> storage = new();
 
 
-	private PartitionGroup(long hashSum, ref Mem<object> components)
+	private SharedComponentGroup(long hashSum, ref Mem<object> components)
 	{
 		this.hashSum = hashSum;
 		foreach (var component in components)
@@ -1245,7 +1250,7 @@ public class PartitionGroup
 	/// </summary>
 	private static ConcurrentQueue<long> _gcCollected = new();
 
-	~PartitionGroup()
+	~SharedComponentGroup()
 	{
 		_gcCollected.Enqueue(hashSum);
 	}
@@ -1254,9 +1259,9 @@ public class PartitionGroup
 	/// pool of all instances
 	/// key is a hashcode.  but because hashcodes can collide, we use a list as value
 	/// </summary>
-	private static ConcurrentDictionary<long, List<WeakReference<PartitionGroup>>> _GLOBAL_STORAGE = new();
+	private static ConcurrentDictionary<long, List<WeakReference<SharedComponentGroup>>> _GLOBAL_STORAGE = new();
 
-	public static PartitionGroup GetOrCreate(params object[] components)
+	public static SharedComponentGroup GetOrCreate(params object[] components)
 	{
 		return GetOrCreate(Mem.CreateUsing(components));
 	}
@@ -1265,7 +1270,7 @@ public class PartitionGroup
 	/// <summary>
 	/// factory method, either returns an existing, or creates a new object from the given parameters
 	/// </summary>
-	public static PartitionGroup GetOrCreate(Mem<IPartitionComponent> components)
+	public static SharedComponentGroup GetOrCreate(Mem<object> components)
 	{
 		//cleanup disposed ParitionComponents, if any
 		if (_gcCollected.Count > 0)
@@ -1300,7 +1305,7 @@ public class PartitionGroup
 
 
 		var hash = _ComputeHashSum(ref components);
-		WeakReference<PartitionGroup> weakRef;
+		WeakReference<SharedComponentGroup> weakRef;
 
 		//first get list, optimal path requires no locking
 		if (_GLOBAL_STORAGE.TryGetValue(hash, out var listWR))
@@ -1328,7 +1333,7 @@ public class PartitionGroup
 			//get or create list
 			if (!_GLOBAL_STORAGE.TryGetValue(hash, out listWR))
 			{
-				listWR = new List<WeakReference<PartitionGroup>>();
+				listWR = new List<WeakReference<SharedComponentGroup>>();
 				var result = _GLOBAL_STORAGE.TryAdd(hash, listWR);
 				__DEBUG.Throw(result);
 
@@ -1345,14 +1350,14 @@ public class PartitionGroup
 				}
 			}
 			//create and add to list
-			var newPC = new PartitionGroup(hash, ref components);
+			var newPC = new SharedComponentGroup(hash, ref components);
 			weakRef = new(newPC);
 			listWR.Add(weakRef);
 			return newPC;
 		}
 	}
 
-	private bool Matches(Mem<IPartitionComponent> components)
+	private bool Matches(Mem<object> components)
 	{
 		if (storage.Count != components.length)
 		{
@@ -1375,7 +1380,7 @@ public class PartitionGroup
 		return true;
 	}
 
-	public bool Contains(IPartitionComponent componentToFind)
+	public bool Contains(object componentToFind)
 	{
 		var type = componentToFind.GetType();
 		if (storage.TryGetValue(type, out var foundComponent))

@@ -39,10 +39,10 @@ var archetype = em.GetOrCreateArchetype(new()
 	typeof(TestInput),
 });
 
-//create partition
-var partitionGroup = PartitionGroup.GetOrCreate()
+//create partition used to bucket
+var sharedComponents = SharedComponentGroup.GetOrCreate(boxModel);
 
-em.EnqueueCreateEntity(10, archetype, boxModel, (args) =>
+em.EnqueueCreateEntity(10, archetype, sharedComponents, (args) =>
 {
 	var (accessTokens, entityHandles, archetype) = args;
 	foreach (var token in accessTokens)

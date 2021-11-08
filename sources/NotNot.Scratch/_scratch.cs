@@ -240,12 +240,8 @@ public class RenderMesh
 	}
 }
 
-public class RenderInfo : IPartitionComponent
+public class RenderInfo 
 {
-	public bool Equals(IPartitionComponent? other)
-	{
-		throw new NotImplementedException();
-	}
 
 	Dictionary<CombinedHash, object> test;
 }

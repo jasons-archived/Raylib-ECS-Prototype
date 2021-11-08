@@ -3,6 +3,7 @@
     <PropertyGroup>
         <TargetFramework>net6.0</TargetFramework>
         <Nullable>enable</Nullable>
+        <EnablePreviewFeatures>true</EnablePreviewFeatures>
 
         <IsPackable>false</IsPackable>
 
@@ -15,11 +16,11 @@
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-      <DefineConstants>$(DefineConstants);DEBUG;TRACE</DefineConstants>
+        <DefineConstants>$(DefineConstants);DEBUG;TRACE</DefineConstants>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Checked|AnyCPU'">
-      <DefineConstants>$(DefineConstants);CHECKED;DEBUG;TRACE</DefineConstants>
+        <DefineConstants>$(DefineConstants);CHECKED;DEBUG;TRACE</DefineConstants>
     </PropertyGroup>
 
     <ItemGroup>

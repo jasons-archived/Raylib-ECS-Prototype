@@ -1,5 +1,6 @@
 using BenchmarkDotNet.Attributes;
 using NotNot.Ecs.Allocation;
+using System.Threading.Tasks;
 
 namespace MyBenchmarks;
 

@@ -12,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime;
+using System.Runtime.CompilerServices;
 
 namespace NotNot.Bcl.Diagnostics
 {
@@ -75,21 +76,21 @@ namespace NotNot.Bcl.Diagnostics
 	{
 		[Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void Assert(bool condition, string message = null)
+		public static void Assert(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 		{
-			_internal.DiagHelper.Assert(condition, message);
+			_internal.DiagHelper.Assert(condition, message, conditionName);
 		}
 		[Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void AssertOnce(bool condition, string message)
+		public static void AssertOnce(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 		{
-			_internal.DiagHelper.AssertOnce(condition, message);
+			_internal.DiagHelper.AssertOnce(condition, message, conditionName);
 		}
 		[Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void Throw(bool condition, string message = null)
+		public static void Throw(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 		{
-			_internal.DiagHelper.Throw(condition, message);
+			_internal.DiagHelper.Throw(condition, message, conditionName);
 		}
 		[Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
@@ -99,31 +100,37 @@ namespace NotNot.Bcl.Diagnostics
 		}
 		[DebuggerNonUserCode, DebuggerHidden]
 		[Conditional("CHECKED")]
-		public static void WriteLine(bool condition, string message)
+		public static void WriteLine(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 		{
-			_internal.DiagHelper.WriteLine(condition, message);
+			_internal.DiagHelper.WriteLine(condition, message, conditionName);
 		}
 	}
 	[DebuggerNonUserCode]
 	public static class __DEBUG
 	{
+		/// <summary>
+		/// Asserts if condition evaluates to false.  
+		/// </summary>
+		/// <param name="condition"></param>
+		/// <param name="message"></param>
+		/// <param name="conditionName"></param>
 		[Conditional("DEBUG"), Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void Assert(bool condition, string message=null)
+		public static void Assert(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 		{
-			_internal.DiagHelper.Assert(condition, message);
+			_internal.DiagHelper.Assert(condition, message, conditionName);
 		}
 		[Conditional("DEBUG"), Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void AssertOnce(bool condition, string message)
+		public static void AssertOnce(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 		{
-			_internal.DiagHelper.AssertOnce(condition, message);
+			_internal.DiagHelper.AssertOnce(condition, message, conditionName);
 		}
 		[Conditional("DEBUG"), Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void Throw(bool condition, string message = null)
+		public static void Throw(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 		{
-			_internal.DiagHelper.Throw(condition, message);
+			_internal.DiagHelper.Throw(condition, message, conditionName);
 		}
 		[DebuggerNonUserCode, DebuggerHidden]
 		[Conditional("DEBUG"), Conditional("CHECKED")]
@@ -133,30 +140,30 @@ namespace NotNot.Bcl.Diagnostics
 		}
 		[DebuggerNonUserCode, DebuggerHidden]
 		[Conditional("DEBUG"), Conditional("CHECKED")]
-		public static void WriteLine(bool condition, string message)
+		public static void WriteLine(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 		{
-			_internal.DiagHelper.WriteLine(condition, message);
+			_internal.DiagHelper.WriteLine(condition, message, conditionName);
 		}
 	}
 	[DebuggerNonUserCode]
 	public static class __ERROR
 	{
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void Assert(bool condition, string message = null)
+		public static void Assert(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 		{
-			_internal.DiagHelper.Assert(condition, message);
+			_internal.DiagHelper.Assert(condition, message, conditionName);
 		}
-	
+
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void AssertOnce(bool condition, string message)
+		public static void AssertOnce(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 		{
-			_internal.DiagHelper.AssertOnce(condition, message);
+			_internal.DiagHelper.AssertOnce(condition, message, conditionName);
 		}
-	
+
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void Throw(bool condition, string message=null)
+		public static void Throw(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 		{
-			_internal.DiagHelper.Throw(condition, message);
+			_internal.DiagHelper.Throw(condition, message, conditionName);
 		}
 
 		[DebuggerNonUserCode, DebuggerHidden]
@@ -165,9 +172,9 @@ namespace NotNot.Bcl.Diagnostics
 			_internal.DiagHelper.WriteLine(message);
 		}
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void WriteLine(bool condition, string message)
+		public static void WriteLine(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 		{
-			_internal.DiagHelper.WriteLine(condition, message);
+			_internal.DiagHelper.WriteLine(condition, message, conditionName);
 		}
 	}
 
@@ -180,11 +187,15 @@ namespace NotNot.Bcl.Diagnostics
 		public static class DiagHelper
 		{
 			[DebuggerNonUserCode, DebuggerHidden]
-			public static void Assert(bool condition, string message)
+			public static void Assert(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 			{
+				if (condition)
+				{
+					return;
+				}
 				message ??= "Assert condition failed";
-				
-				Debug.Assert(condition, message);
+
+				Debug.Assert(false, (string)$"ASSERT({conditionName}) {message}");
 			}
 
 
@@ -197,35 +208,37 @@ namespace NotNot.Bcl.Diagnostics
 			/// <param name="condition"></param>
 			/// <param name="message"></param>
 			[DebuggerNonUserCode, DebuggerHidden]
-			public static void AssertOnce(bool condition, string message)
+			public static void AssertOnce(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 			{
-				message ??= "Assert condition failed";
 				if (condition)
 				{
 					return;
 				}
+				message ??= "Assert condition failed";
 
 				lock (_assertOnceLookup)
 				{
-					if (_assertOnceLookup.Add(message)==false)
+					if (_assertOnceLookup.Add(message) == false)
 					{
 						return;
 					}
 				}
 
-				Debug.Assert(false,"ASSERT ONCE: " + message);
+				//Debug.Assert(false, "ASSERT ONCE: " + message);
+				Debug.Assert(false,(string)$"ASSERT_ONCE({conditionName}) {message}");
 			}
 			[DebuggerNonUserCode, DebuggerHidden]
-			public static void Throw(bool condition, string message)
+			public static void Throw(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 			{
-				message ??= "Throw condition failed";
 				if (condition == true)
 				{
 					return;
 				}
+				message ??= "Throw condition failed";
 
-				//Assert(false, message);
-				throw new(message);
+				//Assert(false, message, conditionName);
+				//throw new(message);
+				throw new($"THROW({conditionName}) {message}");
 			}
 
 			[DebuggerNonUserCode, DebuggerHidden]
@@ -235,13 +248,14 @@ namespace NotNot.Bcl.Diagnostics
 			}
 
 			[DebuggerNonUserCode, DebuggerHidden]
-			public static void WriteLine(bool condition, string message)
+			public static void WriteLine(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 			{
 				if (condition == true)
 				{
 					return;
 				}
-				Console.WriteLine(message);
+				//Console.WriteLine(message);
+				Console.WriteLine($"WRITE({conditionName}) {message}");
 			}
 		}
 	}

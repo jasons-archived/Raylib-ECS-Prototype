@@ -187,6 +187,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 
 		//var x = new SynchronizationContext();
 		Thread.BeginThreadAffinity();
+		//Console.WriteLine($"_RenderThread_Worker AFINITY.  cpuId={Thread.GetCurrentProcessorId()}, mtId={Thread.CurrentThread.ManagedThreadId}");
 		try
 		{
 			Raylib.InitWindow(screenSize.Width, screenSize.Height, windowTitle);

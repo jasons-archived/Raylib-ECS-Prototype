@@ -1043,8 +1043,8 @@ public partial class Page : IDisposable //init logic
 	/// </summary>
 	public int Count { get => _entityLookup.Count; }
 
-	public PartitionGroup PartitionGroup { get; init; }
-	public Page(bool autoPack, int chunkSize, HashSet<Type> componentTypes, PartitionGroup partitionGroup)
+	public SharedComponentGroup PartitionGroup { get; init; }
+	public Page(bool autoPack, int chunkSize, HashSet<Type> componentTypes, SharedComponentGroup partitionGroup)
 	{
 		AutoPack = autoPack;
 		//_entityRegistry = entityRegistry;
