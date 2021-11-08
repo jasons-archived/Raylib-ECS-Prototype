@@ -38,13 +38,13 @@ public class Batched3dModel : IRenderAsset<BatchedRenderMesh>
 		Mesh cube = Raylib.GenMeshCube(1.0f, 1.0f, 1.0f);
 		Shader shader = Raylib.LoadShader("resources/shaders/glsl330/base_lighting.vs", "resources/shaders/glsl330/lighting.fs");
 		// Get some shader loactions
-		unsafe
-		{
-			int* locs = (int*)shader.locs;
-			locs[(int)SHADER_LOC_MATRIX_MVP] = GetShaderLocation(shader, "mvp");
-			locs[(int)SHADER_LOC_VECTOR_VIEW] = GetShaderLocation(shader, "viewPos");
-			locs[(int)SHADER_LOC_MATRIX_MODEL] = GetShaderLocationAttrib(shader, "instanceTransform");
-		}
+		//unsafe
+		//{
+		//	int* locs = (int*)shader.locs;
+		//	locs[(int)SHADER_LOC_MATRIX_MVP] = GetShaderLocation(shader, "mvp");
+		//	locs[(int)SHADER_LOC_VECTOR_VIEW] = GetShaderLocation(shader, "viewPos");
+		//	locs[(int)SHADER_LOC_MATRIX_MODEL] = GetShaderLocationAttrib(shader, "instanceTransform");
+		//}
 		// Ambient light level
 		int ambientLoc = GetShaderLocation(shader, "ambient");
 		Utils.SetShaderValue(shader, ambientLoc, new float[] { 0.2f, 0.2f, 0.2f, 1.0f }, SHADER_UNIFORM_VEC4);
@@ -57,8 +57,9 @@ public class Batched3dModel : IRenderAsset<BatchedRenderMesh>
 		{
 			MaterialMap* maps = (MaterialMap*)material.maps.ToPointer();
 			maps[(int)MATERIAL_MAP_DIFFUSE].color = RED;
+			((MaterialMap*) material.maps)[(int)MATERIAL_MAP_DIFFUSE].color = RED;
 		}
-
+		
 
 		mesh = cube;
 		this.shader = shader;

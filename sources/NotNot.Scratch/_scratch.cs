@@ -215,7 +215,7 @@ public record struct MeshRenderInfo
 //{
 //	public Vector3 value;
 //}
-public record struct PlayerInput
+public record struct TestInput
 {
 }
 
@@ -231,7 +231,7 @@ public class RenderMesh
 	public Raylib_cs.Mesh mesh;
 	public Raylib_cs.Material material;
 
-	public GroupHash groupHash;
+	public CombinedHash combinedHash;
 
 	public RenderMesh(Mesh mesh, Material material)
 	{
@@ -247,77 +247,7 @@ public class RenderInfo : IPartitionComponent
 		throw new NotImplementedException();
 	}
 
-	Dictionary<GroupHash, object> test;
-}
-
-/// <summary>
-/// support hashing of multiple items
-/// </summary>
-/// <remarks>
-/// to support hashing for a container object, that might have an arbitrary number of things inside.
-/// I want to generate a hash to check if two containers are the "same"  (meaning they store the same contents).
-/// some future perf improvements that could be made: 
-/// </remarks>
-public unsafe struct GroupHash : IComparable<GroupHash>, IEquatable<GroupHash>
-{
-	public const int SIZE = 8;
-	/// <summary>
-	/// some .GetHashCode() implementations are not psudoRandom, such as for int/long.
-	/// so to help prevent hash collisions these values are spread across the int spectrum
-	/// </summary>
-	private const int SALT_INCREMENT = (int)(uint.MaxValue / SIZE);
-
-	/// <summary>
-	/// 
-	/// </summary>
-	private int _compressedHash;
-	private fixed int _storage[SIZE];
-
-
-	public GroupHash(Span<int> hashes)
-	{
-		hashes.Sort();
-		var loopSalt = (int)(uint.MaxValue / hashes.Length / SIZE);
-		for (var i = 0; i < hashes.Length; i++)
-		{
-			var salt = loopSalt * (i / SIZE);
-			var value = hashes[i] + salt;
-			_storage[i % SIZE] += value;
-		}
-
-		_compressedHash = 0;
-		for (var i = 0; i < SIZE; i++)
-		{
-			_compressedHash += _storage[i] + (SALT_INCREMENT * i);
-		}
-	}
-
-	public int CompareTo(GroupHash other)
-	{
-		var result = _compressedHash.CompareTo(other._compressedHash);
-		if (result == 0)
-		{
-			for (var i = 0; i < SIZE; i++)
-			{
-				result = _storage[i].CompareTo(other._storage[i]);
-				if (result == 0)
-				{
-					continue;
-				}
-				return result;
-			}
-		}
-		return result;
-	}
-
-	public bool Equals(GroupHash other)
-	{
-		return this.CompareTo(other) == 0;
-	}
-	public override int GetHashCode()
-	{
-		return _compressedHash;
-	}
+	Dictionary<CombinedHash, object> test;
 }
 
 
@@ -329,10 +259,10 @@ public class PlayerInputSystem : NotNot.Ecs.System
 		base.OnInitialize();
 
 
-		playerMoveQuery = entityManager.Query(new() { all = { typeof(PlayerInput), typeof(Move) } });
+		playerMoveQuery = entityManager.Query(new() { all = { typeof(TestInput), typeof(Move) } });
 
 		RegisterWriteLock<Move>();
-		RegisterReadLock<PlayerInput>();
+		RegisterReadLock<TestInput>();
 
 	}
 
@@ -341,7 +271,7 @@ public class PlayerInputSystem : NotNot.Ecs.System
 
 	protected override async Task OnUpdate(Frame frame)
 	{
-		playerMoveQuery.Run((ReadMem<EntityMetadata> meta, Mem<Move> moves, ReadMem<PlayerInput> players) =>
+		playerMoveQuery.Run((ReadMem<EntityMetadata> meta, Mem<Move> moves, ReadMem<TestInput> players) =>
 		{
 			var metaSpan = meta.Span;
 			var totalSeconds = (float)frame._stats._wallTime.TotalSeconds;

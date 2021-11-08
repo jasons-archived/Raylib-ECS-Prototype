@@ -36,7 +36,7 @@ namespace Tests.End2End
 
 				var em = engine.DefaultWorld.entityManager;
 
-				var archetype = em.GetOrCreateArchetype(new() { typeof(PlayerInput), typeof(WorldXform), typeof(Move) });
+				var archetype = em.GetOrCreateArchetype(new() { typeof(TestInput), typeof(WorldXform), typeof(Move) });
 
 				em.EnqueueCreateEntity(1, archetype, (args) =>
 				{
@@ -83,7 +83,7 @@ namespace Tests.End2End
 
 				var em = engine.DefaultWorld.entityManager;
 
-				var archetype = em.GetOrCreateArchetype(new() { typeof(PlayerInput), typeof(WorldXform), typeof(Move) });
+				var archetype = em.GetOrCreateArchetype(new() { typeof(TestInput), typeof(WorldXform), typeof(Move) });
 
 				em.EnqueueCreateEntity(1, archetype, (args) =>
 				{
@@ -110,5 +110,10 @@ namespace Tests.End2End
 
 	}
 
+
+}
+
+public struct IsRenderable
+{
 
 }

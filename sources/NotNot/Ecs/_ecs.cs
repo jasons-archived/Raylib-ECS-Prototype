@@ -425,10 +425,13 @@ public partial class EntityManager //entity creation
 
 
 	public void EnqueueCreateEntity(int count, Archetype archetype, CreateEntitiesCallback doneCallback) => EnqueueCreateEntity(count, archetype, Mem<IPartitionComponent>.Empty, doneCallback);
+
+
 	public void EnqueueCreateEntity(int count, Archetype archetype, Mem<IPartitionComponent> partitionComponents, CreateEntitiesCallback doneCallback)
 	{
 		_createQueue.Enqueue(new(count, archetype, PartitionGroup.GetOrCreate(partitionComponents), doneCallback));
 	}
+
 	public void EnqueueCreateEntity(int count, Archetype archetype, PartitionGroup partitionGroup, CreateEntitiesCallback doneCallback)
 	{
 		_createQueue.Enqueue(new(count, archetype, partitionGroup, doneCallback));
@@ -1198,10 +1201,6 @@ public partial class Archetype //passthrough of page stuff
 }
 
 
-public interface IPartitionComponent : IEquatable<IPartitionComponent>
-{
-	public abstract new int GetHashCode();
-}
 
 /// <summary>
 /// Provides a way of splitting an archetype's entities into chunks based on the unique grouping of partition components
@@ -1216,10 +1215,10 @@ public class PartitionGroup
 	/// <summary>
 	/// stores the components shared by all entities in the partition
 	/// </summary>
-	public Dictionary<Type, IPartitionComponent> storage = new();
+	public Dictionary<Type, object> storage = new();
 
 
-	private PartitionGroup(long hashSum, ref Mem<IPartitionComponent> components)
+	private PartitionGroup(long hashSum, ref Mem<object> components)
 	{
 		this.hashSum = hashSum;
 		foreach (var component in components)
@@ -1228,7 +1227,7 @@ public class PartitionGroup
 		}
 	}
 
-	protected static long _ComputeHashSum(ref Mem<IPartitionComponent> components)
+	protected static long _ComputeHashSum(ref Mem<object> components)
 	{
 		var objHashSum = 0;
 		var typeHashSum = 0;
@@ -1256,6 +1255,12 @@ public class PartitionGroup
 	/// key is a hashcode.  but because hashcodes can collide, we use a list as value
 	/// </summary>
 	private static ConcurrentDictionary<long, List<WeakReference<PartitionGroup>>> _GLOBAL_STORAGE = new();
+
+	public static PartitionGroup GetOrCreate(params object[] components)
+	{
+		return GetOrCreate(Mem.CreateUsing(components));
+	}
+
 
 	/// <summary>
 	/// factory method, either returns an existing, or creates a new object from the given parameters

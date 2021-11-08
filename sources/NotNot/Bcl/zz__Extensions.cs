@@ -30,7 +30,13 @@ using System.Threading.Tasks;
 
 namespace NotNot.Bcl;
 
-
+public unsafe static class zz__Extensions_IntPtr
+{
+	public static T* _As<T>(this IntPtr intPtr) where T : unmanaged
+	{
+		return (T*)intPtr;
+	}
+}
 
 public static class zz__Extensions_List
 {

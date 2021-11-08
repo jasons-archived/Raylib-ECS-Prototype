@@ -9,9 +9,9 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
-using NotNot.Engine.Ecs.Allocation;
-using NotNot.Engine.Ecs;
-using NotNot.Engine.Internal.SimPipeline;
+using NotNot.Ecs.Allocation;
+using NotNot.Ecs;
+using NotNot.SimPipeline;
 using Microsoft.Toolkit.HighPerformance.Buffers;
 
 
@@ -94,8 +94,8 @@ using Microsoft.Toolkit.HighPerformance.Buffers;
 
 
 
-//var engine = new NotNot.Engine.Engine();
-//var updater = new NotNot.Engine.SimpleUpdater();
+//var engine = new NotNot.Engine();
+//var updater = new NotNot.SimpleUpdater();
 //engine.Updater = updater;
 //engine.Initialize();
 //updater.Run();
@@ -107,8 +107,8 @@ using Microsoft.Toolkit.HighPerformance.Buffers;
 
 
 
-//var engine = new NotNot.Engine.Engine();
-//engine.Updater = new NotNot.Engine.HeadlessUpdater();
+//var engine = new NotNot.Engine();
+//engine.Updater = new NotNot.HeadlessUpdater();
 //engine.Initialize();
 
 //engine.Updater.Start();
