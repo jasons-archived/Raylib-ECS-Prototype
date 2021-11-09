@@ -11,6 +11,7 @@
 using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
 using NotNot.Ecs;
+using NotNot.Rendering;
 using NotNot.SimPipeline;
 using System;
 using System.Collections.Concurrent;
@@ -156,16 +157,16 @@ public class Phase0_StateSync : SystemBase
 	/// <summary>
 	/// the current simulation frame writes packets here
 	/// </summary>
-	private ConcurrentQueue<IRenderPacket> _renderPackets = new();
+	private ConcurrentQueue<IRenderPacketNew> _renderPackets = new();
 	/// <summary>
 	/// render packets for frame n-1.  these are ready to be picked up (swapped out) by the rendering system
 	/// </summary>
-	private ConcurrentQueue<IRenderPacket> _renderPacketsPrior = new();
+	private ConcurrentQueue<IRenderPacketNew> _renderPacketsPrior = new();
 
 
-	private HashSet<IRenderPacket> _CHECKED_renderPackets = new();
+	private HashSet<IRenderPacketNew> _CHECKED_renderPackets = new();
 
-	public void EnqueueRenderPacket(IRenderPacket renderPacket)
+	public void EnqueueRenderPacket(IRenderPacketNew renderPacket)
 	{
 		var tempCheck = _renderPackets;
 		//__DEBUG.Throw(_updateLock.CurrentCount != 0, "update occuring.  no other systems should be enqueing");
@@ -178,7 +179,7 @@ public class Phase0_StateSync : SystemBase
 	/// <summary>
 	/// For use by rendering system.   obtain last frame's render packets by swapping out the queue with another blank one.
 	/// </summary>
-	public async ValueTask<ConcurrentQueue<IRenderPacket>> RenderPacketsSwapPrior_New(ConcurrentQueue<IRenderPacket> finishedPackets)
+	public async ValueTask<ConcurrentQueue<IRenderPacketNew>> RenderPacketsSwapPrior_New(ConcurrentQueue<IRenderPacketNew> finishedPackets)
 	{
 		//__DEBUG.Throw(toReturn.Count == 0, "should be empty");
 		__DEBUG.Throw(_updateLock.CurrentCount != 0, "update occuring.  no other systems should be swapping/doing work");
@@ -201,7 +202,7 @@ public class Phase0_StateSync : SystemBase
 		//_updateLock.Release();
 		return toReturn;
 	}
-	private ConcurrentQueue<IRenderPacket> _DEBUG_lastRenderPacketsPriorReturned;
+	private ConcurrentQueue<IRenderPacketNew> _DEBUG_lastRenderPacketsPriorReturned;
 
 
 
@@ -225,16 +226,4 @@ public class Phase0_StateSync : SystemBase
 		__DEBUG.Throw(_renderPacketsPrior.Count == currentCount, "race condition.  something writing to render packets during swap.  ensure the node.updateAfter is properly set");
 		_updateLock.Release();
 	}
-}
-
-public interface IRenderPacket : IComparable<IRenderPacket>
-{
-	/// <summary>
-	/// lower numbers get rendered first
-	/// </summary>
-	public int RenderLayer { get; }
-	public void DoDraw();
-
-	public bool IsInitialized { get; }
-	public void Initialize();
 }

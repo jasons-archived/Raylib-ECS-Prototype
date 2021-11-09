@@ -610,9 +610,13 @@ public class QueryOptions
 	public Action<List<Archetype>> custom;
 
 	/// <summary>
-	/// filters returned chunks to only include those with the all specified partitionComponents
+	/// filters returned chunks to only include those with the all specified sharedComponents (found in the chunk's <see cref="SharedComponentGroup"/>)
 	/// </summary>
-	public List<object> partitionComponents = new();
+	public List<object> sharedComponent = new();
+	/// <summary>
+	/// filters returned chunks to only include those with the all specified TYPES of shared components  (found in the chunk's <see cref="SharedComponentGroup"/>)
+	/// </summary>
+	public List<Type> sharedComponentTypes = new();
 
 	/// <summary>
 	/// Disables the automatic requery when archetypes are added to the world.
@@ -754,16 +758,27 @@ public class EntityQuery
 			}
 
 
-			foreach (var (partitionComponents, page) in archetype._pages)
+			//loop through all pages (archetypes are partitioned by sharedComponentGroups into pages) 
+			foreach (var (sharedComponents, page) in archetype._pages)
 			{
-				//filter by partitionComponents (skip pages that do not match)
+				//filter by sharedComponents (skip pages that do not match)
 				{
 					var usePage = true;
-					foreach (var componentToFind in _options.partitionComponents)
+					//apply the specific object filter
+					foreach (var componentToFind in _options.sharedComponent)
 					{
-						if (partitionComponents.Contains(componentToFind) == false)
+						if (sharedComponents.Contains(componentToFind) == false)
 						{
 							usePage = false;
+							break;
+						}
+					}
+					//apply the type filter
+					foreach(var type in _options.sharedComponentTypes)
+					{
+						if(sharedComponents.storage.ContainsKey(type) == false)
+						{
+							usePage |= false;
 							break;
 						}
 					}
@@ -810,7 +825,7 @@ public class EntityQuery
 				//filter by partitionComponents (skip pages that do not match)
 				{
 					var usePage = true;
-					foreach (var componentToFind in _options.partitionComponents)
+					foreach (var componentToFind in _options.sharedComponent)
 					{
 						if (partitionComponents.Contains(componentToFind) == false)
 						{
@@ -859,7 +874,7 @@ public class EntityQuery
 				//filter by partitionComponents (skip pages that do not match)
 				{
 					var usePage = true;
-					foreach (var componentToFind in _options.partitionComponents)
+					foreach (var componentToFind in _options.sharedComponent)
 					{
 						if (partitionComponents.Contains(componentToFind) == false)
 						{
@@ -909,7 +924,7 @@ public class EntityQuery
 				//filter by partitionComponents (skip pages that do not match)
 				{
 					var usePage = true;
-					foreach (var componentToFind in _options.partitionComponents)
+					foreach (var componentToFind in _options.sharedComponent)
 					{
 						if (partitionComponents.Contains(componentToFind) == false)
 						{
@@ -1389,15 +1404,26 @@ public class SharedComponentGroup
 		}
 		return false;
 	}
+
+	public T Get<T>()
+	{
+		return(T)storage[typeof(T)];
+	}
 }
 
 /// <summary>
-/// functionality to pool instances for discovery later
+/// not actually used, just a friendly hint that a given class/struct is meant to be used as a component.
 /// </summary>
-public abstract class PooledBase : DisposeGuard
-{
+public interface IEcsComponent { }
 
-}
+
+///// <summary>
+///// functionality to pool instances for discovery later
+///// </summary>
+//public abstract class PooledBase : DisposeGuard
+//{
+
+//}
 
 ///// <summary>
 ///// callback used when querying components
@@ -1522,7 +1548,7 @@ public abstract class PooledBase : DisposeGuard
 //}
 
 
-public interface IGroupByComponent<TSelf> where TSelf : class
-{
+//public interface IGroupByComponent<TSelf> where TSelf : class
+//{
 
-}
+//}

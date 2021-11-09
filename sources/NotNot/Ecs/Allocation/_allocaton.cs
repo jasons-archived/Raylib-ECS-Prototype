@@ -74,13 +74,6 @@ public readonly struct EntityHandle : IComparable<EntityHandle>
 		//}
 	}
 }
-public record struct EntityData
-{
-	public EntityHandle handle;
-	public AccessToken pageAccessToken;
-	public bool IsAlive { get => pageAccessToken.isAlive; }
-
-}
 
 
 /// <summary>
@@ -90,6 +83,18 @@ public record struct EntityData
 /// </remarks>
 public class EntityRegistry
 {
+	/// <summary>
+	/// links an entityHandle to it's current accessToken in the EntityRegistry
+	/// </summary>
+	public record struct EntityData
+	{
+		public EntityHandle handle;
+		public AccessToken pageAccessToken;
+		public bool IsAlive { get => pageAccessToken.isAlive; }
+
+	}
+
+
 	public StructSlotArray<EntityData> _storage = new(2000000); //TODO: 1 million items = 232mb at current size of access token (needs size optimizations)
 
 	private volatile int _allocationVersion;
@@ -567,7 +572,7 @@ public partial class Page //unit test
 
 	private static unsafe Page _TEST_HELPER_CreatePage(EntityRegistry entityRegistry)
 	{
-		var page = new Page(__.Rand._NextBoolean(), __.Rand.Next(1, 100), new() { typeof(int), typeof(string) },null);
+		var page = new Page(__.Rand._NextBoolean(), __.Rand.Next(1, 100), new() { typeof(int), typeof(string) }, null);
 		//{
 		//	AutoPack = __.Rand._NextBoolean(),
 		//	ChunkSize = __.Rand.Next(1, 100),
@@ -622,7 +627,7 @@ public partial class Page //unit test
 		//HashSet<EntityHandle> oddSet;
 
 
-		var page = new Page(autoPack, chunkSize, new() { typeof(int), typeof(Vector3), typeof(bool) },null);
+		var page = new Page(autoPack, chunkSize, new() { typeof(int), typeof(Vector3), typeof(bool) }, null);
 		//{
 		//	AutoPack = autoPack,
 		//	ChunkSize = chunkSize,
@@ -1043,14 +1048,14 @@ public partial class Page : IDisposable //init logic
 	/// </summary>
 	public int Count { get => _entityLookup.Count; }
 
-	public SharedComponentGroup PartitionGroup { get; init; }
+	public SharedComponentGroup SharedComponents { get; init; }
 	public Page(bool autoPack, int chunkSize, HashSet<Type> componentTypes, SharedComponentGroup partitionGroup)
 	{
 		AutoPack = autoPack;
 		//_entityRegistry = entityRegistry;
 		ChunkSize = chunkSize;
 		ComponentTypes = componentTypes;
-		PartitionGroup = partitionGroup;
+		SharedComponents = partitionGroup;
 	}
 
 	public void Initialize(IPageOwner owner, EntityRegistry entityRegistry)
@@ -1995,6 +2000,10 @@ public record struct EntityMetadata
 	/// If this slot is in use by an entity
 	/// </summary>
 	public bool IsAlive { get => accessToken.isAlive; }
+	/// <summary>
+	/// obtain the SharedComponents, common for this page
+	/// </summary>
+	public SharedComponentGroup SharedComponents { get => this.accessToken.GetPage().SharedComponents; }
 
 
 
@@ -2018,6 +2027,8 @@ public record struct EntityMetadata
 		var live = IsAlive ? "ALIVE" : "DEAD";
 		return $"{Entity}.{live}";
 	}
+
+
 }
 
 /// <summary>
@@ -2207,7 +2218,7 @@ public class Chunk<TComponent> : Chunk
 	public static ResizableArray<List<Chunk<TComponent>>> _GLOBAL_LOOKUP = new();
 
 
-	
+
 	public Mem<TComponent> _storageRaw;
 
 	/// <summary>
@@ -2301,7 +2312,7 @@ public class Chunk<TComponent> : Chunk
 
 		//_storage = MemoryOwner<TComponent>.Allocate(_length, AllocationMode.Clear); //TODO: maybe no need to clear?
 		_storageRaw = Mem<TComponent>.Allocate(_length, true);
-		
+
 		UnsafeArray = _storageRaw.DangerousGetArray().Array!;
 	}
 	internal override void OnAllocSlot(ref AccessToken pageToken)

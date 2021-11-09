@@ -28,15 +28,23 @@ using static Raylib_cs.KeyboardKey;
 
 namespace NotNot.Rendering;
 
-public class Batched3dModel : IRenderAsset<BatchedRenderMesh>
+
+
+
+
+public class BatchedModelTechnique : IRenderTechnique3d
 {
 	public bool IsInitialized { get; set; }
 	public void Initialize()
 	{
+		if (IsInitialized) { return; }
 		IsInitialized = true;
 
-		Mesh cube = Raylib.GenMeshCube(1.0f, 1.0f, 1.0f);
-		Shader shader = Raylib.LoadShader("resources/shaders/glsl330/base_lighting.vs", "resources/shaders/glsl330/lighting.fs");
+		OnInitialize(this);
+
+		//Mesh cube = Raylib.GenMeshCube(1.0f, 1.0f, 1.0f);
+		Shader shader = Raylib.LoadShader("resources/shaders/glsl330/base_lighting.vs", "resources/shaders/glsl330/lighting.fs"); //TODO: move to a global
+
 		// Get some shader loactions
 		unsafe
 		{
@@ -51,23 +59,22 @@ public class Batched3dModel : IRenderAsset<BatchedRenderMesh>
 
 		Rlights.CreateLight(0, LightType.LIGHT_DIRECTIONAL, new Vector3(50, 50, 0), Vector3.Zero, WHITE, shader);
 
-		Material material = LoadMaterialDefault();
+		//Material material = LoadMaterialDefault();
 
-		unsafe
-		{
-			MaterialMap* maps = (MaterialMap*)material.maps.ToPointer();
-			maps[(int)MATERIAL_MAP_DIFFUSE].color = RED;
-			//((MaterialMap*)material.maps)[(int)MATERIAL_MAP_DIFFUSE].color = RED;
-		}
+		//unsafe
+		//{
+		//	MaterialMap* maps = (MaterialMap*)material.maps.ToPointer();
+		//	maps[(int)MATERIAL_MAP_DIFFUSE].color = RED;
+		//	//((MaterialMap*)material.maps)[(int)MATERIAL_MAP_DIFFUSE].color = RED;
+		//}
 
 
-		mesh = cube;
+		//mesh = cube;
 		this.shader = shader;
-		this.material = material;
-
-
-
+		//this.material = material;
 	}
+
+	public Action<BatchedModelTechnique> OnInitialize;
 
 	public Mesh mesh;
 	public Shader shader;
@@ -75,7 +82,7 @@ public class Batched3dModel : IRenderAsset<BatchedRenderMesh>
 
 
 
-	public void DoDraw(BatchedRenderMesh renderPacket)
+	public void DoDraw(RenderPacket3d renderPacket)
 	{
 		if (IsInitialized == false)
 		{
@@ -101,9 +108,10 @@ public class Batched3dModel : IRenderAsset<BatchedRenderMesh>
 
 		//Console.WriteLine($"cpuId={Thread.GetCurrentProcessorId()}, mtId={Thread.CurrentThread.ManagedThreadId}");
 	}
-}
 
-public interface IRenderAsset<in TPacket> where TPacket : IRenderPacket
-{
-	public void DoDraw(TPacket renderPacket);
+	public void ConstructPacketProperties(RenderPacket3d renderPacket)
+	{
+		
+	}
+
 }

@@ -51,68 +51,6 @@ namespace NotNot;
 
 //system nodes
 
-public class BatchedRenderMesh : IRenderPacket
-{
-
-	public Batched3dModel asset;
-	public int RenderLayer { get; } = 0;
-
-	public BatchedRenderMesh(Batched3dModel asset)
-	{
-		this.asset = asset;
-	}
-
-	public bool IsInitialized { get; set; }
-	public void Initialize()
-	{
-		IsInitialized = true;
-
-		if (asset.IsInitialized == false)
-		{
-			asset.Initialize();
-		}
-
-
-	}
-
-	public Mem<Matrix4x4> instances;
-
-	public void DoDraw()
-	{
-
-		asset.DoDraw(this);
-
-		//if (asset.IsInitialized == false)
-		//{
-		//	asset.Initialize();
-		//}
-		////__DEBUG.Throw(IsInitialized);
-
-		////Utils.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, new Vector3[] { camera.position }, SHADER_UNIFORM_VEC3);
-		////Utils.SetShaderValue(asset.shader, (int)SHADER_LOC_VECTOR_VIEW, RaylibRendering.camera.position, SHADER_UNIFORM_VEC3);
-
-		//var xforms = instances.Span;
-		////var mesh = renderMesh.mesh;
-		////var material = renderMesh.material;
-		////TODO: when raylib 4 is released change to use instanced based.   right now (3.7.x) there's a bug where it doesn't render instances=1
-		//for (var i = 0; i < xforms.Length; i++)
-		//{
-		//	Raylib.DrawMesh(asset.mesh, asset.material, Matrix4x4.Transpose(xforms[i])); //IMPORTANT: raylib is row-major.   need to transpose dotnet (column major) to match
-		//}
-		//if (xforms.Length == 0)
-		//{
-		//	Console.WriteLine("Packet is EMPTY!!>?!?!");
-		//}
-
-		//Console.WriteLine($"cpuId={Thread.GetCurrentProcessorId()}, mtId={Thread.CurrentThread.ManagedThreadId}");
-	}
-
-	public int CompareTo(IRenderPacket? other)
-	{
-		return 0;
-	}
-}
-
 
 
 public record struct RenderPrimitive
@@ -247,7 +185,7 @@ public class RenderInfo
 }
 
 
-public class PlayerInputSystem : NotNot.Ecs.System
+public class TestInputSystem : NotNot.Ecs.System
 {
 	EntityQuery playerMoveQuery;
 	protected override void OnInitialize()
@@ -270,7 +208,7 @@ public class PlayerInputSystem : NotNot.Ecs.System
 		playerMoveQuery.Run((ReadMem<EntityMetadata> meta, Mem<Move> moves, ReadMem<TestInput> players) =>
 		{
 			var metaSpan = meta.Span;
-			var totalSeconds = (float)frame._stats._wallTime.TotalSeconds;
+			var elapsed = (float)frame._stats._wallTime.TotalSeconds * 2;
 
 
 			for (var i = 0; i < meta.length; i++)
@@ -278,9 +216,9 @@ public class PlayerInputSystem : NotNot.Ecs.System
 				__ERROR.Throw(metaSpan[i].IsAlive, "why dead being enumerated?  we are forcing autopack");
 
 
-				var norm = new Vector3(MathF.Sin(totalSeconds), 0f, MathF.Cos(totalSeconds));
+				var norm = new Vector3(MathF.Sin(elapsed), 0f, MathF.Cos(elapsed));
 				moves[i].pos = norm * (float)frame._stats._frameElapsed.TotalSeconds * 3;
-				//moves[i].
+				moves[i].rot = Quaternion.CreateFromYawPitchRoll(0, 0, elapsed);
 
 			}
 
@@ -327,8 +265,8 @@ public class MoveSystem : NotNot.Ecs.System
 			{
 				//apply move vector onto translation vector
 				transforms[i].Position += moves[i].pos;
-				transforms[i].Rotation = Quaternion.CreateFromYawPitchRoll(0, 0, elapsed);
-				transforms[i].Scale = Vector3.One * MathF.Cos(elapsed);
+				transforms[i].Rotation = moves[i].rot;
+				//transforms[i].Scale = Vector3.One * MathF.Cos(elapsed);
 				//Console.WriteLine($"entity={meta[i]}, pos={translations[i].value}, move={moves[i].value}");
 			}
 
@@ -336,16 +274,26 @@ public class MoveSystem : NotNot.Ecs.System
 	}
 }
 
-public class VisibilitySystem : NotNot.Ecs.System
+public struct IsVisible : IEcsComponent
+{
+
+}
+
+/// <summary>
+/// finds all entities that are visible and have a RenderDescription, and generates render packets for them every frame.
+/// </summary>
+public class RenderPacketGenerationSystem : NotNot.Ecs.System
 {
 	EntityQuery positionQuery;
-	Batched3dModel asset = new();
+	BatchedModelTechnique asset = new();
 	protected override void OnInitialize()
 	{
 		base.OnInitialize();
 		//create a query that selects all entities that have a Move and Translation component
 		//for performance reasons this should be cached as a class member,
-		positionQuery = entityManager.Query(new() { all = { typeof(WorldXform) } });
+		positionQuery = entityManager.Query(new() { all = { typeof(WorldXform), typeof(IsVisible) },
+			//only itterate entities that have a RenderDescription
+			sharedComponentTypes = {typeof(RenderDescription) } });
 
 		//notify our need for read/write access so systems can be multithreaded safely
 		RegisterReadLock<WorldXform>();
@@ -359,8 +307,12 @@ public class VisibilitySystem : NotNot.Ecs.System
 		ReadMem<WorldXform> transforms
 		) =>
 		{
+			//get the shared components for this chunk
+			var sharedComponents = meta[0].SharedComponents;
+			//we already filtered the query to require a RenderDescription (above), so get it now
+			var renderDescription = sharedComponents.Get<RenderDescription>();
 
-
+			
 			var instances = Mem<Matrix4x4>.Allocate(meta.length, false);
 			for (var i = 0; i < meta.length; i++)
 			{
@@ -372,15 +324,17 @@ public class VisibilitySystem : NotNot.Ecs.System
 														 //instances[i].Translation = translations[i].value;
 														 //instances[i].Translation = new Vector3(0,0,1.1f);
 														 //instances[i] = Raymath.MatrixTranslate(0, 0, 1);
-
-
-
 			}
-			var renderPacket = new BatchedRenderMesh(asset);
-			renderPacket.instances = instances;
 
-			this.manager.engine.StateSync.EnqueueRenderPacket(renderPacket);
 
+			//loop through the render techniques and generate render packets for them.
+			foreach (var iTechnique in renderDescription.techniques)
+			{
+				var renderPacket = new RenderPacket3d(iTechnique);
+				renderPacket.instances = instances.AsReadMem();
+				renderPacket.entityMetadata = meta;
+				this.manager.engine.StateSync.EnqueueRenderPacket(renderPacket);
+			}
 
 		});
 

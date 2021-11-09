@@ -109,13 +109,13 @@ public class RenderReferenceImplementationSystem : SystemBase
 	/// <summary>
 	/// temp collection used in the render thread, used to sort render packets before drawing
 	/// </summary>
-	List<IRenderPacket> _thread_renderPackets = new();
+	List<IRenderPacketNew> _thread_renderPackets = new();
 
 
 	/// <summary>
 	/// render packets obtained from the Phase0_SyncState system
 	/// </summary>
-	private ConcurrentQueue<IRenderPacket> _nextRenderPackets = new();
+	private ConcurrentQueue<IRenderPacketNew> _nextRenderPackets = new();
 
 
 	/// <summary>
@@ -183,7 +183,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 
 	private async Task _RenderThread_Worker()
 	{
-		ConcurrentQueue<IRenderPacket> packetsCurrent = new();
+		ConcurrentQueue<IRenderPacketNew> packetsCurrent = new();
 
 		//var x = new SynchronizationContext();
 		Thread.BeginThreadAffinity();

@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
-      <EnablePreviewFeatures>True</EnablePreviewFeatures>
+      <EnablePreviewFeatures>true</EnablePreviewFeatures>
       <LangVersion>Preview</LangVersion>
       <Nullable>enable</Nullable>
     <Configurations>Debug;Release;Checked</Configurations>
@@ -23,8 +23,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BepuPhysics" Version="2.4.0-beta8" />
-    <PackageReference Include="BepuUtilities" Version="2.4.0-beta8" />
+    <PackageReference Include="BepuPhysics" Version="2.4.0-beta7" />
+    <PackageReference Include="BepuUtilities" Version="2.4.0-beta7" />
     <PackageReference Include="Raylib-cs" Version="3.7.0.1" />
   </ItemGroup>
 

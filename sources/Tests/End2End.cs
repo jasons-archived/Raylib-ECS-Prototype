@@ -29,7 +29,7 @@ namespace Tests.End2End
 				//engine.DefaultWorld.AddChild(new TimestepNodeTest() { TargetFps = 10 });
 
 				engine.DefaultWorld.AddChild(new MoveSystem() { Name = "MOVE" });
-				engine.DefaultWorld.AddChild(new PlayerInputSystem() { Name = "PLAYER" });
+				engine.DefaultWorld.AddChild(new TestInputSystem() { Name = "PLAYER" });
 
 				engine.Updater.Start();
 				await Task.Delay(10);
@@ -74,16 +74,16 @@ namespace Tests.End2End
 				//engine.DefaultWorld.AddChild(new TimestepNodeTest() { TargetFps = 10 });
 
 				engine.DefaultWorld.Phase2_Simulation.AddChild(new MoveSystem());
-				engine.DefaultWorld.Phase2_Simulation.AddChild(new PlayerInputSystem());
+				engine.DefaultWorld.Phase2_Simulation.AddChild(new TestInputSystem());
 				engine.Rendering.AddChild(new RenderReferenceImplementationSystem());
 
-				engine.DefaultWorld.Phase2_Simulation.AddChild(new VisibilitySystem());
+				engine.DefaultWorld.Phase2_Simulation.AddChild(new RenderPacketGenerationSystem());
 				engine.Updater.Start();
 				await Task.Delay(10);
 
 				var em = engine.DefaultWorld.entityManager;
 
-				var archetype = em.GetOrCreateArchetype(new() { typeof(TestInput), typeof(WorldXform), typeof(Move) });
+				var archetype = em.GetOrCreateArchetype(new() { typeof(TestInput), typeof(WorldXform), typeof(Move), typeof(IsVisible) });
 
 				em.EnqueueCreateEntity(1, archetype, (args) =>
 				{
@@ -110,10 +110,5 @@ namespace Tests.End2End
 
 	}
 
-
-}
-
-public struct IsRenderable
-{
 
 }
