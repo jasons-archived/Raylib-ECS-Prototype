@@ -266,6 +266,8 @@ public class MoveSystem : NotNot.Ecs.System
 				//apply move vector onto translation vector
 				transforms[i].Position += moves[i].pos;
 				transforms[i].Rotation = moves[i].rot;
+				//transforms[i].Position = new Vector3(MathF.Sin(elapsed), 0f, MathF.Cos(elapsed));
+				//transforms[i].Rotation = Quaternion.CreateFromYawPitchRoll(0, 0, elapsed);
 				//transforms[i].Scale = Vector3.One * MathF.Cos(elapsed);
 				//Console.WriteLine($"entity={meta[i]}, pos={translations[i].value}, move={moves[i].value}");
 			}
@@ -273,7 +275,6 @@ public class MoveSystem : NotNot.Ecs.System
 		});
 	}
 }
-
 public struct IsVisible : IEcsComponent
 {
 

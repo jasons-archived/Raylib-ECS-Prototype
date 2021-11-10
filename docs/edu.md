@@ -20,13 +20,19 @@ Some ECS Intro videos that are mostly applicable to !!.Ecs
 
 
 # Graphics Programming
-- https://github.com/lettier/3d-game-shaders-for-beginners  beginner guides to shader dev
-- https://vksegfault.github.io/posts/gentle-intro-gpu-inner-workings/   inner workings of the modern gpu
+
+- theory
+  - https://vksegfault.github.io/posts/gentle-intro-gpu-inner-workings/   inner workings of the modern gpu
 - multithread rendering
   - https://vkguide.dev/docs/extra-chapter/multithreading/
   - https://www.youtube.com/watch?v=0nTDFLMLX9k
   - https://www.youtube.com/watch?v=v2Q_zHG3vqg
-
+- shaders
+  - https://developer.nvidia.com/fx-composer
+  - https://github.com/lettier/3d-game-shaders-for-beginners  beginner guides to shader dev
+  - shadertoy.com
+    - tutorials at bottom of page
+    - include discord channel
 
 
 # Business / Market analysis

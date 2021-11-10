@@ -1,12 +1,9 @@
 global using NotNot;
-global using System;
-global using System.Collections;
 using NotNot.Bcl;
 using NotNot.Ecs;
 using NotNot.Rendering;
 using Raylib_cs;
 using System.Threading.Tasks;
-
 
 //create basic engine
 var engine = new Engine();
@@ -22,7 +19,6 @@ engine.DefaultWorld.Phase2_Simulation.AddChild(new RenderPacketGenerationSystem(
 
 //start
 engine.Updater.Start();
-
 
 //create a box mesh+material used for rendering
 var boxModel = new BatchedModelTechnique();
@@ -61,8 +57,6 @@ em.EnqueueCreateEntity(100, archetype, sharedComponents, (args) =>
 		xform = new WorldXform(){Position=__.Rand._NextVector3()*10};
 	}
 });
-
-
 
 await Task.WhenAny(engine.RunningTask, Task.Delay(100000000));
 await engine.Updater.Stop();

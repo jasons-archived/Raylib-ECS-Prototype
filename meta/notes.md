@@ -201,7 +201,7 @@ Logical object structure is
 
 - blog
   - tools for pr/marketing
-    - ScreenToGif
+    - ScreenToGif : https://github.com/NickeManarin/ScreenToGif
     - `WIN-SHFT-S` (take screenshot)
     - 
 - discord
