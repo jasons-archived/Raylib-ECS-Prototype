@@ -1,4 +1,4 @@
-﻿// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
+// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
 // [!!] Copyright ©️ NotNot Project and Contributors. 
 // [!!] By default, this file is licensed to you under the AGPL-3.0.
 // [!!] However a Private Commercial License is available. 
@@ -26,7 +26,8 @@ namespace NotNot.Bcl.Diagnostics;
 public unsafe struct PercentileSampler800<T> where T : unmanaged, IComparable<T>
 {
 	public const int BUFFER_SIZE = 800;
-	public int MaxCapacity { get => BUFFER_SIZE / sizeof(T); }
+	public int MaxCapacity { get; } = BUFFER_SIZE / sizeof(T);
+
 	public StructArray800<T> _samples;
 
 
@@ -37,16 +38,28 @@ public unsafe struct PercentileSampler800<T> where T : unmanaged, IComparable<T>
 	/// </summary>
 	private int _fill;
 
-	public int SampleCount
+	public bool IsFilled
 	{
-		get => _sampleCount;
+		get => _fill >= _targetSampleCount;
+	}
+
+	/// <summary>
+	/// maximum samples this instance supports.   must be less than or equal to <see cref="MaxCapacity"/>
+	/// </summary>
+	public int TargetSampleCount
+	{
+		get => _targetSampleCount;
 		set
 		{
 			__ERROR.Throw(value <= MaxCapacity, $"({value}) is too big.  Samples must be equal to or less than MaxCapacity ({MaxCapacity})");
-			_sampleCount = value;
+			_targetSampleCount = value;
+			if (_fill >= _targetSampleCount)
+			{
+				_fill = _targetSampleCount;
+			}
 		}
 	}
-	private int _sampleCount = BUFFER_SIZE / sizeof(T);
+	private int _targetSampleCount = BUFFER_SIZE / sizeof(T);
 
 	public void Clear()
 	{
@@ -61,10 +74,10 @@ public unsafe struct PercentileSampler800<T> where T : unmanaged, IComparable<T>
 		fixed (byte* pBuffer = _samples._buffer)
 		{
 			var tBuffer = (T*)pBuffer;
-			tBuffer[_nextIndex % SampleCount] = value;
+			tBuffer[_nextIndex % TargetSampleCount] = value;
 		}
-		_nextIndex = (_nextIndex + 1) % SampleCount;
-		if (_fill < MaxCapacity)
+		_nextIndex = (_nextIndex + 1) % TargetSampleCount;
+		if (_fill < TargetSampleCount)
 		{
 			_fill++;
 		}
@@ -72,11 +85,11 @@ public unsafe struct PercentileSampler800<T> where T : unmanaged, IComparable<T>
 	public T GetLastSample()
 	{
 		__CHECKED.Throw(_isCtored, "you need to use a .ctor() otherwise fields are not init");
-		var lastIndex = (SampleCount + _nextIndex - 1) % SampleCount;
+		var lastIndex = (TargetSampleCount + _nextIndex - 1) % TargetSampleCount;
 		fixed (byte* pBuffer = _samples._buffer)
 		{
 			var tBuffer = (T*)pBuffer;
-			return tBuffer[_nextIndex % SampleCount];
+			return tBuffer[_nextIndex % TargetSampleCount];
 		}
 	}
 
@@ -84,7 +97,7 @@ public unsafe struct PercentileSampler800<T> where T : unmanaged, IComparable<T>
 	{
 		__CHECKED.Throw(_isCtored, "you need to use a .ctor() otherwise fields are not init");
 
-		return new(_samples.AsSpan().Slice(0, Math.Min(SampleCount, _fill)));
+		return new(_samples.AsSpan().Slice(0, Math.Min(TargetSampleCount, _fill)));
 	}
 
 	public override string ToString()
