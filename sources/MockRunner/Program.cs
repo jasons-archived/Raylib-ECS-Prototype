@@ -3,6 +3,7 @@ using NotNot.Bcl;
 using NotNot.Ecs;
 using NotNot.Rendering;
 using Raylib_cs;
+using System.Numerics;
 using System.Threading.Tasks;
 
 //create basic engine
@@ -54,7 +55,7 @@ em.EnqueueCreateEntity(100, archetype, sharedComponents, (args) =>
 	foreach (var token in accessTokens)
 	{
 		ref var xform = ref token.GetComponentWriteRef<WorldXform>();
-		xform = new WorldXform(){Position=__.Rand._NextVector3()*10};
+		xform = new WorldXform(){Position=(__.Rand._NextVector3()- (Vector3.One * 0.5f))*10};
 	}
 });
 

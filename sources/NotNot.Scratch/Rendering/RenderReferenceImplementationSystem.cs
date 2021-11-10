@@ -183,6 +183,8 @@ public class RenderReferenceImplementationSystem : SystemBase
 
 	private async Task _RenderThread_Worker()
 	{
+		//the render packets currently being consumed by this render thread.
+		//note that this gets swapped out for the queue stored in Engine.Phase0_StateSync every loop via some complex swap logic below.
 		ConcurrentQueue<IRenderPacketNew> packetsCurrent = new();
 
 		//var x = new SynchronizationContext();
@@ -207,12 +209,14 @@ public class RenderReferenceImplementationSystem : SystemBase
 					}
 					else
 					{
+						//due to timer resolution, this could wait up to 16ms.
+						//that is okay because we are "disabled"
 						await Task.Delay(1);
 					}
-
 					continue;
 				}
 
+				#region TO_DELETE
 				//wait until released from main system.update method
 				//var isSuccess = await _renderLoopAutoResetEvent.WaitAsync(TimeSpan.FromMilliseconds(1));
 				//if (!isSuccess)
@@ -220,8 +224,10 @@ public class RenderReferenceImplementationSystem : SystemBase
 				//	//our main system update isn't done yet, so delay rendering until it is ready (when we have new render data)
 				//	continue;
 				//}
+				#endregion
 
 				//critical section that must not be raced by the main simulation's render update task
+				//this section swaps out our renderPacket queue with a "fresh" one from the engine threads
 				{
 					await _renderLoopAutoResetEvent.WaitAsync();
 					await _updateSyncCriticalSectionLock.WaitAsync();
@@ -235,6 +241,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 						_updateSyncCriticalSectionLock.Release();
 					}
 				}
+				#region TO_DELETE
 				//////obtain render packets for the most recent frame (N-1) in a locked fashion
 				////await _swapPacketsLock.WaitAsync();
 				////try
@@ -248,7 +255,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 				////{
 				////	_swapPacketsLock.Release();
 				////}
-
+				#endregion
 
 
 
@@ -257,29 +264,37 @@ public class RenderReferenceImplementationSystem : SystemBase
 
 				Raylib.ClearBackground(Color.RAYWHITE);
 				Raylib.BeginMode3D(camera);
-				//Matrix4x4[] transforms = new[]{ Matrix4x4.Identity };
-				//DrawMeshInstanced(cube, material,new[]{ Matrix4x4.Identity }, 1);
-				//DrawMesh(cube, material, Matrix4x4.Identity);
 
 				//draw renderpackets
 				{
-					//#if CHECKED
-					if (packetsCurrent.Count == 0)
+					//debug logic
 					{
-						Console.WriteLine("NO PACKETS");
+						//#if CHECKED
+						if (packetsCurrent.Count == 0)
+						{
+							Console.WriteLine("NO PACKETS");
+						}
+						//#endif
+						__DEBUG.Throw(_thread_renderPackets.Count == 0);
 					}
-					//#endif
-					__DEBUG.Throw(_thread_renderPackets.Count == 0);
-					while (packetsCurrent.TryDequeue(out var renderPacket))
+
+					//sort render packets according to their internal priority
 					{
-						_thread_renderPackets.Add(renderPacket);
+						while (packetsCurrent.TryDequeue(out var renderPacket))
+						{
+							_thread_renderPackets.Add(renderPacket);
+						}
+
+						_thread_renderPackets.Sort();
 					}
-					_thread_renderPackets.Sort();
+
+					//draw them
 					foreach (var renderPacket in _thread_renderPackets)
 					{
 						renderPacket.DoDraw();
 					}
 					_thread_renderPackets.Clear();
+
 				}
 
 				Raylib.DrawGrid(100, 1.0f);
@@ -297,6 +312,8 @@ public class RenderReferenceImplementationSystem : SystemBase
 		{
 			Thread.EndThreadAffinity();
 		}
+		//if/when our render thread terminates, stop the engine.
+		//this can happen when the user closes the render window.
 		_ = manager.engine.Updater.Stop();
 	}
 
