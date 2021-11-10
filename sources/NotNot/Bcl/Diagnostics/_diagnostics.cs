@@ -13,6 +13,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime;
 using System.Runtime.CompilerServices;
+using NotNot.Bcl;
+using NotNot.Bcl.Diagnostics;
 
 namespace NotNot.Bcl.Diagnostics
 {
@@ -268,5 +270,95 @@ public static class __GcHelper
 		GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
 		GC.Collect();
 		GC.WaitForPendingFinalizers();
+	}
+}
+
+
+/// <summary>
+/// a stopwatch that checks for spikes (2x percentile 100 sample) and logs it.
+/// <para>use via the .Lap() method</para>
+/// </summary>
+public class PerfSpikeWatch
+{
+	public string Name { get; init; }
+
+	public PerfSpikeWatch(string? name = null)
+	{
+		if (name == null)
+		{
+			name = "";
+		}
+
+		
+		//name += $"({sourceFilePath._GetAfter('\\', true)}:{sourceLineNumber})";
+
+		Name = name.PadRight(20); 
+	}
+
+	public Stopwatch sw=new Stopwatch();
+	public PercentileSampler800<TimeSpan> sampler=new();
+	public int pollSkipFrequency = 100;
+	private int _lapCount = 0;
+	private Percentiles<TimeSpan> _lastPollPercentiles;
+	private string _caller;
+
+	public void Start()
+	{
+		sw.Start();
+	}
+
+	public void Stop()
+	{
+		sw.Stop();
+	}
+
+
+	public void Restart()
+	{
+		sw.Restart();
+	}
+
+	public void Reset()
+	{
+		sw.Reset();
+	}
+
+	public void Lap([CallerFilePath] string sourceFilePath = "???", [CallerLineNumber] int sourceLineNumber = 0)
+	{
+		var elapsed = sw.Elapsed;
+		sw.Restart();
+		sampler.RecordSample(elapsed);
+		_lapCount++;
+
+		//once we fill up, do logging if circumstances dictate
+		if (sampler.IsFilled && _lapCount%pollSkipFrequency==0)
+		{
+			var percentiles = sampler.GetPercentiles();
+			if (_lastPollPercentiles.sampleCount == 0)
+			{
+				_lastPollPercentiles = percentiles;
+				return;
+			}
+
+			if (percentiles.p100 >= percentiles.p50* 2
+			    && percentiles.p100 > _lastPollPercentiles.p100 * 2
+				)
+			{
+				if (_caller == null)
+				{
+					_caller = $"{sourceFilePath._GetAfter('\\', true)}:{sourceLineNumber}";
+				}
+				__ERROR.WriteLine($"PERFSPIKEWATCH {Name}({_caller}): spike p100={percentiles.p100.TotalMilliseconds._Round(2)}ms.  " +
+				                  $"currentStats={percentiles.ToString((val)=>val.TotalMilliseconds._Round(2))}   " +
+				                  $"priorStats={_lastPollPercentiles.ToString((val) => val.TotalMilliseconds._Round(2))}");
+			}
+			_lastPollPercentiles=percentiles;
+		}
+	}
+
+	public void LapAndReset([CallerFilePath] string sourceFilePath = "???", [CallerLineNumber] int sourceLineNumber = 0)
+	{
+		Lap(sourceFilePath,sourceLineNumber);
+		sw.Reset();
 	}
 }
