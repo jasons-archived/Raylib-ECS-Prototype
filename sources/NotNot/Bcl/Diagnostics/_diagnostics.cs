@@ -322,7 +322,7 @@ public class PerfSpikeWatch
 	{
 		sw.Reset();
 	}
-
+	//[Conditional("DEBUG")]
 	public void Lap([CallerFilePath] string sourceFilePath = "???", [CallerLineNumber] int sourceLineNumber = 0)
 	{
 		var elapsed = sw.Elapsed;
@@ -355,7 +355,7 @@ public class PerfSpikeWatch
 			_lastPollPercentiles=percentiles;
 		}
 	}
-
+	//[Conditional("DEBUG")]
 	public void LapAndReset([CallerFilePath] string sourceFilePath = "???", [CallerLineNumber] int sourceLineNumber = 0)
 	{
 		Lap(sourceFilePath,sourceLineNumber);

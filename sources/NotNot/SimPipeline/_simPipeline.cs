@@ -704,6 +704,7 @@ public abstract partial class SimNode //update logic
 	/// <returns></returns>
 	internal Task DoUpdate(Frame frame, NodeFrameState nodeState)
 	{
+
 		try
 		{
 			__DEBUG.WriteLine(_DEBUG_PRINT_TRACE!=true, $"{frame._stats._frameId}  :  {GetHierarchyName()}");

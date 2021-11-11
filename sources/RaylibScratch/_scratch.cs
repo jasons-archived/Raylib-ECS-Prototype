@@ -17,8 +17,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
-
-
+using Nito.AsyncEx;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
 using static Raylib_cs.ConfigFlags;
@@ -49,90 +48,84 @@ public class RenderSystem
 		projection = CameraProjection.CAMERA_PERSPECTIVE,                   // Camera3D mode type
 	};
 
-	
+	private Nito.AsyncEx.AsyncContextThread _renderThread;
 	public Task renderTask;
 	public void Start()
 	{
-
-		renderTask = new Task(() =>
-		{
-			Nito.AsyncEx.AsyncContext.Run(_RenderThread_Worker);
-		}, TaskCreationOptions.LongRunning);
-		renderTask.Start();
-
-		//_renderThread = new Thread(() =>
-		//{
-		//	Nito.AsyncEx.AsyncContext.Run(async () =>
-		//	{
-		//		renderTask = _RenderThread_Worker();
-		//		return renderTask;
-		//	});
-		//});
-		//_renderThread.Start();
-
+		_renderThread = new Nito.AsyncEx.AsyncContextThread();
+		renderTask = _renderThread.Factory.Run(_RenderThread_Worker);
 	}
 
 
-
+	public int mtId;
 	public async Task _RenderThread_Worker()
 	{
 		Console.WriteLine("render thread start");
-		Thread.BeginThreadAffinity();
-		try
+
+		//init
+		Raylib.InitWindow(screenSize.Width, screenSize.Height, windowTitle);
+		var technique = new ModelTechnique();
+		technique.Init();
+
+		var rand = new Random();
+		var renderPacket = new RenderPacket3d();
+		renderPacket.instances = new Matrix4x4[1000];
+		for (var i = 0; i < renderPacket.instances.Length; i++)
 		{
-			//init
-			Raylib.InitWindow(screenSize.Width, screenSize.Height, windowTitle);
-			var technique = new ModelTechnique();
-			technique.Init();
-
-			var rand = new Random();
-			var renderPacket = new RenderPacket3d();
-			renderPacket.instances = new Matrix4x4[100];
-			for (var i = 0; i < renderPacket.instances.Length; i++)
-			{
-				renderPacket.instances[i]=Matrix4x4.Identity;
-				renderPacket.instances[i].Translation = new Vector3(rand.NextSingle() - 0.5f, rand.NextSingle() - 0.5f, rand.NextSingle() - 0.5f) * 10;
-			}
-
-
-
-
-			var swElapsed = Stopwatch.StartNew();
-			var swTotal = Stopwatch.StartNew();
-			//render loop
-			while (!Raylib.WindowShouldClose())
-			{
-				var elapsed =(float)swElapsed.Elapsed.TotalSeconds;
-				swElapsed.Restart();
-				var totalTime =(float) swTotal.Elapsed.TotalSeconds;
-
-				_UpdateRenderPacket(renderPacket, elapsed, totalTime);
-
-				//draw
-				Raylib.BeginDrawing();
-				Raylib.ClearBackground(Color.RAYWHITE);
-				Raylib.BeginMode3D(camera);
-				//draw renderpackets
-				technique.DoDraw(renderPacket);
-
-				Raylib.DrawGrid(100, 1.0f);
-				Raylib.EndMode3D();
-				Raylib.DrawText("Reference Rendering", 10, 40, 20, Color.DARKGRAY);
-				Raylib.DrawFPS(10, 10);
-				Raylib.EndDrawing();
-			}
-			Raylib.CloseWindow();
-
-		}
-		finally
-		{
-			Thread.EndThreadAffinity();
+			renderPacket.instances[i] = Matrix4x4.Identity;
+			renderPacket.instances[i].Translation = new Vector3(rand.NextSingle() - 0.5f, rand.NextSingle() - 0.5f, rand.NextSingle() - 0.5f) * 10;
 		}
 
 
 
+
+		var swElapsed = Stopwatch.StartNew();
+		var swTotal = Stopwatch.StartNew();
+		//render loop
+		while (!Raylib.WindowShouldClose())
+		{
+
+
+			var elapsed = (float)swElapsed.Elapsed.TotalSeconds;
+			swElapsed.Restart();
+			var totalTime = (float)swTotal.Elapsed.TotalSeconds;
+
+			await Task.Delay(rand.Next(10));
+
+			//Console.WriteLine($"_RenderThread_Worker AFINITY.  cpuId={Thread.GetCurrentProcessorId()}, mtId={Thread.CurrentThread.ManagedThreadId}");
+			mtId = Thread.CurrentThread.ManagedThreadId;
+
+			_UpdateRenderPacket(renderPacket, elapsed, totalTime);
+
+			//draw
+			Raylib.BeginDrawing();
+			Raylib.ClearBackground(Color.RAYWHITE);
+			Raylib.BeginMode3D(camera);
+			//draw renderpackets
+			//technique.DoDraw(renderPacket);
+			var waitFor = DoDraw(technique, renderPacket);
+			await waitFor;
+
+			Raylib.DrawGrid(100, 1.0f);
+			Raylib.EndMode3D();
+			Raylib.DrawText("Reference Rendering", 10, 40, 20, Color.DARKGRAY);
+			Raylib.DrawFPS(10, 10);
+			Raylib.EndDrawing();
+		}
+
+
+
+		Raylib.CloseWindow();
 		Console.WriteLine("render thread done");
 	}
+
+	private async Task DoDraw(ModelTechnique technique, RenderPacket3d renderPacket)
+	{
+		technique.DoDraw(renderPacket);
+		await Task.Delay(0);
+	}
+
+
 
 	private void _UpdateRenderPacket(RenderPacket3d renderPacket, float elapsed, float totalTime)
 	{
@@ -201,7 +194,7 @@ public class ModelTechnique
 
 	public void DoDraw(RenderPacket3d renderPacket)
 	{
-	
+
 
 		Utils.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, new Vector3[] { RenderSystem.camera.position }, SHADER_UNIFORM_VEC3);
 		Utils.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, RenderSystem.camera.position, SHADER_UNIFORM_VEC3);

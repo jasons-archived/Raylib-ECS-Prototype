@@ -53,6 +53,12 @@ Some ECS Intro videos that are mostly applicable to !!.Ecs
 
 - row major traversal of matrix vs column major traversal
 
+# multithreading patterns
+- `async`/`await` Synchronization Context
+  - https://devblogs.microsoft.com/dotnet/configureawait-faq/
+- **Channels** for Producer/Consumer pattern
+  - https://ndportmann.com/system-threading-channels/
+  - https://devblogs.microsoft.com/dotnet/an-introduction-to-system-threading-channels/
 
 # OSS gamedev
 - https://gist.github.com/raysan5/bd8c0293d8b8da1e9e44d8ac435e9304

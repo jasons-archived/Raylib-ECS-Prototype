@@ -205,6 +205,13 @@ public class TestInputSystem : NotNot.Ecs.System
 
 	protected override async Task OnUpdate(Frame frame)
 	{
+#if DEBUG
+		__ERROR.Throw(Thread.CurrentThread.ManagedThreadId != RenderReferenceImplementationSystem.mtId);
+		if (Thread.CurrentThread.ManagedThreadId == RenderReferenceImplementationSystem.mtId)
+		{
+			__ERROR.WriteLine("whut");
+		}
+#endif
 		playerMoveQuery.Run((ReadMem<EntityMetadata> meta, Mem<Move> moves, ReadMem<TestInput> players) =>
 		{
 			var metaSpan = meta.Span;

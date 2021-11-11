@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Numerics;
+using Nito.AsyncEx;
 using NotNot.Bcl.Diagnostics;
 using NotNot.Ecs;
 using NotNot.SimPipeline;
@@ -37,53 +38,65 @@ public class RenderReferenceImplementationSystem : SystemBase
 	{
 		base.OnRegister();
 
-		//start rendering on it's own thread
-		_renderTask = new Task(_RenderThread, TaskCreationOptions.LongRunning); //runs for entire app duration
-		_renderTask.Start();
+		
 
-		//_renderTask = new Task(() => StartRender2());
-		//_renderTask.Start(renderScheduler);
-
-		//renderScheduler
-		//_renderTask = Task.Factory.StartNew(_RenderThread,CancellationToken.None,TaskCreationOptions.LongRunning,renderScheduler);
-		//new Task(_RenderThread,TaskCreationOptions.LongRunning)
-
-		//TaskScheduler.con
-		//var x = new Thread()
-		//Task.Factory.
-	}
-
-	private void _RenderThread()
-	{
 		//If Raylib or any app executes OpenGl instructions from multiple threads, it will crash with an AccessViolationException.
 		//This is a problem not only for doing multithreading, but also using async/await.
 		//If you use async/await in your render loop, you might be running on a different thread if you ever await, such as await Task.Delay(1);
 		//The simplist solution is to start your render task via Nito.AsyncEx.AsyncContext.Run(_RenderThread);
 		//which will force the async continuations to run on the same managed thread.
 		//alternately creating a custom task scheduler works, but is a lot more effort.  see the edu.md "Threading" section for notes, or the NotNot.Bcl.Threading.CustomTaskScheduler
-		Nito.AsyncEx.AsyncContext.Run(_RenderThread_Worker);
 
 
-		Console.WriteLine("DONE");
+
+		//start rendering on it's own thread
+		//_renderTask = new Task(_RenderThread, TaskCreationOptions.LongRunning); //runs for entire app duration
+		//_renderTask.Start();
+
+
+		_renderThread = new Nito.AsyncEx.AsyncContextThread();
+		_renderTask = _renderThread.Factory.Run(_RenderThread_Worker);
+		
+		
+		
+
+		//////_renderTask = new Task(() => StartRender2());
+		//////_renderTask.Start(renderScheduler);
+
+		//////renderScheduler
+		//////_renderTask = Task.Factory.StartNew(_RenderThread,CancellationToken.None,TaskCreationOptions.LongRunning,renderScheduler);
+		//////new Task(_RenderThread,TaskCreationOptions.LongRunning)
+
+		//////TaskScheduler.con
+		//////var x = new Thread()
+		//////Task.Factory.
 	}
-	private Task StartRender()
-	{
-		try
-		{
-			return _RenderThread_Worker();
-		}
-		catch (Exception ex)
-		{
-			Console.WriteLine(ex.Message);
-		}
-		finally
-		{
-			Console.WriteLine("DONE");
-		}
-		return Task.CompletedTask;
 
-	}
+	//private void _RenderThread()
+	//{
+	//	Nito.AsyncEx.AsyncContext.Run(_RenderThread_Worker);
 
+
+	//	Console.WriteLine("DONE");
+	//}
+	//private Task StartRender()
+	//{
+	//	try
+	//	{
+	//		return _RenderThread_Worker();
+	//	}
+	//	catch (Exception ex)
+	//	{
+	//		Console.WriteLine(ex.Message);
+	//	}
+	//	finally
+	//	{
+	//		Console.WriteLine("DONE");
+	//	}
+	//	return Task.CompletedTask;
+
+	//}
+	private Nito.AsyncEx.AsyncContextThread _renderThread;
 	private Task _renderTask;
 
 	//private SemaphoreSlim _swapPacketsLock = new(1, 1);
@@ -177,10 +190,13 @@ public class RenderReferenceImplementationSystem : SystemBase
 			_renderTask.Wait();
 		}
 		_renderTask = null;
+		_renderThread.Dispose();
+		_renderThread = null;
 
 
 	}
 
+	public static int mtId;
 	private async Task _RenderThread_Worker()
 	{
 		//the render packets currently being consumed by this render thread.
@@ -201,7 +217,8 @@ public class RenderReferenceImplementationSystem : SystemBase
 		var pswEndDrawing = new PerfSpikeWatch("EndDrawing");
 
 		//var x = new SynchronizationContext();
-		Thread.BeginThreadAffinity();
+		//Thread.BeginThreadAffinity();
+		mtId = Thread.CurrentThread.ManagedThreadId;
 		//Console.WriteLine($"_RenderThread_Worker AFINITY.  cpuId={Thread.GetCurrentProcessorId()}, mtId={Thread.CurrentThread.ManagedThreadId}");
 		try
 		{
@@ -352,7 +369,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 		}
 		finally
 		{
-			Thread.EndThreadAffinity();
+			//Thread.EndThreadAffinity();
 		}
 		//if/when our render thread terminates, stop the engine.
 		//this can happen when the user closes the render window.
