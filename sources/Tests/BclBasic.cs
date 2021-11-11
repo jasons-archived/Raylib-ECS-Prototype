@@ -9,6 +9,7 @@
 // [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!]  [!!] [!!] [!!] [!!]
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -24,8 +25,8 @@ public class BclBasic
 	[TestMethod]
 	public async Task DotNextAsyncAutoResetEvent2()
 	{
-		//DotNext.Threading.AsyncAutoResetEvent autoResetEvent = new(false);
-		Nito.AsyncEx.AsyncAutoResetEvent autoResetEvent = new(false);
+		DotNext.Threading.AsyncAutoResetEvent autoResetEvent = new(false);
+		//Nito.AsyncEx.AsyncAutoResetEvent autoResetEvent = new(false);
 
 		var loopCount = 0;
 		var setCount = 0;
@@ -39,11 +40,11 @@ public class BclBasic
 				while (true)
 				{
 					loopCount++;
-					//var didSet = autoResetEvent.Set();
-					var didSet = autoResetEvent.IsSet == false;										
+					var didSet = autoResetEvent.Set();
+					//var didSet = autoResetEvent.IsSet == false;										
 					if (didSet)
 					{
-						autoResetEvent.Set();
+						//autoResetEvent.Set();
 						setCount++;
 					}
 
@@ -62,9 +63,9 @@ public class BclBasic
 					if (__.Rand._NextBoolean())
 					{
 						//extra wait
-						System.Threading.Thread.SpinWait(__.Rand.Next(10000));
-						//await Task.Delay(__.Rand.Next(10));
-						await Task.Delay(0);						
+						//System.Threading.Thread.SpinWait(__.Rand.Next(10000));
+						await Task.Delay(__.Rand.Next(10));
+						//await Task.Delay(0);						
 					}
 				}
 			}
@@ -81,9 +82,9 @@ public class BclBasic
 			{
 				while (true)
 				{
-					await autoResetEvent.WaitAsync();
-					//var success = await autoResetEvent.WaitAsync(TimeSpan.FromMilliseconds(1));
-					var success = true;
+					//await autoResetEvent.WaitAsync();
+					var success = await autoResetEvent.WaitAsync(TimeSpan.FromMilliseconds(1));
+					//var success = true;
 					if (success)
 					{
 						consumedCount++;
@@ -95,9 +96,9 @@ public class BclBasic
 					if (__.Rand._NextBoolean())
 					{
 						//extra wait
-						System.Threading.Thread.SpinWait(__.Rand.Next(10000));
-						//await Task.Delay(__.Rand.Next(10));
-						await Task.Delay(0);
+						//System.Threading.Thread.SpinWait(__.Rand.Next(10000));
+						await Task.Delay(__.Rand.Next(10));
+						//await Task.Delay(0);
 					}
 				}
 			}
@@ -190,5 +191,47 @@ public class BclBasic
 		await consumerTask;
 
 
+		
+
 	}
 }
+
+//public class Example
+//{
+//	public WorkBuffer<ConcurrentQueue<int>> workBuffer = new(initalBuffer: new());
+
+//	public async Task ConsumerThread()
+//	{
+//		var consumerBuffer = new ConcurrentQueue<int>();
+//		while (true)
+//		{
+//			//wait for new work to be available, and grab it
+//			consumerBuffer = await workBuffer.AwaitWork(usedBuffer: consumerBuffer);
+
+//			while (consumerBuffer.TryDequeue(out var item))
+//			{
+//				//process the item
+//				Console.WriteLine(item);
+//			}
+//		}
+//	}
+
+//	public void ProducerThread()
+//	{
+//		var rand = new Random();
+//		var productionBuffer = new ConcurrentQueue<int>();
+//		while (true)
+//		{
+//			var count = rand.Next(100);
+//			for (var i = 0; i < count; i++)
+//			{
+//				productionBuffer.Enqueue(i);
+//			}
+//			//pushes work in a non-blocking fashion
+//			productionBuffer = workBuffer.PushWork(freshBuffer: productionBuffer);
+//			//clear in case prior buffer wasn't consumed yet
+//			productionBuffer.Clear();
+//		}
+//	}
+
+//}
