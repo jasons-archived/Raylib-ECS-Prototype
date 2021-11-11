@@ -208,7 +208,7 @@ public class TestInputSystem : NotNot.Ecs.System
 		playerMoveQuery.Run((ReadMem<EntityMetadata> meta, Mem<Move> moves, ReadMem<TestInput> players) =>
 		{
 			var metaSpan = meta.Span;
-			var elapsed = (float)frame._stats._wallTime.TotalSeconds * 2;
+			var totalTime = (float)frame._stats._wallTime.TotalSeconds * 2;
 
 
 			for (var i = 0; i < meta.length; i++)
@@ -216,9 +216,9 @@ public class TestInputSystem : NotNot.Ecs.System
 				__ERROR.Throw(metaSpan[i].IsAlive, "why dead being enumerated?  we are forcing autopack");
 
 
-				var norm = new Vector3(MathF.Sin(elapsed), 0f, MathF.Cos(elapsed));
+				var norm = new Vector3(MathF.Sin(totalTime), 0f, MathF.Cos(totalTime));
 				moves[i].pos = norm * (float)frame._stats._frameElapsed.TotalSeconds * 3;
-				moves[i].rot = Quaternion.CreateFromYawPitchRoll(0, 0, elapsed);
+				moves[i].rot = Quaternion.CreateFromYawPitchRoll(0, 0, totalTime);
 
 			}
 

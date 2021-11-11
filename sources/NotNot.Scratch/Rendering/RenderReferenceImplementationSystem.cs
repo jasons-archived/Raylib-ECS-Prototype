@@ -186,6 +186,19 @@ public class RenderReferenceImplementationSystem : SystemBase
 		//the render packets currently being consumed by this render thread.
 		//note that this gets swapped out for the queue stored in Engine.Phase0_StateSync every loop via some complex swap logic below.
 		ConcurrentQueue<IRenderPacketNew> packetsCurrent = new();
+		var pswRenderLoop = new PerfSpikeWatch("RenderLoop");
+		var pswRenderPacketSync = new PerfSpikeWatch("RenderPacketSync");
+		var pswRaylibDraw = new PerfSpikeWatch("RaylibDraw");
+		var pswDrawRenderPacket = new PerfSpikeWatch("DrawRenderPacket");
+		var pswDoDraw = new PerfSpikeWatch("DoDraw");
+		var pswRaylibSetup = new PerfSpikeWatch("RaylibSetup");
+
+		var pswRaylibTeardown = new PerfSpikeWatch("RaylibTeardown");
+		var pswDrawGrid = new PerfSpikeWatch("DrawGrid");
+		var pswEnd3d = new PerfSpikeWatch("DrawEnd3d");
+		var pswDrawText = new PerfSpikeWatch("DrawText");
+		var pswDrawFps = new PerfSpikeWatch("DrawFps");
+		var pswEndDrawing = new PerfSpikeWatch("EndDrawing");
 
 		//var x = new SynchronizationContext();
 		Thread.BeginThreadAffinity();
@@ -193,11 +206,11 @@ public class RenderReferenceImplementationSystem : SystemBase
 		try
 		{
 			Raylib.InitWindow(screenSize.Width, screenSize.Height, windowTitle);
-
+			//Raylib.SetTargetFPS(60);
 
 			while (!Raylib.WindowShouldClose() && IsRegistered && IsDisposed == false)
 			{
-
+				pswRenderLoop.Lap();
 
 				//if disabled, wait until we are not disabled
 				if (IsDisabled)
@@ -213,10 +226,12 @@ public class RenderReferenceImplementationSystem : SystemBase
 						//that is okay because we are "disabled"
 						await Task.Delay(1);
 					}
+
 					continue;
 				}
 
 				#region TO_DELETE
+
 				//wait until released from main system.update method
 				//var isSuccess = await _renderLoopAutoResetEvent.WaitAsync(TimeSpan.FromMilliseconds(1));
 				//if (!isSuccess)
@@ -224,10 +239,12 @@ public class RenderReferenceImplementationSystem : SystemBase
 				//	//our main system update isn't done yet, so delay rendering until it is ready (when we have new render data)
 				//	continue;
 				//}
+
 				#endregion
 
 				//critical section that must not be raced by the main simulation's render update task
 				//this section swaps out our renderPacket queue with a "fresh" one from the engine threads
+				pswRenderPacketSync.Start();
 				{
 					await _renderLoopAutoResetEvent.WaitAsync();
 					await _updateSyncCriticalSectionLock.WaitAsync();
@@ -241,7 +258,10 @@ public class RenderReferenceImplementationSystem : SystemBase
 						_updateSyncCriticalSectionLock.Release();
 					}
 				}
+				pswRenderPacketSync.LapAndReset();
+
 				#region TO_DELETE
+
 				//////obtain render packets for the most recent frame (N-1) in a locked fashion
 				////await _swapPacketsLock.WaitAsync();
 				////try
@@ -255,17 +275,20 @@ public class RenderReferenceImplementationSystem : SystemBase
 				////{
 				////	_swapPacketsLock.Release();
 				////}
+
 				#endregion
 
 
-
-
+				pswRaylibDraw.Start();
+				pswRaylibSetup.Start();
 				Raylib.BeginDrawing();
 
 				Raylib.ClearBackground(Color.RAYWHITE);
 				Raylib.BeginMode3D(camera);
+				pswRaylibSetup.LapAndReset();
 
 				//draw renderpackets
+				pswDrawRenderPacket.Start();
 				{
 					//debug logic
 					{
@@ -274,6 +297,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 						{
 							Console.WriteLine("NO PACKETS");
 						}
+
 						//#endif
 						__DEBUG.Throw(_thread_renderPackets.Count == 0);
 					}
@@ -289,22 +313,40 @@ public class RenderReferenceImplementationSystem : SystemBase
 					}
 
 					//draw them
+					pswDoDraw.Start();
 					foreach (var renderPacket in _thread_renderPackets)
 					{
 						renderPacket.DoDraw();
 					}
+
+					pswDoDraw.Stop();
 					_thread_renderPackets.Clear();
 
 				}
+				pswDoDraw.LapAndReset();
+				pswDrawRenderPacket.LapAndReset();
 
-				Raylib.DrawGrid(100, 1.0f);
-				Raylib.EndMode3D();
-				Raylib.DrawText("Reference Rendering", 10, 40, 20, Color.DARKGRAY);
-				Raylib.DrawFPS(10, 10);
+				pswRaylibTeardown.Start();
+				{
+					pswDrawGrid.Start();
+					Raylib.DrawGrid(100, 1.0f);
+					pswDrawGrid.LapAndReset();
+					pswEnd3d.Start();
+					Raylib.EndMode3D();
+					pswEnd3d.LapAndReset();
+					pswDrawText.Start();
+					Raylib.DrawText("Reference Rendering", 10, 40, 20, Color.DARKGRAY);
+					pswDrawText.LapAndReset();
+					pswDrawFps.Start();
+					Raylib.DrawFPS(10, 10);
+					pswDrawFps.LapAndReset();
+					pswEndDrawing.Start();
+					Raylib.EndDrawing();
+					pswEndDrawing.LapAndReset();
+				}
+				pswRaylibTeardown.LapAndReset();
 
-
-				Raylib.EndDrawing();
-
+				pswRaylibDraw.LapAndReset();
 			}
 			Raylib.CloseWindow();
 		}

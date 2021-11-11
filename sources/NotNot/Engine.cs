@@ -127,6 +127,8 @@ public class HeadlessUpdater : DisposeGuard, IUpdatePump
 				//Console.WriteLine($" ======================== {loop} ({Math.Round(TimeSpan.FromTicks(lastElapsed).TotalMilliseconds,1)}ms) ============================================== ");
 				await OnUpdate(TimeSpan.FromTicks(lastElapsed));
 				//Console.WriteLine($"last Elapsed = {lastElapsed}");
+
+
 				//runningLock.Release();
 				//await runningLock.WaitAsync();
 			}
@@ -210,6 +212,10 @@ public class Phase0_StateSync : SystemBase
 
 	protected override async Task OnUpdate(Frame frame)
 	{
+		//__ERROR.WriteLine(frame._stats._frameElapsed.TotalMilliseconds >= frame._stats._maxMs,$"{frame._stats}");
+		//Console.WriteLine(frame._stats);
+		
+
 		await _updateLock.WaitAsync();
 		var currentCount = _renderPackets.Count;
 
@@ -225,5 +231,7 @@ public class Phase0_StateSync : SystemBase
 #endif
 		__DEBUG.Throw(_renderPacketsPrior.Count == currentCount, "race condition.  something writing to render packets during swap.  ensure the node.updateAfter is properly set");
 		_updateLock.Release();
+
+
 	}
 }
