@@ -1,4 +1,4 @@
-﻿// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
+// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
 // [!!] Copyright ©️ NotNot Project and Contributors. 
 // [!!] By default, this file is licensed to you under the AGPL-3.0.
 // [!!] However a Private Commercial License is available. 
@@ -66,12 +66,12 @@ public class SimplePubSub
 	/// <typeparam name="TMessage">must be struct (to prevent GC allocations).  Pass a tuple if you NEED to pass an object</typeparam>
 	/// <param name="key"></param>
 	/// <returns></returns>
-	public Channel<TMessage> GetChannel<TMessage>(string key) where TMessage : struct
+	public MessageChannel<TMessage> GetChannel<TMessage>(string key) where TMessage : struct
 	{
 
-		var channel = _storage.GetOrAdd(key, (_key) => (new Channel<TMessage>(key)));
+		var channel = _storage.GetOrAdd(key, (_key) => (new MessageChannel<TMessage>(key)));
 
-		return (Channel<TMessage>)channel;
+		return (MessageChannel<TMessage>)channel;
 
 	}
 
