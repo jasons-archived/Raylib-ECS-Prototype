@@ -28,6 +28,8 @@ using static Raylib_cs.ShaderUniformDataType;
 using static Raylib_cs.MaterialMapIndex;
 using static Raylib_cs.CameraMode;
 using static Raylib_cs.KeyboardKey;
+using System.Runtime;
+using System.Runtime.InteropServices;
 
 namespace RaylibScratch;
 
@@ -54,13 +56,18 @@ public class RenderSystem
 	{
 		_renderThread = new Nito.AsyncEx.AsyncContextThread();
 		renderTask = _renderThread.Factory.Run(_RenderThread_Worker);
+		//GetGamepadName(0);
+
 	}
 
+	
+	//public int mtId;
 
-	public int mtId;
+	public AsyncAutoResetEvent renderGate = new(true);
 	public async Task _RenderThread_Worker()
 	{
 		Console.WriteLine("render thread start");
+
 
 		//init
 		Raylib.InitWindow(screenSize.Width, screenSize.Height, windowTitle);
@@ -69,31 +76,46 @@ public class RenderSystem
 
 		var rand = new Random();
 		var renderPacket = new RenderPacket3d();
-		renderPacket.instances = new Matrix4x4[1000];
+		renderPacket.instances = new Matrix4x4[100];
 		for (var i = 0; i < renderPacket.instances.Length; i++)
 		{
 			renderPacket.instances[i] = Matrix4x4.Identity;
 			renderPacket.instances[i].Translation = new Vector3(rand.NextSingle() - 0.5f, rand.NextSingle() - 0.5f, rand.NextSingle() - 0.5f) * 10;
 		}
+		//to try:
+		// LowLatency Mode
+		//[SuppressGCTransition]
+		//GC.Pause() before enddraw
+		//increase time of main loop, measure
+		//sync main loop
 
 
+		Thread.BeginThreadAffinity();
+		Thread.CurrentThread.Priority = ThreadPriority.Highest;
 
+		Raylib.SetTargetFPS(120);
 
 		var swElapsed = Stopwatch.StartNew();
 		var swTotal = Stopwatch.StartNew();
 		//render loop
+
+		var swEndDraw = new Stopwatch();
+		var swLoop = new Stopwatch();
+		var loopCount = 0;
 		while (!Raylib.WindowShouldClose())
 		{
-
+			swLoop.Restart();
+			loopCount++;
+			//renderGate.Set();
 
 			var elapsed = (float)swElapsed.Elapsed.TotalSeconds;
 			swElapsed.Restart();
 			var totalTime = (float)swTotal.Elapsed.TotalSeconds;
 
-			await Task.Delay(rand.Next(10));
+			//await Task.Delay(rand.Next(10));
 
 			//Console.WriteLine($"_RenderThread_Worker AFINITY.  cpuId={Thread.GetCurrentProcessorId()}, mtId={Thread.CurrentThread.ManagedThreadId}");
-			mtId = Thread.CurrentThread.ManagedThreadId;
+			//mtId = Thread.CurrentThread.ManagedThreadId;
 
 			_UpdateRenderPacket(renderPacket, elapsed, totalTime);
 
@@ -102,19 +124,48 @@ public class RenderSystem
 			Raylib.ClearBackground(Color.RAYWHITE);
 			Raylib.BeginMode3D(camera);
 			//draw renderpackets
-			//technique.DoDraw(renderPacket);
-			var waitFor = DoDraw(technique, renderPacket);
-			await waitFor;
+			technique.DoDraw(renderPacket);
+			//await DoDraw(technique, renderPacket);
 
 			Raylib.DrawGrid(100, 1.0f);
 			Raylib.EndMode3D();
-			Raylib.DrawText("Reference Rendering", 10, 40, 20, Color.DARKGRAY);
+			//Raylib.DrawText("Reference Rendering", 10, 40, 20, Color.DARKGRAY);
 			Raylib.DrawFPS(10, 10);
-			Raylib.EndDrawing();
+
+			swEndDraw.Restart();
+
+			{
+				//renderGate.Set();
+				//GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+				//GC.Collect();
+				//GC.WaitForPendingFinalizers();
+				var current = GCSettings.LatencyMode;
+				GCSettings.LatencyMode = GCLatencyMode.LowLatency;
+				var crit = GC.TryStartNoGCRegion(100000000);
+				{
+					//Raylib.EndDrawing();
+					Thread.BeginCriticalRegion();
+					EndDrawing();
+					Thread.EndCriticalRegion();
+				}
+				if (crit)
+				{
+					GC.EndNoGCRegion();
+				}
+				GCSettings.LatencyMode = current;
+			}
+			renderGate.Set();
+			var endDrawElapsed = swEndDraw.ElapsedMilliseconds;
+			var loopElapsed = swLoop.ElapsedMilliseconds;
+			
+			if (loopCount % 1000 == 0 || loopElapsed > 50)
+			{
+				Console.WriteLine($"loop={(int)(loopElapsed-endDrawElapsed)}  endDraw={(int)endDrawElapsed}  GC={GCInfo.Get()}  cpuId={Thread.GetCurrentProcessorId()}, mtId={Thread.CurrentThread.ManagedThreadId}");
+			}
 		}
 
-
-
+		Thread.EndThreadAffinity();
+		renderGate.Set();
 		Raylib.CloseWindow();
 		Console.WriteLine("render thread done");
 	}
@@ -124,7 +175,11 @@ public class RenderSystem
 		technique.DoDraw(renderPacket);
 		await Task.Delay(0);
 	}
-
+	/// <summary>End canvas drawing and swap buffers (double buffering)</summary>
+	[DllImport("raylib", CallingConvention = CallingConvention.Cdecl)]
+	//[System.Runtime.]
+	//[SuppressGCTransition]
+	public static extern void EndDrawing();
 
 
 	private void _UpdateRenderPacket(RenderPacket3d renderPacket, float elapsed, float totalTime)

@@ -188,7 +188,7 @@ public class RenderInfo
 public class TestInputSystem : NotNot.Ecs.System
 {
 	EntityQuery playerMoveQuery;
-	protected override void OnInitialize()
+	protected override async void OnInitialize()
 	{
 		base.OnInitialize();
 

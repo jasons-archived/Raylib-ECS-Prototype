@@ -19,10 +19,10 @@ using System.Threading.Tasks;
 namespace NotNot.Bcl.Messaging;
 /// <summary>
 /// Represents a channel of communication between Publisher(s) and Subscriber(s).   
-/// Only one kind of message may be sent per Channel.
+/// Only one kind of message may be sent per MessageChannel.
 /// </summary>
 /// <typeparam name="TMessage">must be struct (to prevent GC allocations).  Pass a tuple if you want to pass an object</typeparam>
-public class Channel<TMessage> where TMessage : struct
+public class MessageChannel<TMessage> where TMessage : struct
 {
 	private ReaderWriterLockSlim rwLock = new ReaderWriterLockSlim();
 
@@ -40,7 +40,7 @@ public class Channel<TMessage> where TMessage : struct
 	}
 
 
-	public Channel(string key)
+	public MessageChannel(string key)
 	{
 		this.key = key;
 	}

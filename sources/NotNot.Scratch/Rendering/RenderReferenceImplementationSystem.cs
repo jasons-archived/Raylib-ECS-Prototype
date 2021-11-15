@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Numerics;
 using Nito.AsyncEx;
 using NotNot.Bcl.Diagnostics;
+using NotNot.Bcl.Threading;
 using NotNot.Ecs;
 using NotNot.SimPipeline;
 using Raylib_cs;
@@ -26,10 +28,10 @@ public class RenderReferenceImplementationSystem : SystemBase
 	public static Camera3D camera = new()
 	{
 		position = new Vector3(0.0f, 10.0f, 10.0f), // Camera3D position
-		target = new Vector3(0.0f, 0.0f, 0.0f),      // Camera3D looking at point
-		up = new Vector3(0.0f, 1.0f, 0.0f),          // Camera3D up vector (rotation towards target)
-		fovy = 45.0f,                             // Camera3D field-of-view Y
-		projection = CameraProjection.CAMERA_PERSPECTIVE,                   // Camera3D mode type
+		target = new Vector3(0.0f, 0.0f, 0.0f), // Camera3D looking at point
+		up = new Vector3(0.0f, 1.0f, 0.0f), // Camera3D up vector (rotation towards target)
+		fovy = 45.0f, // Camera3D field-of-view Y
+		projection = CameraProjection.CAMERA_PERSPECTIVE, // Camera3D mode type
 	};
 
 	//private CustomTaskScheduler renderScheduler = new CustomTaskScheduler(1);
@@ -38,7 +40,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 	{
 		base.OnRegister();
 
-		
+
 
 		//If Raylib or any app executes OpenGl instructions from multiple threads, it will crash with an AccessViolationException.
 		//This is a problem not only for doing multithreading, but also using async/await.
@@ -56,9 +58,9 @@ public class RenderReferenceImplementationSystem : SystemBase
 
 		_renderThread = new Nito.AsyncEx.AsyncContextThread();
 		_renderTask = _renderThread.Factory.Run(_RenderThread_Worker);
-		
-		
-		
+
+
+
 
 		//////_renderTask = new Task(() => StartRender2());
 		//////_renderTask.Start(renderScheduler);
@@ -128,7 +130,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 	/// <summary>
 	/// render packets obtained from the Phase0_SyncState system
 	/// </summary>
-	private ConcurrentQueue<IRenderPacketNew> _nextRenderPackets = new();
+	private ConcurrentQueue<IRenderPacketNew> _tempRenderPackets = new();
 
 
 	/// <summary>
@@ -160,16 +162,21 @@ public class RenderReferenceImplementationSystem : SystemBase
 	protected override async Task OnUpdate(Frame frame)
 	{
 
-		await _updateSyncCriticalSectionLock.WaitAsync();
-		try
-		{
-			_nextRenderPackets = await manager.engine.StateSync.RenderPacketsSwapPrior_New(_nextRenderPackets);
-			_renderLoopAutoResetEvent.Set();
-		}
-		finally
-		{
-			_updateSyncCriticalSectionLock.Release();
-		}
+		//////await _updateSyncCriticalSectionLock.WaitAsync();
+		//////try
+		//////{
+		//////	_tempRenderPackets = await manager.engine.StateSync.RenderPacketsSwapPrior_New(_tempRenderPackets);
+		//////	_renderLoopAutoResetEvent.Set();
+		//////	_tempRenderPackets = renderThreadInput.WriteAndSwap(_tempRenderPackets);
+		//////}
+		//////finally
+		//////{
+		//////	_updateSyncCriticalSectionLock.Release();
+		//////}
+
+		//get our render packets from prior frame and pass it to the render thread
+		_tempRenderPackets = await manager.engine.StateSync.RenderPacketsSwapPrior_New(_tempRenderPackets);
+		_tempRenderPackets = renderThreadInput.WriteAndSwap(_tempRenderPackets);
 	}
 
 
@@ -189,12 +196,23 @@ public class RenderReferenceImplementationSystem : SystemBase
 			_renderLoopAutoResetEvent.Set();
 			_renderTask.Wait();
 		}
+
 		_renderTask = null;
 		_renderThread.Dispose();
 		_renderThread = null;
 
 
 	}
+
+	public RecycleChannel<ConcurrentQueue<IRenderPacketNew>> renderThreadInput = new(
+		1,
+		() => new(),
+		(toClean) =>
+		{
+			toClean.Clear();
+			return toClean;
+		}
+	);
 
 	public static int mtId;
 	private async Task _RenderThread_Worker()
@@ -223,11 +241,17 @@ public class RenderReferenceImplementationSystem : SystemBase
 		try
 		{
 			Raylib.InitWindow(screenSize.Width, screenSize.Height, windowTitle);
-			//Raylib.SetTargetFPS(60);
+			Raylib.SetTargetFPS(60);
+			var swElapsed = Stopwatch.StartNew();
+			var swTotal = Stopwatch.StartNew();
+
 
 			while (!Raylib.WindowShouldClose() && IsRegistered && IsDisposed == false)
 			{
 				pswRenderLoop.Lap();
+				var elapsed = (float)swElapsed.Elapsed.TotalSeconds;
+				swElapsed.Restart();
+				var totalTime = (float)swTotal.Elapsed.TotalSeconds;
 
 				//if disabled, wait until we are not disabled
 				if (IsDisabled)
@@ -262,23 +286,27 @@ public class RenderReferenceImplementationSystem : SystemBase
 				//critical section that must not be raced by the main simulation's render update task
 				//this section swaps out our renderPacket queue with a "fresh" one from the engine threads
 				pswRenderPacketSync.Start();
-				{
-					await _renderLoopAutoResetEvent.WaitAsync();
-					await _updateSyncCriticalSectionLock.WaitAsync();
-					try
-					{
-						packetsCurrent = Interlocked.Exchange(ref _nextRenderPackets, packetsCurrent);
-						_renderLoopAutoResetEvent.Reset();
-					}
-					finally
-					{
-						_updateSyncCriticalSectionLock.Release();
-					}
-				}
+				//{
+				//	await _renderLoopAutoResetEvent.WaitAsync();
+				//	await _updateSyncCriticalSectionLock.WaitAsync();
+				//	try
+				//	{
+				//		packetsCurrent = Interlocked.Exchange(ref _tempRenderPackets, packetsCurrent);
+				//		_renderLoopAutoResetEvent.Reset();
+				//	}
+				//	finally
+				//	{
+				//		_updateSyncCriticalSectionLock.Release();
+				//	}
+				//}
+				packetsCurrent = await renderThreadInput.ReadAndSwap(packetsCurrent);
+
 				pswRenderPacketSync.LapAndReset();
 
 				#region TO_DELETE
-
+				Thread.CurrentThread.Priority = ThreadPriority.Highest;
+				Thread.BeginCriticalRegion();
+				Thread.BeginThreadAffinity();
 				//////obtain render packets for the most recent frame (N-1) in a locked fashion
 				////await _swapPacketsLock.WaitAsync();
 				////try
@@ -295,6 +323,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 
 				#endregion
 
+				//await Task.Delay(10);
 
 				pswRaylibDraw.Start();
 				pswRaylibSetup.Start();
@@ -333,6 +362,8 @@ public class RenderReferenceImplementationSystem : SystemBase
 					pswDoDraw.Start();
 					foreach (var renderPacket in _thread_renderPackets)
 					{
+						//__TEST_JITTER_RENDER_XFORM(elapsed, totalTime, renderPacket);
+
 						renderPacket.DoDraw();
 					}
 
@@ -352,7 +383,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 					Raylib.EndMode3D();
 					pswEnd3d.LapAndReset();
 					pswDrawText.Start();
-					Raylib.DrawText("Reference Rendering", 10, 40, 20, Color.DARKGRAY);
+					Raylib.DrawText($"Reference Rendering {this.renderThreadInput._reader.Count}", 10, 40, 20, Color.DARKGRAY);
 					pswDrawText.LapAndReset();
 					pswDrawFps.Start();
 					Raylib.DrawFPS(10, 10);
@@ -364,6 +395,9 @@ public class RenderReferenceImplementationSystem : SystemBase
 				pswRaylibTeardown.LapAndReset();
 
 				pswRaylibDraw.LapAndReset();
+
+				Thread.EndCriticalRegion();
+				Thread.EndThreadAffinity();
 			}
 			Raylib.CloseWindow();
 		}
@@ -376,4 +410,16 @@ public class RenderReferenceImplementationSystem : SystemBase
 		_ = manager.engine.Updater.Stop();
 	}
 
+	private static void __TEST_JITTER_RENDER_XFORM(float elapsed, float totalTime, IRenderPacketNew renderPacket)
+	{
+		var rp3d = renderPacket as RenderPacket3d;
+		var span = rp3d.instances.AsWriteSpan();
+		for (var i = 0; i < span.Length; i++)
+		{
+			ref var currXform = ref span[i];
+			var currentPos = currXform.Translation;
+			currXform = Matrix4x4.CreateFromYawPitchRoll(0, 0, i + totalTime);
+			currXform.Translation = currentPos + new Vector3(MathF.Sin(totalTime), 0f, MathF.Cos(totalTime)) * elapsed * 3;
+		}
+	}
 }
