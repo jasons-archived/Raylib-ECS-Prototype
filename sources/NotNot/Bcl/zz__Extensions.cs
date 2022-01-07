@@ -717,6 +717,7 @@ public static class zz_Extensions_Span
 	/// </summary>
 	public static unsafe bool _ReferenceEquals<T1, T2>(ref this Span<T1> target, ref Span<T2> other) where T1 : unmanaged where T2 : unmanaged
 	{
+		
 		fixed (T1* pSpan1 = target)
 		{
 			fixed (T2* pSpan2 = other)

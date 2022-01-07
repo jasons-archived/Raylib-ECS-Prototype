@@ -18,16 +18,16 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 using Nito.AsyncEx;
-using Raylib_cs;
-using static Raylib_cs.Raylib;
-using static Raylib_cs.ConfigFlags;
-using static Raylib_cs.Color;
-using static Raylib_cs.CameraProjection;
-using static Raylib_cs.ShaderLocationIndex;
-using static Raylib_cs.ShaderUniformDataType;
-using static Raylib_cs.MaterialMapIndex;
-using static Raylib_cs.CameraMode;
-using static Raylib_cs.KeyboardKey;
+using Raylib_CsLo;
+using static Raylib_CsLo.Raylib;
+using static Raylib_CsLo.ConfigFlags;
+using static Raylib_CsLo.Color;
+using static Raylib_CsLo.CameraProjection;
+using static Raylib_CsLo.ShaderLocationIndex;
+using static Raylib_CsLo.ShaderUniformDataType;
+using static Raylib_CsLo.MaterialMapIndex;
+using static Raylib_CsLo.CameraMode;
+using static Raylib_CsLo.KeyboardKey;
 using System.Runtime;
 using System.Runtime.InteropServices;
 
@@ -47,7 +47,7 @@ public class RenderSystem
 		target = new Vector3(0.0f, 0.0f, 0.0f),      // Camera3D looking at point
 		up = new Vector3(0.0f, 1.0f, 0.0f),          // Camera3D up vector (rotation towards target)
 		fovy = 45.0f,                             // Camera3D field-of-view Y
-		projection = CameraProjection.CAMERA_PERSPECTIVE,                   // Camera3D mode type
+		projection_ = CameraProjection.CAMERA_PERSPECTIVE,                   // Camera3D mode type
 	};
 
 	private Nito.AsyncEx.AsyncContextThread _renderThread;
@@ -67,7 +67,7 @@ public class RenderSystem
 	public async Task _RenderThread_Worker()
 	{
 		Console.WriteLine("render thread start");
-
+		//Raylib_CsLo.CsLoSettings.config.OpenGl43 = true;
 
 		//init
 		Raylib.InitWindow(screenSize.Width, screenSize.Height, windowTitle);
@@ -94,7 +94,7 @@ public class RenderSystem
 		Thread.CurrentThread.Priority = ThreadPriority.Highest;
 
 		Raylib.SetTargetFPS(120);
-
+		Raylib.SetWindowState(ConfigFlags.FLAG_VSYNC_HINT);
 		var swElapsed = Stopwatch.StartNew();
 		var swTotal = Stopwatch.StartNew();
 		//render loop
@@ -102,6 +102,7 @@ public class RenderSystem
 		var swEndDraw = new Stopwatch();
 		var swLoop = new Stopwatch();
 		var loopCount = 0;
+		var framesCounter = 0;
 		while (!Raylib.WindowShouldClose())
 		{
 			swLoop.Restart();
@@ -112,6 +113,21 @@ public class RenderSystem
 			swElapsed.Restart();
 			var totalTime = (float)swTotal.Elapsed.TotalSeconds;
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 			//await Task.Delay(rand.Next(10));
 
 			//Console.WriteLine($"_RenderThread_Worker AFINITY.  cpuId={Thread.GetCurrentProcessorId()}, mtId={Thread.CurrentThread.ManagedThreadId}");
@@ -121,8 +137,153 @@ public class RenderSystem
 
 			//draw
 			Raylib.BeginDrawing();
-			Raylib.ClearBackground(Color.RAYWHITE);
+			Raylib.ClearBackground(RAYWHITE);
 			Raylib.BeginMode3D(camera);
+
+
+
+
+
+
+
+
+
+
+
+
+
+			// Update
+			//-----------------------------------------------------
+			if (IsKeyPressed(KEY_F)) ToggleFullscreen();  // modifies window size when scaling!
+
+			if (IsKeyPressed(KEY_R))
+			{
+				if (IsWindowState(FLAG_WINDOW_RESIZABLE)) ClearWindowState(FLAG_WINDOW_RESIZABLE);
+				else SetWindowState(FLAG_WINDOW_RESIZABLE);
+				
+			}
+
+			if (IsKeyPressed(KEY_D))
+			{
+				if (IsWindowState(FLAG_WINDOW_UNDECORATED)) ClearWindowState(FLAG_WINDOW_UNDECORATED);
+				else SetWindowState(FLAG_WINDOW_UNDECORATED);
+			}
+
+			if (IsKeyPressed(KEY_H))
+			{
+				if (!IsWindowState(FLAG_WINDOW_HIDDEN)) SetWindowState(FLAG_WINDOW_HIDDEN);
+
+				framesCounter = 0;
+			}
+
+			if (IsWindowState(FLAG_WINDOW_HIDDEN))
+			{
+				framesCounter++;
+				if (framesCounter >= 240) ClearWindowState(FLAG_WINDOW_HIDDEN); // Show window after 3 seconds
+			}
+
+			if (IsKeyPressed(KEY_N))
+			{
+				if (!IsWindowState(FLAG_WINDOW_MINIMIZED)) MinimizeWindow();
+
+				framesCounter = 0;
+			}
+
+			if (IsWindowState(FLAG_WINDOW_MINIMIZED))
+			{
+				framesCounter++;
+				if (framesCounter >= 240) RestoreWindow(); // Restore window after 3 seconds
+			}
+
+			if (IsKeyPressed(KEY_M))
+			{
+				// NOTE: Requires FLAG_WINDOW_RESIZABLE enabled!
+				if (IsWindowState(FLAG_WINDOW_MAXIMIZED)) RestoreWindow();
+				else MaximizeWindow();
+			}
+
+			if (IsKeyPressed(KEY_U))
+			{
+				if (IsWindowState(FLAG_WINDOW_UNFOCUSED)) ClearWindowState(FLAG_WINDOW_UNFOCUSED);
+				else SetWindowState(FLAG_WINDOW_UNFOCUSED);
+			}
+
+			if (IsKeyPressed(KEY_T))
+			{
+				if (IsWindowState(FLAG_WINDOW_TOPMOST)) ClearWindowState(FLAG_WINDOW_TOPMOST);
+				else SetWindowState(FLAG_WINDOW_TOPMOST);
+			}
+
+			if (IsKeyPressed(KEY_A))
+			{
+				if (IsWindowState(FLAG_WINDOW_ALWAYS_RUN)) ClearWindowState(FLAG_WINDOW_ALWAYS_RUN);
+				else SetWindowState(FLAG_WINDOW_ALWAYS_RUN);
+			}
+
+			if (IsKeyPressed(KEY_V))
+			{
+				if (IsWindowState(FLAG_VSYNC_HINT)) ClearWindowState(FLAG_VSYNC_HINT);
+				else SetWindowState(FLAG_VSYNC_HINT);
+			}
+			DrawText(TextFormat("Screen Size: [%i, %i]", GetScreenWidth(), GetScreenHeight()), 10, 40, 10, GREEN);
+
+			// Draw window state info
+			DrawText("Following flags can be set after window creation:", 10, 60, 10, GRAY);
+			if (IsWindowState(FLAG_FULLSCREEN_MODE)) DrawText("[F] FLAG_FULLSCREEN_MODE: on", 10, 80, 10, LIME);
+			else DrawText("[F] FLAG_FULLSCREEN_MODE: off", 10, 80, 10, MAROON);
+			if (IsWindowState(FLAG_WINDOW_RESIZABLE)) DrawText("[R] FLAG_WINDOW_RESIZABLE: on", 10, 100, 10, LIME);
+			else DrawText("[R] FLAG_WINDOW_RESIZABLE: off", 10, 100, 10, MAROON);
+			if (IsWindowState(FLAG_WINDOW_UNDECORATED)) DrawText("[D] FLAG_WINDOW_UNDECORATED: on", 10, 120, 10, LIME);
+			else DrawText("[D] FLAG_WINDOW_UNDECORATED: off", 10, 120, 10, MAROON);
+			if (IsWindowState(FLAG_WINDOW_HIDDEN)) DrawText("[H] FLAG_WINDOW_HIDDEN: on", 10, 140, 10, LIME);
+			else DrawText("[H] FLAG_WINDOW_HIDDEN: off", 10, 140, 10, MAROON);
+			if (IsWindowState(FLAG_WINDOW_MINIMIZED)) DrawText("[N] FLAG_WINDOW_MINIMIZED: on", 10, 160, 10, LIME);
+			else DrawText("[N] FLAG_WINDOW_MINIMIZED: off", 10, 160, 10, MAROON);
+			if (IsWindowState(FLAG_WINDOW_MAXIMIZED)) DrawText("[M] FLAG_WINDOW_MAXIMIZED: on", 10, 180, 10, LIME);
+			else DrawText("[M] FLAG_WINDOW_MAXIMIZED: off", 10, 180, 10, MAROON);
+			if (IsWindowState(FLAG_WINDOW_UNFOCUSED)) DrawText("[G] FLAG_WINDOW_UNFOCUSED: on", 10, 200, 10, LIME);
+			else DrawText("[U] FLAG_WINDOW_UNFOCUSED: off", 10, 200, 10, MAROON);
+			if (IsWindowState(FLAG_WINDOW_TOPMOST)) DrawText("[T] FLAG_WINDOW_TOPMOST: on", 10, 220, 10, LIME);
+			else DrawText("[T] FLAG_WINDOW_TOPMOST: off", 10, 220, 10, MAROON);
+			if (IsWindowState(FLAG_WINDOW_ALWAYS_RUN)) DrawText("[A] FLAG_WINDOW_ALWAYS_RUN: on", 10, 240, 10, LIME);
+			else DrawText("[A] FLAG_WINDOW_ALWAYS_RUN: off", 10, 240, 10, MAROON);
+			if (IsWindowState(FLAG_VSYNC_HINT)) DrawText("[V] FLAG_VSYNC_HINT: on", 10, 260, 10, LIME);
+			else DrawText("[V] FLAG_VSYNC_HINT: off", 10, 260, 10, MAROON);
+
+			DrawText("Following flags can only be set before window creation:", 10, 300, 10, GRAY);
+			if (IsWindowState(FLAG_WINDOW_HIGHDPI)) DrawText("FLAG_WINDOW_HIGHDPI: on", 10, 320, 10, LIME);
+			else DrawText("FLAG_WINDOW_HIGHDPI: off", 10, 320, 10, MAROON);
+			if (IsWindowState(FLAG_WINDOW_TRANSPARENT)) DrawText("FLAG_WINDOW_TRANSPARENT: on", 10, 340, 10, LIME);
+			else DrawText("FLAG_WINDOW_TRANSPARENT: off", 10, 340, 10, MAROON);
+			if (IsWindowState(FLAG_MSAA_4X_HINT)) DrawText("FLAG_MSAA_4X_HINT: on", 10, 360, 10, LIME);
+			else DrawText("FLAG_MSAA_4X_HINT: off", 10, 360, 10, MAROON);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 			//draw renderpackets
 			technique.DoDraw(renderPacket);
 			//await DoDraw(technique, renderPacket);
@@ -141,17 +302,17 @@ public class RenderSystem
 				//GC.WaitForPendingFinalizers();
 				var current = GCSettings.LatencyMode;
 				GCSettings.LatencyMode = GCLatencyMode.LowLatency;
-				var crit = GC.TryStartNoGCRegion(100000000);
+				//var crit = GC.TryStartNoGCRegion(100000000);
 				{
 					//Raylib.EndDrawing();
-					Thread.BeginCriticalRegion();
+					//Thread.BeginCriticalRegion();
 					EndDrawing();
-					Thread.EndCriticalRegion();
+					//Thread.EndCriticalRegion();
 				}
-				if (crit)
-				{
-					GC.EndNoGCRegion();
-				}
+				//if (crit)
+				//{
+				//	GC.EndNoGCRegion();
+				//}
 				GCSettings.LatencyMode = current;
 			}
 			renderGate.Set();
@@ -175,11 +336,11 @@ public class RenderSystem
 		technique.DoDraw(renderPacket);
 		await Task.Delay(0);
 	}
-	/// <summary>End canvas drawing and swap buffers (double buffering)</summary>
-	[DllImport("raylib", CallingConvention = CallingConvention.Cdecl)]
-	//[System.Runtime.]
-	//[SuppressGCTransition]
-	public static extern void EndDrawing();
+	///// <summary>End canvas drawing and swap buffers (double buffering)</summary>
+	//[DllImport("raylib", CallingConvention = CallingConvention.Cdecl)]
+	////[System.Runtime.]
+	////[SuppressGCTransition]
+	//public static extern void EndDrawing();
 
 
 	private void _UpdateRenderPacket(RenderPacket3d renderPacket, float elapsed, float totalTime)
@@ -240,7 +401,7 @@ public class ModelTechnique
 		material = Raylib.LoadMaterialDefault();
 		unsafe
 		{
-			MaterialMap* maps = (MaterialMap*)material.maps.ToPointer();
+			MaterialMap* maps = (MaterialMap*)material.maps;//.ToPointer();
 			maps[(int)MATERIAL_MAP_DIFFUSE].color = RED;
 			//((MaterialMap*)material.maps)[(int)MATERIAL_MAP_DIFFUSE].color = RED;
 		}

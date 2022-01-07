@@ -166,16 +166,23 @@ Logical object structure is
     - https://github.com/JamieDixon/GraphViz-C-Sharp-Wrapper
     - https://github.com/klassmann/libnoise-csharp
 
+- logging
+  - good no allocation logger
+    - https://github.com/Cysharp/ZLogger/
 
 - timestep smoothing
   - https://blog.unity.com/technology/fixing-time-deltatime-in-unity-2020-2-for-smoother-gameplay-what-did-it-take
   - https://www.gafferongames.com/post/fix_your_timestep/
-
+  - **increase timer resoultion to 1ms**
+    - https://docs.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timebeginperiod
+    - https://newbedev.com/why-are-net-timers-limited-to-15-ms-resolution
 
 - perlin / noise generation
   - https://github.com/Auburn/FastNoiseLite
 
-
+- GC / Native Gen
+  - https://github.com/MichalStrehovsky/zerosharp
+  - https://github.com/dotnet/runtimelab/tree/feature/NativeAOT
 - **CPP INTEROP**
   - generate pinvoke / extern bindings for clang/cpp projects
     - https://github.com/microsoft/clangsharp#generating-bindings
@@ -266,7 +273,8 @@ raylib seems most complete.  meaning least work to get a working renderer out-of
    - https://www.raylib.com/examples.html
 - raylib based debug frames.  **EXCELENT**
   - https://github.com/JeffM2501/TestFrame
-
+- better camera implementation  https://github.com/raylib-extras/extras-c/tree/main/cameras
+- 
 ### Spatial partitioning notes
 
 - re monogame discord

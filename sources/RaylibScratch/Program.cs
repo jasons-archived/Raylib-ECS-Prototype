@@ -18,22 +18,24 @@ while (true)
 	await renderSystem.renderGate.WaitAsync();
 	loopCount++;
 	swMainLoop.Restart();
-	//List<Task> tasks = new();
-	//List<Object> objects = new();
-	//for (var i = 0; i < 500; i++)
-	//{
-	//	objects.Add((object)i);
-	//	;
-	//	var task = Task.Run(async () =>
-	//	{
-	//		var rand = new Random();
-	//		var awaitTask = Task.Delay(rand.Next(10));
-	//		Thread.SpinWait(100); //increase some time of main loop
-	//		await awaitTask;
-	//	});
-	//	tasks.Add(task);
-	//}
-	//await Task.WhenAll(tasks);
+	List<Task> tasks = new();
+	List<Object> objects = new();
+	for (var i = 0; i < 50; i++)
+	{
+		objects.Add((object)i);
+		;
+		var task = Task.Run(async () =>
+		{
+			var rand = new Random();
+			var awaitTask = Task.Delay(rand.Next(10));
+			Thread.SpinWait(100); //increase some time of main loop
+			await awaitTask;
+		});
+		tasks.Add(task);
+	}
+	await Task.WhenAll(tasks);
+
+	//Thread.SpinWait(10000000);
 
 	if (renderSystem.renderTask.IsCompleted)
 	{
