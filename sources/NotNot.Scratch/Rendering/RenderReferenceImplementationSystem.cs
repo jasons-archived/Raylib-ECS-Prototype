@@ -6,7 +6,7 @@ using NotNot.Bcl.Diagnostics;
 using NotNot.Bcl.Threading;
 using NotNot.Ecs;
 using NotNot.SimPipeline;
-using Raylib_cs;
+using Raylib_CsLo;
 
 namespace NotNot.Rendering;
 
@@ -31,7 +31,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 		target = new Vector3(0.0f, 0.0f, 0.0f), // Camera3D looking at point
 		up = new Vector3(0.0f, 1.0f, 0.0f), // Camera3D up vector (rotation towards target)
 		fovy = 45.0f, // Camera3D field-of-view Y
-		projection = CameraProjection.CAMERA_PERSPECTIVE, // Camera3D mode type
+		projection_ = CameraProjection.CAMERA_PERSPECTIVE, // Camera3D mode type
 	};
 
 	//private CustomTaskScheduler renderScheduler = new CustomTaskScheduler(1);
@@ -328,8 +328,8 @@ public class RenderReferenceImplementationSystem : SystemBase
 				pswRaylibDraw.Start();
 				pswRaylibSetup.Start();
 				Raylib.BeginDrawing();
-
-				Raylib.ClearBackground(Color.RAYWHITE);
+				
+				Raylib.ClearBackground(Raylib.RAYWHITE);
 				Raylib.BeginMode3D(camera);
 				pswRaylibSetup.LapAndReset();
 
@@ -383,7 +383,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 					Raylib.EndMode3D();
 					pswEnd3d.LapAndReset();
 					pswDrawText.Start();
-					Raylib.DrawText($"Reference Rendering {this.renderThreadInput._reader.Count}", 10, 40, 20, Color.DARKGRAY);
+					Raylib.DrawText($"Reference Rendering {this.renderThreadInput._reader.Count}", 10, 40, 20, Raylib.DARKGRAY);
 					pswDrawText.LapAndReset();
 					pswDrawFps.Start();
 					Raylib.DrawFPS(10, 10);

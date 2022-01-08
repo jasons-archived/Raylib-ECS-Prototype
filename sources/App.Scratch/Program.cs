@@ -15,17 +15,17 @@
 
 using System;
 using System.Numerics;
-using Raylib_cs;
+using Raylib_CsLo;
 using NotNot;
-using static Raylib_cs.Raylib;
-using static Raylib_cs.ConfigFlags;
-using static Raylib_cs.Color;
-using static Raylib_cs.CameraProjection;
-using static Raylib_cs.ShaderLocationIndex;
-using static Raylib_cs.ShaderUniformDataType;
-using static Raylib_cs.MaterialMapIndex;
-using static Raylib_cs.CameraMode;
-using static Raylib_cs.KeyboardKey;
+using static Raylib_CsLo.Raylib;
+using static Raylib_CsLo.ConfigFlags;
+using static Raylib_CsLo.Color;
+using static Raylib_CsLo.CameraProjection;
+using static Raylib_CsLo.ShaderLocationIndex;
+using static Raylib_CsLo.ShaderUniformDataType;
+using static Raylib_CsLo.MaterialMapIndex;
+using static Raylib_CsLo.CameraMode;
+using static Raylib_CsLo.KeyboardKey;
 
 
 public class shaders_mesh_instancing
@@ -58,7 +58,7 @@ public class shaders_mesh_instancing
 		camera.target = new Vector3(0.0f, 0.0f, 0.0f);
 		camera.up = new Vector3(0.0f, 1.0f, 0.0f);
 		camera.fovy = 45.0f;
-		camera.projection = CAMERA_PERSPECTIVE;
+		camera.projection_ = CAMERA_PERSPECTIVE;
 
 		// Number of instances to display
 		const int instances = 2;
@@ -80,7 +80,7 @@ public class shaders_mesh_instancing
 			y = GetRandomValue(0, 360);
 			z = GetRandomValue(0, 360);
 			Vector3 axis = Vector3.Normalize(new Vector3(x, y, z));
-			float angle = (float)GetRandomValue(0, 10) * DEG2RAD;
+			float angle = (float)GetRandomValue(0, 10) * RayMath.DEG2RAD;
 
 			rotationsInc[i] = Matrix4x4.CreateFromAxisAngle(axis, angle);
 			rotations[i] = Matrix4x4.Identity;
@@ -101,15 +101,16 @@ public class shaders_mesh_instancing
 
 		// Ambient light level
 		int ambientLoc = GetShaderLocation(shader, "ambient");
-		Utils.SetShaderValue(shader, ambientLoc, new float[] { 0.2f, 0.2f, 0.2f, 1.0f }, SHADER_UNIFORM_VEC4);
+		Raylib.SetShaderValue(shader, ambientLoc, new float[] { 0.2f, 0.2f, 0.2f, 1.0f }, SHADER_UNIFORM_VEC4);
 
-		Rlights.CreateLight(0, LightType.LIGHT_DIRECTIONAL, new Vector3(50, 50, 0), Vector3.Zero, WHITE, shader);
+		var rLights = new NotNot.Rendering.RLights();
+		rLights.CreateLight(NotNot.Rendering.RLights.LightType.LIGHT_DIRECTIONAL, new Vector3(50, 50, 0), Vector3.Zero, WHITE, shader);
 
 		Material material = LoadMaterialDefault();
 		material.shader = shader;
 		unsafe
 		{
-			MaterialMap* maps = (MaterialMap*)material.maps.ToPointer();
+			MaterialMap* maps = (MaterialMap*)material.maps;
 			maps[(int)MATERIAL_MAP_DIFFUSE].color = RED;
 		}
 
@@ -139,7 +140,7 @@ public class shaders_mesh_instancing
 			// Update the light shader with the camera view position
 			//float[] cameraPos = { camera.position.X, camera.position.Y, camera.position.Z };
 			//Utils.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, cameraPos, SHADER_UNIFORM_VEC3);
-			Utils.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, ref camera.position, SHADER_UNIFORM_VEC3);
+			Raylib.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, ref camera.position, SHADER_UNIFORM_VEC3);
 
 			// Apply per-instance transformations
 			for (int i = 0; i < instances; i++)

@@ -14,17 +14,17 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
-using Raylib_cs;
+using Raylib_CsLo;
 
-using static Raylib_cs.Raylib;
-using static Raylib_cs.ConfigFlags;
-using static Raylib_cs.Color;
-using static Raylib_cs.CameraProjection;
-using static Raylib_cs.ShaderLocationIndex;
-using static Raylib_cs.ShaderUniformDataType;
-using static Raylib_cs.MaterialMapIndex;
-using static Raylib_cs.CameraMode;
-using static Raylib_cs.KeyboardKey;
+using static Raylib_CsLo.Raylib;
+using static Raylib_CsLo.ConfigFlags;
+using static Raylib_CsLo.Color;
+using static Raylib_CsLo.CameraProjection;
+using static Raylib_CsLo.ShaderLocationIndex;
+using static Raylib_CsLo.ShaderUniformDataType;
+using static Raylib_CsLo.MaterialMapIndex;
+using static Raylib_CsLo.CameraMode;
+using static Raylib_CsLo.KeyboardKey;
 
 namespace NotNot.Rendering;
 
@@ -55,9 +55,10 @@ public class BatchedModelTechnique : IRenderTechnique3d
 		}
 		// Ambient light level
 		int ambientLoc = GetShaderLocation(shader, "ambient");
-		Utils.SetShaderValue(shader, ambientLoc, new float[] { 0.2f, 0.2f, 0.2f, 1.0f }, SHADER_UNIFORM_VEC4);
+		Raylib.SetShaderValue(shader, ambientLoc, new float[] { 0.2f, 0.2f, 0.2f, 1.0f }, SHADER_UNIFORM_VEC4);
 
-		Rlights.CreateLight(0, LightType.LIGHT_DIRECTIONAL, new Vector3(50, 50, 0), Vector3.Zero, WHITE, shader);
+		lights = new RLights();
+		lights.CreateLight(RLights.LightType.LIGHT_DIRECTIONAL, new Vector3(50, 50, 0), Vector3.Zero, WHITE, shader);
 
 		//Material material = LoadMaterialDefault();
 
@@ -79,7 +80,7 @@ public class BatchedModelTechnique : IRenderTechnique3d
 	public Mesh mesh;
 	public Shader shader;
 	public Material material;
-
+	public RLights lights;
 
 
 	public void DoDraw(RenderPacket3d renderPacket)
@@ -90,8 +91,8 @@ public class BatchedModelTechnique : IRenderTechnique3d
 		}
 		//__DEBUG.Throw(IsInitialized);
 
-		Utils.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, new Vector3[] { RenderReferenceImplementationSystem.camera.position }, SHADER_UNIFORM_VEC3);
-		Utils.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, RenderReferenceImplementationSystem.camera.position, SHADER_UNIFORM_VEC3);
+		Raylib.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, new Vector3[] { RenderReferenceImplementationSystem.camera.position }, SHADER_UNIFORM_VEC3);
+		Raylib.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, RenderReferenceImplementationSystem.camera.position, SHADER_UNIFORM_VEC3);
 
 		var xforms = renderPacket.instances.Span;
 		//var mesh = renderMesh.mesh;

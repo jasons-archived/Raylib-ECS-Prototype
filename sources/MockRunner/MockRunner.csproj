@@ -25,11 +25,11 @@
   <ItemGroup>
     <PackageReference Include="BepuPhysics" Version="2.4.0-beta7" />
     <PackageReference Include="BepuUtilities" Version="2.4.0-beta7" />
-    <PackageReference Include="Raylib-cs" Version="3.7.0.1" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\NotNot\NotNot.csproj" />
+    <ProjectReference Include="..\sub-modules\Raylib-CsLo\Raylib-CsLo\Raylib-CsLo.csproj" />
     <ProjectReference Include="..\Tests\Tests.csproj" />
   </ItemGroup>
 

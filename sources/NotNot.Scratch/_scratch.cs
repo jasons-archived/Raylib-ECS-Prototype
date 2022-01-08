@@ -5,7 +5,7 @@ using NotNot.Bcl.Diagnostics;
 using NotNot.Ecs;
 using NotNot.Ecs.Allocation;
 using NotNot.SimPipeline;
-using Raylib_cs;
+using Raylib_CsLo;
 
 using NotNot.Rendering;
 
@@ -166,8 +166,8 @@ public record struct Move
 
 public class RenderMesh
 {
-	public Raylib_cs.Mesh mesh;
-	public Raylib_cs.Material material;
+	public Raylib_CsLo.Mesh mesh;
+	public Raylib_CsLo.Material material;
 
 	public CombinedHash combinedHash;
 

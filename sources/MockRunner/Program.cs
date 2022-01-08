@@ -2,7 +2,7 @@ global using NotNot;
 using NotNot.Bcl;
 using NotNot.Ecs;
 using NotNot.Rendering;
-using Raylib_cs;
+using Raylib_CsLo;
 using System.Numerics;
 using System.Threading.Tasks;
 
@@ -30,7 +30,7 @@ boxModel.OnInitialize=(_this)=>
 	_this.material = Raylib.LoadMaterialDefault();
 	unsafe
 	{
-		boxModel.material.maps._As<MaterialMap>()[(int)MaterialMapIndex.MATERIAL_MAP_DIFFUSE].color = Color.LIME;
+		boxModel.material.maps[(int)MaterialMapIndex.MATERIAL_MAP_ALBEDO].color = Raylib.LIME;
 	}
 };
 var renderDescription = new RenderDescription() { techniques = { boxModel } };
