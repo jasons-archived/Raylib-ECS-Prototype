@@ -22,7 +22,7 @@ engine.DefaultWorld.Phase2_Simulation.AddChild(new RenderPacketGenerationSystem(
 engine.Updater.Start();
 
 //create a box mesh+material used for rendering
-var boxModel = new BatchedModelTechnique();
+var boxModel = new StaticModelTechnique();
 //init gfx via a callback.  this is needed because opengl only runs single threaded
 boxModel.OnInitialize=(_this)=>
 {

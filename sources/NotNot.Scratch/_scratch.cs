@@ -293,7 +293,7 @@ public struct IsVisible : IEcsComponent
 public class RenderPacketGenerationSystem : NotNot.Ecs.System
 {
 	EntityQuery positionQuery;
-	BatchedModelTechnique asset = new();
+	StaticModelTechnique asset = new();
 	protected override void OnInitialize()
 	{
 		base.OnInitialize();

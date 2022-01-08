@@ -241,7 +241,8 @@ public class RenderReferenceImplementationSystem : SystemBase
 		try
 		{
 			Raylib.InitWindow(screenSize.Width, screenSize.Height, windowTitle);
-			Raylib.SetTargetFPS(60);
+			//Raylib.SetTargetFPS(60);
+			
 			var swElapsed = Stopwatch.StartNew();
 			var swTotal = Stopwatch.StartNew();
 

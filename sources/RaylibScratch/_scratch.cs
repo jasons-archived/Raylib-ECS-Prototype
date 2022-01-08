@@ -374,7 +374,7 @@ public class ModelTechnique
 
 		//shader
 		{
-			shader = Raylib.LoadShader("resources/shaders/glsl330/base_lighting.vs",
+			shader = Raylib.LoadShader("resources/shaders/glsl330/base_lighting_instanced.vs",
 				"resources/shaders/glsl330/lighting.fs"); //TODO: move to a global
 
 			// Get some shader loactions
@@ -390,9 +390,7 @@ public class ModelTechnique
 			int ambientLoc = GetShaderLocation(shader, "ambient");
 
 			Raylib.SetShaderValue(shader, ambientLoc, new float[] { 0.2f, 0.2f, 0.2f, 1.0f }, SHADER_UNIFORM_VEC4);
-
-
-			//Rlights.CreateLight(0, LightType.LIGHT_DIRECTIONAL, new Vector3(50, 50, 0), Vector3.Zero, WHITE, shader);
+			Rlights.CreateLight(0, LightType.LIGHT_DIRECTIONAL, new Vector3(50, 50, 0), Vector3.Zero, WHITE, shader);
 		}
 
 		//mesh
@@ -400,6 +398,7 @@ public class ModelTechnique
 
 		//material
 		material = Raylib.LoadMaterialDefault();
+		material.shader = shader;
 		unsafe
 		{
 			MaterialMap* maps = (MaterialMap*)material.maps;//.ToPointer();
@@ -409,7 +408,7 @@ public class ModelTechnique
 	}
 
 
-	public void DoDraw(RenderPacket3d renderPacket)
+	public unsafe void DoDraw(RenderPacket3d renderPacket)
 	{
 
 
@@ -419,11 +418,24 @@ public class ModelTechnique
 		var xforms = renderPacket.instances;
 		//var mesh = renderMesh.mesh;
 		//var material = renderMesh.material;
-		//TODO: when raylib 4 is released change to use instanced based.   right now (3.7.x) there's a bug where it doesn't render instances=1
-		for (var i = 0; i < xforms.Length; i++)
+		//instanced
 		{
-			Raylib.DrawMesh(mesh, material, Matrix4x4.Transpose(xforms[i])); //IMPORTANT: raylib is row-major.   need to transpose dotnet (column major) to match
+			var transposedXforms = stackalloc Matrix4x4[xforms.Length];
+			//var transposedXforms = Mem<Matrix4x4>.Allocate(xforms.Length, false);
+			for (var i = 0; i < xforms.Length; i++)
+			{
+				transposedXforms[i] = Matrix4x4.Transpose(xforms[i]); //IMPORTANT: raylib is row-major.   need to transpose dotnet (column major) to match
+			}
+			Raylib.DrawMeshInstanced(mesh, material, transposedXforms, xforms.Length);
 		}
+		//non-instanced
+		{
+			//for (var i = 0; i < xforms.Length; i++)
+			//{
+			//	Raylib.DrawMesh(mesh, material, Matrix4x4.Transpose(xforms[i])); //IMPORTANT: raylib is row-major.   need to transpose dotnet (column major) to match
+			//}
+		}
+
 		if (xforms.Length == 0)
 		{
 			Console.WriteLine("Packet is EMPTY!!>?!?!");
