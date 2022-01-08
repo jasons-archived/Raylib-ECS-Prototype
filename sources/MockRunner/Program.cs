@@ -28,9 +28,10 @@ boxModel.OnInitialize=(_this)=>
 {
 	_this.mesh = Raylib.GenMeshCube(1, 1, 1);
 	_this.material = Raylib.LoadMaterialDefault();
+	_this.material.shader = _this.shader;
 	unsafe
 	{
-		boxModel.material.maps[(int)MaterialMapIndex.MATERIAL_MAP_ALBEDO].color = Raylib.LIME;
+		_this.material.maps[(int)MaterialMapIndex.MATERIAL_MAP_ALBEDO].color = Raylib.LIME;
 	}
 };
 var renderDescription = new RenderDescription() { techniques = { boxModel } };

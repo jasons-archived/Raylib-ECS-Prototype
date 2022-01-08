@@ -25,6 +25,7 @@ using static Raylib_CsLo.ShaderUniformDataType;
 using static Raylib_CsLo.MaterialMapIndex;
 using static Raylib_CsLo.CameraMode;
 using static Raylib_CsLo.KeyboardKey;
+using NotNot.Bcl;
 
 namespace NotNot.Rendering;
 
@@ -40,10 +41,11 @@ public class BatchedModelTechnique : IRenderTechnique3d
 		if (IsInitialized) { return; }
 		IsInitialized = true;
 
-		OnInitialize(this);
-
 		//Mesh cube = Raylib.GenMeshCube(1.0f, 1.0f, 1.0f);
-		Shader shader = Raylib.LoadShader("resources/shaders/glsl330/base_lighting.vs", "resources/shaders/glsl330/lighting.fs"); //TODO: move to a global
+		//shader = Raylib.LoadShader("resources/shaders/glsl330/base_lighting_instanced.vs", "resources/shaders/glsl330/lighting.fs"); //TODO: move to a global
+		shader = Raylib.LoadShader("resources/shaders/glsl330/base_lighting_instanced.vs", "resources/shaders/glsl330/lighting.fs"); //TODO: move to a global
+
+
 
 		// Get some shader loactions
 		unsafe
@@ -60,6 +62,8 @@ public class BatchedModelTechnique : IRenderTechnique3d
 		lights = new RLights();
 		lights.CreateLight(RLights.LightType.LIGHT_DIRECTIONAL, new Vector3(50, 50, 0), Vector3.Zero, WHITE, shader);
 
+
+		OnInitialize(this);
 		//Material material = LoadMaterialDefault();
 
 		//unsafe
@@ -71,7 +75,7 @@ public class BatchedModelTechnique : IRenderTechnique3d
 
 
 		//mesh = cube;
-		this.shader = shader;
+		//this.shader = shader;
 		//this.material = material;
 	}
 
@@ -97,10 +101,21 @@ public class BatchedModelTechnique : IRenderTechnique3d
 		var xforms = renderPacket.instances.Span;
 		//var mesh = renderMesh.mesh;
 		//var material = renderMesh.material;
-		//TODO: when raylib 4 is released change to use instanced based.   right now (3.7.x) there's a bug where it doesn't render instances=1
-		for (var i = 0; i < xforms.Length; i++)
+		//instanced
 		{
-			Raylib.DrawMesh(mesh, material, Matrix4x4.Transpose(xforms[i])); //IMPORTANT: raylib is row-major.   need to transpose dotnet (column major) to match
+			var transposedXforms = Mem<Matrix4x4>.Allocate(xforms.Length, false);
+			for (var i = 0; i < xforms.Length; i++)
+			{
+				transposedXforms[i] = Matrix4x4.Transpose(xforms[i]); //IMPORTANT: raylib is row-major.   need to transpose dotnet (column major) to match
+			}
+			Raylib.DrawMeshInstanced(mesh, material, transposedXforms.Span, transposedXforms.length);
+		}
+		//non-instanced
+		{
+			//for (var i = 0; i < xforms.Length; i++)
+			//{
+			//	Raylib.DrawMesh(mesh, material, Matrix4x4.Transpose(xforms[i])); //IMPORTANT: raylib is row-major.   need to transpose dotnet (column major) to match
+			//}
 		}
 		if (xforms.Length == 0)
 		{

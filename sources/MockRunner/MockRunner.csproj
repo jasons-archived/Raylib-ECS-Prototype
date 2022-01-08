@@ -32,4 +32,9 @@
     <ProjectReference Include="..\NotNot\NotNot.csproj" />
   </ItemGroup>
 
+    <ItemGroup>
+        <Content Include="resources\**">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
 </Project>

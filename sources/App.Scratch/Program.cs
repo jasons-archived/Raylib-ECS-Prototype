@@ -26,7 +26,7 @@ using static Raylib_CsLo.ShaderUniformDataType;
 using static Raylib_CsLo.MaterialMapIndex;
 using static Raylib_CsLo.CameraMode;
 using static Raylib_CsLo.KeyboardKey;
-
+using NotNot.Bcl;
 
 public class shaders_mesh_instancing
 {
@@ -61,8 +61,7 @@ public class shaders_mesh_instancing
 		camera.projection_ = CAMERA_PERSPECTIVE;
 
 		// Number of instances to display
-		const int instances = 1;
-		Mesh cube = GenMeshCube(1.0f, 1.0f, 1.0f);
+		const int instances = 10;
 
 		Matrix4x4[] rotations = new Matrix4x4[instances];    // Rotation state of instances
 		Matrix4x4[] rotationsInc = new Matrix4x4[instances]; // Per-frame rotation animation of instances
@@ -114,23 +113,24 @@ public class shaders_mesh_instancing
 			maps[(int)MATERIAL_MAP_DIFFUSE].color = RED;
 		}
 
-		SetCameraMode(camera, CAMERA_FREE); // Set a free camera mode
 
 		int textPositionY = 300;
 
 		// Simple frames counter to manage animation
 		int framesCounter = 0;
 
-		var cubeModel = LoadModelFromMesh(cube);
+		Mesh cube = GenMeshCube(1.0f, 1.0f, 1.0f);
+		//var cubeModel = LoadModelFromMesh(cube);
 		//unsafe
 		//{
 		//	Material* materials = (Material*)cubeModel.materials;
 		//	materials[0] = material;
 		//}
-		
+
+		SetCameraMode(camera, CAMERA_FREE); // Set a free camera mode
 
 		//SetTargetFPS(fps);                   // Set our game to run at 60 frames-per-second
-											 //--------------------------------------------------------------------------------------
+		//--------------------------------------------------------------------------------------
 
 		// Main game loop
 		while (!WindowShouldClose())        // Detect window close button or ESC key
@@ -168,8 +168,12 @@ public class shaders_mesh_instancing
 			ClearBackground(RAYWHITE);
 
 			BeginMode3D(camera);
-			DrawMeshInstanced(cube, material, transforms, instances);
-			//DrawModelEx()
+			var transposedXforms = Mem<Matrix4x4>.Allocate(transforms, false);
+
+			//DrawMeshInstanced(cube, material, transforms, instances);
+			DrawMeshInstanced(cube, material, transposedXforms.Span, instances);
+
+			//
 			//for (var i = 0; i < instances; ++i)
 			//{
 			//	DrawMesh(cube, material, transforms[i]);
