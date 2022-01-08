@@ -95,6 +95,10 @@ NotNot is a grand experiment in open source: Is there room for another open sour
 
 # ChangeLog Summary
 A short summary of work done every few days
+- 2022.01.08
+  - port rendering to Raylib-CsLo, get instancing working, work on abstracting render details from main engine.
+- 2021.12.20
+  - spent last month writing [Raylib-CsLo: a C# wrapper over Raylib](https://github.com/NotNotTech/Raylib-CsLo).  This will be the "placeholder" rendering system while the rest of the engine is developed.
 - 2021.10.28
   - rendering thread and renderpacket workflow+foundations coded and bugs ironed out. 
   - wip: add async/task synchronization 
