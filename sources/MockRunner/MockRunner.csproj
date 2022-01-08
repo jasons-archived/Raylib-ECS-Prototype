@@ -28,9 +28,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\NotNot.Scratch\NotNot.Scratch.csproj" />
     <ProjectReference Include="..\NotNot\NotNot.csproj" />
-    <ProjectReference Include="..\sub-modules\Raylib-CsLo\Raylib-CsLo\Raylib-CsLo.csproj" />
-    <ProjectReference Include="..\Tests\Tests.csproj" />
   </ItemGroup>
 
 </Project>

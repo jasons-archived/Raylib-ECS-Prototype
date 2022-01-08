@@ -368,7 +368,7 @@ public class ModelTechnique
 	public Mesh mesh;
 	public Shader shader;
 	public Material material;
-
+	//public 
 	public void Init()
 	{
 
@@ -389,9 +389,10 @@ public class ModelTechnique
 			// Ambient light level
 			int ambientLoc = GetShaderLocation(shader, "ambient");
 
-			Utils.SetShaderValue(shader, ambientLoc, new float[] { 0.2f, 0.2f, 0.2f, 1.0f }, SHADER_UNIFORM_VEC4);
+			Raylib.SetShaderValue(shader, ambientLoc, new float[] { 0.2f, 0.2f, 0.2f, 1.0f }, SHADER_UNIFORM_VEC4);
 
-			Rlights.CreateLight(0, LightType.LIGHT_DIRECTIONAL, new Vector3(50, 50, 0), Vector3.Zero, WHITE, shader);
+
+			//Rlights.CreateLight(0, LightType.LIGHT_DIRECTIONAL, new Vector3(50, 50, 0), Vector3.Zero, WHITE, shader);
 		}
 
 		//mesh
@@ -412,8 +413,8 @@ public class ModelTechnique
 	{
 
 
-		Utils.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, new Vector3[] { RenderSystem.camera.position }, SHADER_UNIFORM_VEC3);
-		Utils.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, RenderSystem.camera.position, SHADER_UNIFORM_VEC3);
+		Raylib.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, new Vector3[] { RenderSystem.camera.position }, SHADER_UNIFORM_VEC3);
+		Raylib.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, RenderSystem.camera.position, SHADER_UNIFORM_VEC3);
 
 		var xforms = renderPacket.instances;
 		//var mesh = renderMesh.mesh;

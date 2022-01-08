@@ -61,7 +61,7 @@ public class shaders_mesh_instancing
 		camera.projection_ = CAMERA_PERSPECTIVE;
 
 		// Number of instances to display
-		const int instances = 2;
+		const int instances = 1;
 		Mesh cube = GenMeshCube(1.0f, 1.0f, 1.0f);
 
 		Matrix4x4[] rotations = new Matrix4x4[instances];    // Rotation state of instances
@@ -87,8 +87,8 @@ public class shaders_mesh_instancing
 		}
 
 		Matrix4x4[] transforms = new Matrix4x4[instances];   // Pre-multiplied transformations passed to rlgl
-		//Shader shader = LoadShader("resources/shaders/glsl330/base_lighting_instanced.vs", "resources/shaders/glsl330/lighting.fs");
-		Shader shader = LoadShader("resources/shaders/glsl330/base_lighting.vs", "resources/shaders/glsl330/lighting.fs");
+		Shader shader = LoadShader("resources/shaders/glsl330/base_lighting_instanced.vs", "resources/shaders/glsl330/lighting.fs");
+		//Shader shader = LoadShader("resources/shaders/glsl330/base_lighting.vs", "resources/shaders/glsl330/lighting.fs");
 
 		// Get some shader loactions
 		unsafe
@@ -168,12 +168,12 @@ public class shaders_mesh_instancing
 			ClearBackground(RAYWHITE);
 
 			BeginMode3D(camera);
-			//DrawMeshInstanced(cube, material, transforms, instances);
+			DrawMeshInstanced(cube, material, transforms, instances);
 			//DrawModelEx()
-			for (var i = 0; i < instances; ++i)
-			{
-				DrawMesh(cube, material, transforms[i]);
-			}
+			//for (var i = 0; i < instances; ++i)
+			//{
+			//	DrawMesh(cube, material, transforms[i]);
+			//}
 			//
 			//for (int i = 0; i < instances; i++)
 			//{

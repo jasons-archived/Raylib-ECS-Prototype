@@ -304,9 +304,9 @@ public class RenderReferenceImplementationSystem : SystemBase
 				pswRenderPacketSync.LapAndReset();
 
 				#region TO_DELETE
-				Thread.CurrentThread.Priority = ThreadPriority.Highest;
-				Thread.BeginCriticalRegion();
-				Thread.BeginThreadAffinity();
+				//Thread.CurrentThread.Priority = ThreadPriority.Highest;
+				//Thread.BeginCriticalRegion();
+				//Thread.BeginThreadAffinity();
 				//////obtain render packets for the most recent frame (N-1) in a locked fashion
 				////await _swapPacketsLock.WaitAsync();
 				////try
