@@ -13,8 +13,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BepuPhysics" Version="2.4.0-beta7" />
-    <PackageReference Include="BepuUtilities" Version="2.4.0-beta7" />
+    <PackageReference Include="BepuPhysics" Version="2.4.0-beta9" />
+    <PackageReference Include="BepuUtilities" Version="2.4.0-beta9" />
   </ItemGroup>
 
   <ItemGroup>
