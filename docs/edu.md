@@ -1,13 +1,34 @@
 links for tangental educational stuff here.
 
-
+- [gamedev](#gamedev)
+  - [gamedev technical blogs](#gamedev-technical-blogs)
+- [ECS](#ecs)
+- [Timesteps](#timesteps)
+- [Graphics Programming](#graphics-programming)
+- [Business / Market analysis](#business--market-analysis)
+- [technical writing](#technical-writing)
+- [Project Management](#project-management)
+- [dev](#dev)
+  - [c# performance](#c-performance)
+  - [multithreading patterns](#multithreading-patterns)
+  - [OSS gamedev](#oss-gamedev)
+  - [Native Interop (PInvoke)](#native-interop-pinvoke)
+    - [calling pinvoke that takes a callback](#calling-pinvoke-that-takes-a-callback)
+  - [nuget publishing](#nuget-publishing)
+- [game ideas](#game-ideas)
+- [game postmortums](#game-postmortums)
+- [art](#art)
 
 # gamedev
+- general gamedev
+  - Game Programming Patterns, free web book: https://gameprogrammingpatterns.com/
+  - 
 - spatial stuff, A*, etc
   - https://simblob.blogspot.com/
   - https://www.redblobgames.com/grids/hexagons/
   - 
-
+## gamedev technical blogs
+- https://ourmachinery.com/post/
 # ECS
 Some ECS Intro videos that are mostly applicable to !!.Ecs
 - https://www.youtube.com/watch?v=OqzUr-Rg6w4
@@ -24,6 +45,12 @@ Some ECS Intro videos that are mostly applicable to !!.Ecs
 
 
 # Graphics Programming
+- high promise
+  - opengl introduction https://learnopengl.com/Getting-started/Shaders
+  - shader editor: SHADERed
+    - https://github.com/dfranx/SHADERed
+    - https://shadered.org/
+      - can import from https://www.shadertoy.com/ via plugin
 - intro
   - http://alextardif.com/LearningGraphics.html
 - theory
@@ -48,7 +75,9 @@ Some ECS Intro videos that are mostly applicable to !!.Ecs
 
 # technical writing
 - emoji lookup: https://gist.github.com/endolith/157796
-
+- markdown book publishing
+  - using rust: https://github.com/rust-lang/mdBook
+    - example book using this: https://github.com/rustwasm/book
 # Project Management
 - OSS Repo Checklist: https://gist.github.com/ZacharyPatten/08532b31ef5efc7593b32326b498023a
 
@@ -69,7 +98,8 @@ Some ECS Intro videos that are mostly applicable to !!.Ecs
   - https://devblogs.microsoft.com/dotnet/an-introduction-to-system-threading-channels/
 
 ## OSS gamedev
-- https://gist.github.com/raysan5/bd8c0293d8b8da1e9e44d8ac435e9304
+- porting old xna games to raylib
+  - https://gist.github.com/raysan5/bd8c0293d8b8da1e9e44d8ac435e9304
 
 ## Native Interop (PInvoke)
 - calling native methods that take variable length args
@@ -148,3 +178,12 @@ SetTraceLogCallback(&LogCustom2);
 - text adventure games: https://if50.substack.com/archive?sort=new
 - tradewars:
   - https://if50.substack.com/p/1991-trade-wars-2002
+
+
+
+# art
+  - svg editor online 
+    - https://minimator.app/#/project/0
+    - http://100r.co/site/dotgrid.html
+      - web version: https://hundredrabbits.github.io/Dotgrid/
+    - 
