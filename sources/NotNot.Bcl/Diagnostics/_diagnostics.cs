@@ -117,7 +117,7 @@ namespace NotNot.Bcl.Diagnostics
 		/// <param name="message"></param>
 		/// <param name="conditionName"></param>
 		[Conditional("DEBUG"), Conditional("CHECKED")]
-		[DebuggerNonUserCode, DebuggerHidden]
+		[DebuggerNonUserCode]//, DebuggerHidden]
 		public static void Assert(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 		{
 			_internal.DiagHelper.Assert(condition, message, conditionName);
@@ -188,7 +188,7 @@ namespace NotNot.Bcl.Diagnostics
 		[DebuggerNonUserCode]
 		public static class DiagHelper
 		{
-			[DebuggerNonUserCode, DebuggerHidden]
+			[DebuggerNonUserCode]//, DebuggerHidden]
 			public static void Assert(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 			{
 				if (condition)
