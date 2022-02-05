@@ -1,0 +1,5 @@
+{
+	"sdk": {
+		//"version": "6.0.100" //needed for Generic Math support.   VS 2022 v17.1 Previews use an incompatable version of dotnet6.  located under C:\Program Files\dotnet\sdk
+	}
+}

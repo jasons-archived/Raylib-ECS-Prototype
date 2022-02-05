@@ -70,7 +70,7 @@ public enum Primitive
 
 public record struct WorldXform
 {
-	public short version;
+	public short version = default;
 	private Vector3 _position = Vector3.Zero;
 	public Vector3 Position
 	{
@@ -110,6 +110,10 @@ public record struct WorldXform
 		xformMatrix.Translation = _position;
 	}
 	public Matrix4x4 xformMatrix = Matrix4x4.Identity;
+
+	public WorldXform() 
+	{
+	}
 
 	/// <summary>
 	/// set this xform from a matrix.   the matrix needs to be decomposable so we can obtain the position/rotation/scale components

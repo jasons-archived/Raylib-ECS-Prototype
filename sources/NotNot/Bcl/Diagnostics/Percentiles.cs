@@ -31,12 +31,12 @@ public unsafe struct PercentileSampler800<T> where T : unmanaged, IComparable<T>
 	public StructArray800<T> _samples;
 
 
-	private int _nextIndex;
+	private int _nextIndex=0;
 	private bool _isCtored = true;
 	/// <summary>
 	/// if we have not filled our sample count, don't generate percentiles based on the blanks
 	/// </summary>
-	private int _fill;
+	private int _fill=0;
 
 	public bool IsFilled
 	{
@@ -60,6 +60,10 @@ public unsafe struct PercentileSampler800<T> where T : unmanaged, IComparable<T>
 		}
 	}
 	private int _targetSampleCount = BUFFER_SIZE / sizeof(T);
+
+	public PercentileSampler800() 
+	{
+	}
 
 	public void Clear()
 	{

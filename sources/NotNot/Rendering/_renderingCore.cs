@@ -33,6 +33,19 @@ public class RenderPacket3d : IRenderPacketNew
 	}
 
 	public bool IsInitialized { get; set; }
+
+	public bool IsEmpty
+	{
+		get
+		{
+			if(technique == null){ return true; }
+
+			if (instances.length > 0) return false;
+
+			return true;
+		}
+	}
+
 	public void Initialize()
 	{
 		if (IsInitialized)
@@ -65,7 +78,9 @@ public class RenderPacket3d : IRenderPacketNew
 		return 0;
 	}
 }
-
+/// <summary>
+/// how to render something
+/// </summary>
 public interface IRenderTechnique3d
 {
 	public bool IsInitialized { get; set; }
@@ -93,6 +108,7 @@ public interface IRenderPacketNew : IComparable<IRenderPacketNew>
 	public void DoDraw();
 
 	public bool IsInitialized { get; }
+	public bool IsEmpty { get; }
 	public void Initialize();
 }
 

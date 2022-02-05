@@ -35,7 +35,7 @@ namespace NotNot.Rendering;
 
 public class StaticModelTechnique : IRenderTechnique3d
 {
-	public bool doBatching=true;
+	public bool doBatching=false;
 	public bool IsInitialized { get; set; }
 	public void Initialize()
 	{
@@ -128,7 +128,8 @@ public class StaticModelTechnique : IRenderTechnique3d
 		}
 		if (xforms.Length == 0)
 		{
-			Console.WriteLine("Packet is EMPTY!!>?!?!");
+			
+			Console.WriteLine($"Packet is EMPTY!!>?!?!  packet.IsEmpty={renderPacket.IsEmpty}");
 		}
 
 		//Console.WriteLine($"cpuId={Thread.GetCurrentProcessorId()}, mtId={Thread.CurrentThread.ManagedThreadId}");

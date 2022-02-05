@@ -500,10 +500,19 @@ public static class zz_Extensions_TaskCompletionSource
 /// </summary>
 public static class zz_Extensions_Numeric
 {
-	public static T _Round<T>(this T value, int digits, MidpointRounding mode = MidpointRounding.AwayFromZero) where T : IFloatingPoint<T>
+	//public static T _Round<T>(this T value, int digits, MidpointRounding mode = MidpointRounding.AwayFromZero) where T : IFloatingPoint<T>
+	//{
+	//	return T.Round(value, digits, mode);
+	//}
+	public static double _Round(this double value, int digits, MidpointRounding mode = MidpointRounding.AwayFromZero)
 	{
-		return T.Round(value, digits, mode);
+		return Math.Round(value, digits, mode);
 	}
+	public static float _Round(this float value, int digits, MidpointRounding mode = MidpointRounding.AwayFromZero)
+	{
+		return MathF.Round(value, digits, mode);
+	}
+
 }
 
 
@@ -660,7 +669,22 @@ public static class zz_Extensions_Span
 	[ThreadStatic]
 	static Random _rand = new();
 
+	public static TOut _Aggregate<TIn, TOut>(this Span<TIn> source, TOut seedValue,
+		Func<TIn, TOut, TOut> handler)
+	{
+		return source._AsReadOnly()._Aggregate(seedValue,handler);
+	}
 
+	public static TOut _Aggregate<TIn, TOut>(this ReadOnlySpan<TIn> source,TOut seedValue, Func<TIn,TOut, TOut> accumFunc)
+	{
+		var accumulation = seedValue;
+		foreach (var value in source)
+		{
+			accumulation = accumFunc(value, accumulation);
+		}
+
+		return accumulation;
+	}
 
 	public static void _Randomize<T>(this Span<T> target)
 	{
@@ -913,14 +937,78 @@ public static class zz_Extensions_Span
 	//}
 
 
+	////MISSING GENERIC MATH
+	//public static T _Sum<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
+	//{
+	//	return values._AsReadOnly()._Sum();
+	//}
+	//public static T _Sum<T>(this ReadOnlySpan<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
+	//{
+	//	var toReturn = T.AdditiveIdentity;
+	//	foreach (var val in values)
+	//	{
+	//		toReturn += val;
+	//	}
+	//	return toReturn;
+	//}
 
-	public static T _Sum<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
+	//public static T _Avg<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>, IDivisionOperators<T, float, T>
+	//{
+	//	return values._AsReadOnly()._Avg();
+	//}
+	//public static T _Avg<T>(this ReadOnlySpan<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>, IDivisionOperators<T, float, T>
+	//{
+	//	var count = 0;
+	//	var toReturn = T.AdditiveIdentity;
+	//	foreach (var val in values)
+	//	{
+	//		count++;
+	//		toReturn += val;
+	//	}
+	//	return toReturn / count;
+	//}
+	//public static T _Min<T>(this Span<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	//{
+	//	return values._AsReadOnly()._Min();
+	//}
+	//public static T _Min<T>(this ReadOnlySpan<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	//{
+	//	var toReturn = T.MaxValue;
+
+	//	foreach (var val in values)
+	//	{
+	//		if (toReturn > val)
+	//		{
+	//			toReturn = val;
+	//		}
+	//	}
+	//	return toReturn;
+	//}
+	//public static T _Max<T>(this Span<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	//{
+	//	return values._AsReadOnly()._Max();
+	//}
+	//public static T _Max<T>(this ReadOnlySpan<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	//{
+	//	var toReturn = T.MinValue;
+
+	//	foreach (var val in values)
+	//	{
+	//		if (toReturn < val)
+	//		{
+	//			toReturn = val;
+	//		}
+	//	}
+	//	return toReturn;
+	//}
+	//MISSING GENERIC MATH
+	public static float _Sum(this Span<float> values) 
 	{
 		return values._AsReadOnly()._Sum();
 	}
-	public static T _Sum<T>(this ReadOnlySpan<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
+	public static float _Sum(this ReadOnlySpan<float> values) 
 	{
-		var toReturn = T.AdditiveIdentity;
+		float toReturn =0;
 		foreach (var val in values)
 		{
 			toReturn += val;
@@ -928,14 +1016,14 @@ public static class zz_Extensions_Span
 		return toReturn;
 	}
 
-	public static T _Avg<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>, IDivisionOperators<T, float, T>
+	public static float _Avg(this Span<float> values) 
 	{
 		return values._AsReadOnly()._Avg();
 	}
-	public static T _Avg<T>(this ReadOnlySpan<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>, IDivisionOperators<T, float, T>
+	public static float _Avg(this ReadOnlySpan<float> values)
 	{
 		var count = 0;
-		var toReturn = T.AdditiveIdentity;
+		var toReturn = 0f;
 		foreach (var val in values)
 		{
 			count++;
@@ -943,13 +1031,13 @@ public static class zz_Extensions_Span
 		}
 		return toReturn / count;
 	}
-	public static T _Min<T>(this Span<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	public static float _Min(this Span<float> values)
 	{
 		return values._AsReadOnly()._Min();
 	}
-	public static T _Min<T>(this ReadOnlySpan<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	public static float _Min(this ReadOnlySpan<float> values)
 	{
-		var toReturn = T.MaxValue;
+		var toReturn = float.MaxValue;
 
 		foreach (var val in values)
 		{
@@ -960,13 +1048,13 @@ public static class zz_Extensions_Span
 		}
 		return toReturn;
 	}
-	public static T _Max<T>(this Span<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	public static float _Max(this Span<float> values)
 	{
 		return values._AsReadOnly()._Max();
 	}
-	public static T _Max<T>(this ReadOnlySpan<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	public static float _Max(this ReadOnlySpan<float> values)
 	{
-		var toReturn = T.MinValue;
+		var toReturn = float.MinValue;
 
 		foreach (var val in values)
 		{

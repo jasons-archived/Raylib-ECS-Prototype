@@ -27,8 +27,11 @@ namespace NotNot.Ecs;
 /// </summary>
 public unsafe struct TimeStats
 {
-	public TimeSpan _frameElapsed;
-	public TimeSpan _wallTime;
+	public TimeStats()
+	{
+	}
+	public TimeSpan _frameElapsed=default;
+	public TimeSpan _wallTime = default;
 	public int _frameId = 0;
 
 	private const int SAMPLE_COUNT = 100;
@@ -38,6 +41,8 @@ public unsafe struct TimeStats
 	public float _avgMs = 0;
 	public float _minMs = 0;
 	public float _maxMs = 0;
+
+
 	internal void Update(TimeSpan frameElapsed)
 	{
 		//simple fps metrics calculated
@@ -66,7 +71,7 @@ public unsafe struct TimeStats
 	}
 	public override string ToString()
 	{
-		var gcTime = GC.GetGCMemoryInfo().PauseDurations._Sum();
+		var gcTime = GC.GetGCMemoryInfo().PauseDurations._Aggregate(TimeSpan.Zero, (time, sum) => time + sum);//..._Sum();
 		var frameInfo = $"frame= {_frameId} @ {_wallTime.TotalSeconds._Round(0)}sec ";
 		var historyInfo = $" history = {_frameElapsed.TotalMilliseconds._Round(2)}cur {_maxMs._Round(1)}max {_avgMs._Round(1)}avg {_minMs._Round(1)}min  ";
 		var gcInfo = $" GC={GC.CollectionCount(0)} ({gcTime.TotalMilliseconds._Round(1)} ms)";
@@ -85,20 +90,24 @@ public unsafe struct TimeStats
 public struct NodeUpdateStats
 {
 	private bool _isCtored = true;
-	public TimeStats _timeStats;
+	public TimeStats _timeStats = default;
 
 	public PercentileSampler800<TimeSpan> _updateDurations=new PercentileSampler800<TimeSpan>();
 	public PercentileSampler800<TimeSpan> _updateChildrenDurations = new PercentileSampler800<TimeSpan>();
 
-	public TimeSpan _lastUpdateTime;
-	public TimeSpan _lastUpdateHierarchyTime;
-	public TimeSpan _avgUpdateTime;
-	public TimeSpan _avgUpdateHierarchyTime;
+	public TimeSpan _lastUpdateTime = default;
+	public TimeSpan _lastUpdateHierarchyTime = default;
+	public TimeSpan _avgUpdateTime = default;
+	public TimeSpan _avgUpdateHierarchyTime = default;
 
 	//public Tim
 	//TODO: record time since last run of update()
-	public TimeSpan _timeSinceLastUpdate;
+	public TimeSpan _timeSinceLastUpdate = default;
 	public Stopwatch _timeSinceLastUpdateStopwatch = Stopwatch.StartNew();
+
+	public NodeUpdateStats() 
+	{
+	}
 
 	public void Update(Frame frame, NodeFrameState nodeState)
 	{

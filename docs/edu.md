@@ -26,6 +26,7 @@ links for tangental educational stuff here.
 - spatial stuff, A*, etc
   - https://simblob.blogspot.com/
   - https://www.redblobgames.com/grids/hexagons/
+  - pathfinding and 2d spatial algorithms https://www.redblobgames.com/
   - 
 ## gamedev technical blogs
 - https://ourmachinery.com/post/
@@ -67,7 +68,11 @@ Some ECS Intro videos that are mostly applicable to !!.Ecs
     - include discord channel
 - maths
   - https://liorsinai.github.io/mathematics/2021/11/05/quaternion-1-intro.html
-
+- raylib model and animation import
+  - iqm animation raylib 4.0 example - Tutorial
+    - https://www.youtube.com/watch?v=_EurjoraotA
+    - https://github.com/lsalzman/iqm
+  - 
 # Business / Market analysis
 - Market anaysis of Roblox https://www.fortressofdoors.com/so-you-want-to-compete-with-roblox/
   - https://news.ycombinator.com/item?id=28714779
@@ -84,7 +89,7 @@ Some ECS Intro videos that are mostly applicable to !!.Ecs
 # dev
 ## c# performance
   - Scott Meyers: Cpu Caches and Why You Care: https://www.youtube.com/watch?v=WDIkqP4JbkE&t=247s
-
+  - dotnet book of the runtime: low level https://github.com/dotnet/coreclr/blob/master/Documentation/botr/README.md
 
 - row major traversal of matrix vs column major traversal
 
@@ -100,7 +105,10 @@ Some ECS Intro videos that are mostly applicable to !!.Ecs
 ## OSS gamedev
 - porting old xna games to raylib
   - https://gist.github.com/raysan5/bd8c0293d8b8da1e9e44d8ac435e9304
-
+- algorithms resources / samples
+  - https://github.com/SimonDarksideJ/XNAGameStudio/wiki
+  - https://github.com/MonoGame/MonoGame.Samples
+  - monogame discord, libraries channel
 ## Native Interop (PInvoke)
 - calling native methods that take variable length args
   - dealing with __arglist: 

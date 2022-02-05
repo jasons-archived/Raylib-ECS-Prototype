@@ -14,6 +14,7 @@
 ********************************************************************************************/
 
 using System;
+using System.Diagnostics;
 using System.Numerics;
 using Raylib_CsLo;
 using NotNot;
@@ -32,6 +33,7 @@ public class shaders_mesh_instancing
 {
 	public static int Main()
 	{
+		bool isBatched = false;
 		// Initialization
 		//--------------------------------------------------------------------------------------
 		const int screenWidth = 1920;
@@ -54,14 +56,14 @@ public class shaders_mesh_instancing
 
 		// Define the camera to look into our 3d world
 		Camera3D camera = new Camera3D();
-		camera.position = new Vector3(125.0f, 125.0f, 125.0f);
+		camera.position = Vector3.One * 80f;// new Vector3(52.0f, 52.0f, 12.0f);
 		camera.target = new Vector3(0.0f, 0.0f, 0.0f);
 		camera.up = new Vector3(0.0f, 1.0f, 0.0f);
 		camera.fovy = 45.0f;
 		camera.projection_ = CAMERA_PERSPECTIVE;
 
 		// Number of instances to display
-		const int instances = 10;
+		const int instances = 8000;
 
 		Matrix4x4[] rotations = new Matrix4x4[instances];    // Rotation state of instances
 		Matrix4x4[] rotationsInc = new Matrix4x4[instances]; // Per-frame rotation animation of instances
@@ -86,8 +88,17 @@ public class shaders_mesh_instancing
 		}
 
 		Matrix4x4[] transforms = new Matrix4x4[instances];   // Pre-multiplied transformations passed to rlgl
-		Shader shader = LoadShader("resources/shaders/glsl330/base_lighting_instanced.vs", "resources/shaders/glsl330/lighting.fs");
-		//Shader shader = LoadShader("resources/shaders/glsl330/base_lighting.vs", "resources/shaders/glsl330/lighting.fs");
+		
+		Shader shader;
+		if (isBatched)
+		{
+			shader = LoadShader("resources/shaders/glsl330/base_lighting_instanced.vs",
+				"resources/shaders/glsl330/lighting.fs");
+		}
+		else
+		{
+			shader = LoadShader("resources/shaders/glsl330/base_lighting.vs", "resources/shaders/glsl330/lighting.fs");
+		}
 
 		// Get some shader loactions
 		unsafe
@@ -133,9 +144,11 @@ public class shaders_mesh_instancing
 		//--------------------------------------------------------------------------------------
 
 		// Main game loop
+		var timer = Stopwatch.StartNew();
 		while (!WindowShouldClose())        // Detect window close button or ESC key
 		{
-		
+			var elapsed = timer.ElapsedMilliseconds/100f;
+			var posOffset = new Vector3(MathF.Sin(elapsed), MathF.Cos(elapsed / 2), MathF.Sin(elapsed/4));
 
 			// Update the light shader with the camera view position
 			//float[] cameraPos = { camera.position.X, camera.position.Y, camera.position.Z };
@@ -157,7 +170,9 @@ public class shaders_mesh_instancing
 				// Clamp to floor
 				y = (y < 0) ? 0.0f : y;
 
-				transforms[i] = Matrix4x4.Multiply(transforms[i], Matrix4x4.CreateTranslation(0.0f, y, 0.0f));
+				//transforms[i] = Matrix4x4.Multiply(transforms[i], Matrix4x4.CreateTranslation(0.0f, y, 0.0f));
+				//transforms[i] = Matrix4x4.Multiply(transforms[i], Matrix4x4.CreateTranslation(posOffset));
+				transforms[i].Translation += posOffset;
 				transforms[i] = Matrix4x4.Transpose(transforms[i]);
 			}
 			//----------------------------------------------------------------------------------
@@ -168,21 +183,23 @@ public class shaders_mesh_instancing
 			ClearBackground(RAYWHITE);
 
 			BeginMode3D(camera);
-			var transposedXforms = Mem<Matrix4x4>.Allocate(transforms, false);
+			if (isBatched)
+			{
+				var transposedXforms = Mem<Matrix4x4>.Allocate(transforms, false);
 
-			//DrawMeshInstanced(cube, material, transforms, instances);
-			DrawMeshInstanced(cube, material, transposedXforms.Span, instances);
+				//DrawMeshInstanced(cube, material, transforms, instances);
+				DrawMeshInstanced(cube, material, transposedXforms.Span, instances);
+			}
+			else
+			{
 
-			//
-			//for (var i = 0; i < instances; ++i)
-			//{
-			//	DrawMesh(cube, material, transforms[i]);
-			//}
-			//
-			//for (int i = 0; i < instances; i++)
-			//{
-			//    DrawMesh(cube, material, transforms[i]);
-			//}
+				for (int i = 0; i < instances; i++)
+				{
+					DrawMesh(cube, material, transforms[i]);
+				}
+
+			}
+
 			EndMode3D();
 
 		

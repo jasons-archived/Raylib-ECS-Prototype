@@ -34,6 +34,10 @@ boxModel.OnInitialize=(_this)=>
 		_this.material.maps[(int)MaterialMapIndex.MATERIAL_MAP_ALBEDO].color = Raylib.LIME;
 	}
 };
+
+
+
+
 var renderDescription = new RenderDescription() { techniques = { boxModel } };
 
 //create an archetype
@@ -50,13 +54,17 @@ var archetype = em.GetOrCreateArchetype(new()
 var sharedComponents = SharedComponentGroup.GetOrCreate(renderDescription);
 
 //create entities using the sharedComponent
-em.EnqueueCreateEntity(100, archetype, sharedComponents, (args) =>
+em.EnqueueCreateEntity(2000, archetype, sharedComponents, (args) =>
 {
 	var (accessTokens, entityHandles, archetype) = args;
 	foreach (var token in accessTokens)
 	{
 		ref var xform = ref token.GetComponentWriteRef<WorldXform>();
-		xform = new WorldXform(){Position=(__.Rand._NextVector3()- (Vector3.One * 0.5f))*10};
+		xform = new WorldXform() {
+			Position = (__.Rand._NextVector3() - (Vector3.One * 0.5f)) * 10,
+			Rotation = Quaternion.CreateFromYawPitchRoll(-1, -1, -1),
+			Scale = (__.Rand._NextVector3()),
+		};
 	}
 });
 

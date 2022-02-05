@@ -160,7 +160,8 @@ Logical object structure is
 - serialization: https://github.com/neuecc/MessagePack-CSharp
 - gui
   - https://opengameart.org/content/ui-pack
-
+- discord rich presence
+  - https://github.com/Lachee/discord-rpc-csharp
 - debugging
   - simPipeline debug/visualization
     - https://github.com/JamieDixon/GraphViz-C-Sharp-Wrapper
@@ -169,7 +170,7 @@ Logical object structure is
 - logging
   - good no allocation logger
     - https://github.com/Cysharp/ZLogger/
-
+- pathfinding and 2d spatial algorithms https://www.redblobgames.com/
 - timestep smoothing
   - https://blog.unity.com/technology/fixing-time-deltatime-in-unity-2020-2-for-smoother-gameplay-what-did-it-take
   - https://www.gafferongames.com/post/fix_your_timestep/

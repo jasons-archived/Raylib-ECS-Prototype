@@ -176,6 +176,12 @@ public class RenderReferenceImplementationSystem : SystemBase
 
 		//get our render packets from prior frame and pass it to the render thread
 		_tempRenderPackets = await manager.engine.StateSync.RenderPacketsSwapPrior_New(_tempRenderPackets);
+		if (_tempRenderPackets.TryPeek(out var pooked))
+		{
+			
+			__ERROR.Throw(pooked.IsEmpty == false);
+		}
+		
 		_tempRenderPackets = renderThreadInput.WriteAndSwap(_tempRenderPackets);
 	}
 
@@ -241,7 +247,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 		try
 		{
 			Raylib.InitWindow(screenSize.Width, screenSize.Height, windowTitle);
-			//Raylib.SetTargetFPS(60);
+			//Raylib.SetTargetFPS(240);
 			
 			var swElapsed = Stopwatch.StartNew();
 			var swTotal = Stopwatch.StartNew();
@@ -249,6 +255,12 @@ public class RenderReferenceImplementationSystem : SystemBase
 
 			while (!Raylib.WindowShouldClose() && IsRegistered && IsDisposed == false)
 			{
+				//unsafe
+				//{
+				//	var hWindow = Raylib.GetWindowHandle();
+				//	Console.WriteLine((int)hWindow);
+				//}
+
 				pswRenderLoop.Lap();
 				var elapsed = (float)swElapsed.Elapsed.TotalSeconds;
 				swElapsed.Restart();
