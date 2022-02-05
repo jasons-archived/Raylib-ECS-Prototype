@@ -1,38 +1,48 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-		<EnablePreviewFeatures>True</EnablePreviewFeatures>
-		<LangVersion>Preview</LangVersion>
-    <Nullable>enable</Nullable>
-    <AssemblyVersion></AssemblyVersion>
-    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+      <!--standard dotnet stuff-->
+      <TargetFramework>net6.0</TargetFramework>
+      <ImplicitUsings>enable</ImplicitUsings>
+      <Nullable>enable</Nullable>
+      <EnablePreviewFeatures>True</EnablePreviewFeatures>
+      <LangVersion>Preview</LangVersion>
+      <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+      <GenerateDocumentationFile>False</GenerateDocumentationFile>
+      </PropertyGroup>
+
+    <PropertyGroup>
+        <!--nuget package stuff-->
+        <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Version>$(VersionPrefix)0.0.0.0-alpha</Version>
-    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
-    <GenerateDocumentationFile>False</GenerateDocumentationFile>
-    <Configurations>Debug;Release;Checked</Configurations>
-  </PropertyGroup>
+    </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <Deterministic>False</Deterministic>
-    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-    <DefineConstants>$(DefineConstants);DEBUG;TEST</DefineConstants>
-  </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Checked|AnyCPU'">
-    <Deterministic>False</Deterministic>
-    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-    <DefineConstants>$(DefineConstants);DEBUG;CHECKED;TEST</DefineConstants>
-  </PropertyGroup>
+    <PropertyGroup>
+        <!--build configuration stuff-->
+        <Configurations>Debug;Release;Checked</Configurations>
+        <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+        <Deterministic>False</Deterministic>
+    </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <Deterministic>False</Deterministic>
-    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-    <DefineConstants>$(DefineConstants);TEST</DefineConstants>
-    <Optimize>True</Optimize>
-  </PropertyGroup>
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+        <DefineConstants>$(DefineConstants);DEBUG;TEST</DefineConstants>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Checked|AnyCPU'">
+        <DefineConstants>$(DefineConstants);DEBUG;CHECKED;TEST</DefineConstants>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+        <DefineConstants>$(DefineConstants);TEST</DefineConstants>
+        <Optimize>True</Optimize>
+    </PropertyGroup>
+
+
+
 
   <ItemGroup>
+    <Folder Include="Bcl\" />
     <Folder Include="Ecs\Scheduling\" />
     <Folder Include="EngineOld\Internal\" />
   </ItemGroup>
@@ -47,7 +57,10 @@
     <PackageReference Include="DotNext.Threading" Version="4.1.3" />
     <PackageReference Include="DotNext.Unsafe" Version="4.1.3" />
     <PackageReference Include="Microsoft.Toolkit.HighPerformance" Version="7.1.2" />
-    <PackageReference Include="System.Runtime.Experimental" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NotNot.Bcl\NotNot.Bcl.csproj" />
   </ItemGroup>
 
 </Project>

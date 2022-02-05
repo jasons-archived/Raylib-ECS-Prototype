@@ -1,4 +1,4 @@
-﻿// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
+// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
 // [!!] Copyright ©️ NotNot Project and Contributors. 
 // [!!] By default, this file is licensed to you under the AGPL-3.0.
 // [!!] However a Private Commercial License is available. 
@@ -8,8 +8,8 @@
 // [!!] Would you like to know more? https://github.com/NotNotTech/NotNot 
 // [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!]  [!!] [!!] [!!] [!!]
 
-using Microsoft.Toolkit.HighPerformance;
-using Microsoft.Toolkit.HighPerformance.Buffers;
+using CommunityToolkit.HighPerformance;
+using CommunityToolkit.HighPerformance.Buffers;
 using System;
 using System.Buffers;
 using System.Diagnostics;
@@ -342,7 +342,7 @@ public sealed class MemoryOwner_Custom<T> : IMemoryOwner<T>
 		}
 
 		// Same representation used in Span<T>
-		return $"Microsoft.Toolkit.HighPerformance.Buffers.MemoryOwner<{typeof(T)}>[{this.length}]";
+		return $"CommunityToolkit.HighPerformance.Buffers.MemoryOwner<{typeof(T)}>[{this.length}]";
 	}
 
 	/// <summary>

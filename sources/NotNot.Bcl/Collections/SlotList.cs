@@ -1,4 +1,4 @@
-﻿// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
+// [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
 // [!!] Copyright ©️ NotNot Project and Contributors. 
 // [!!] By default, this file is licensed to you under the AGPL-3.0.
 // [!!] However a Private Commercial License is available. 
@@ -12,7 +12,7 @@ using System;
 using System.Collections.Generic;
 using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
-using Microsoft.Toolkit.HighPerformance;
+using CommunityToolkit.HighPerformance;
 /// <summary>
 /// pretty similar to ResizableArray.   probably should be deleted and just use that.
 /// </summary>

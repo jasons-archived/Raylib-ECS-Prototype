@@ -9,7 +9,7 @@
 // [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!]  [!!] [!!] [!!] [!!]
 
 using NotNot.Bcl.Diagnostics;
-using Microsoft.Toolkit.HighPerformance.Helpers;
+using CommunityToolkit.HighPerformance.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -23,7 +23,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-//using Microsoft.Toolkit.HighPerformance;
+//using CommunityToolkit.HighPerformance;
 //using DotNext;
 
 
@@ -500,10 +500,10 @@ public static class zz_Extensions_TaskCompletionSource
 /// </summary>
 public static class zz_Extensions_Numeric
 {
-	//public static T _Round<T>(this T value, int digits, MidpointRounding mode = MidpointRounding.AwayFromZero) where T : IFloatingPoint<T>
-	//{
-	//	return T.Round(value, digits, mode);
-	//}
+	public static T _Round<T>(this T value, int digits, MidpointRounding mode = MidpointRounding.AwayFromZero) where T : IFloatingPoint<T>
+	{
+		return T.Round(value, digits, mode);
+	}
 	public static double _Round(this double value, int digits, MidpointRounding mode = MidpointRounding.AwayFromZero)
 	{
 		return Math.Round(value, digits, mode);
