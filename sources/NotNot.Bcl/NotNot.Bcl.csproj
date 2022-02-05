@@ -52,6 +52,7 @@
         <!--include pdb in nuget package, as per: https://stackoverflow.com/a/48391188 -->
         <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
         <IsPublishable>True</IsPublishable>
+        <PackageIcon>[!!]-logos.jpeg</PackageIcon>
     </PropertyGroup>
 
 
@@ -67,7 +68,12 @@
 
     <ItemGroup>
       <None Update="README.md">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        <Pack>True</Pack>
+        <PackagePath>\</PackagePath>
+      </None>
+      <None Update="[!!]-logos.jpeg">
+        <Pack>True</Pack>
+        <PackagePath>\</PackagePath>
       </None>
     </ItemGroup>
 

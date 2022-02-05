@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using BenchmarkDotNet.Running;
 using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
-using Microsoft.Toolkit.HighPerformance.Buffers;
-using Microsoft.Toolkit.HighPerformance.Helpers;
+//using Microsoft.Toolkit.HighPerformance.Buffers;
+//using Microsoft.Toolkit.HighPerformance.Helpers;
 
 namespace MyBenchmarks;
 

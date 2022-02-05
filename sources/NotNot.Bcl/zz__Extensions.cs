@@ -937,71 +937,71 @@ public static class zz_Extensions_Span
 	//}
 
 
-	////MISSING GENERIC MATH
-	//public static T _Sum<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
-	//{
-	//	return values._AsReadOnly()._Sum();
-	//}
-	//public static T _Sum<T>(this ReadOnlySpan<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
-	//{
-	//	var toReturn = T.AdditiveIdentity;
-	//	foreach (var val in values)
-	//	{
-	//		toReturn += val;
-	//	}
-	//	return toReturn;
-	//}
+	//// GENERIC MATH  requires System.Runtime.Experimental nuget package matching the current DotNet runtime.
+	public static T _Sum<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
+	{
+		return values._AsReadOnly()._Sum();
+	}
+	public static T _Sum<T>(this ReadOnlySpan<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
+	{
+		var toReturn = T.AdditiveIdentity;
+		foreach (var val in values)
+		{
+			toReturn += val;
+		}
+		return toReturn;
+	}
 
-	//public static T _Avg<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>, IDivisionOperators<T, float, T>
-	//{
-	//	return values._AsReadOnly()._Avg();
-	//}
-	//public static T _Avg<T>(this ReadOnlySpan<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>, IDivisionOperators<T, float, T>
-	//{
-	//	var count = 0;
-	//	var toReturn = T.AdditiveIdentity;
-	//	foreach (var val in values)
-	//	{
-	//		count++;
-	//		toReturn += val;
-	//	}
-	//	return toReturn / count;
-	//}
-	//public static T _Min<T>(this Span<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
-	//{
-	//	return values._AsReadOnly()._Min();
-	//}
-	//public static T _Min<T>(this ReadOnlySpan<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
-	//{
-	//	var toReturn = T.MaxValue;
+	public static T _Avg<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>, IDivisionOperators<T, float, T>
+	{
+		return values._AsReadOnly()._Avg();
+	}
+	public static T _Avg<T>(this ReadOnlySpan<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>, IDivisionOperators<T, float, T>
+	{
+		var count = 0;
+		var toReturn = T.AdditiveIdentity;
+		foreach (var val in values)
+		{
+			count++;
+			toReturn += val;
+		}
+		return toReturn / count;
+	}
+	public static T _Min<T>(this Span<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	{
+		return values._AsReadOnly()._Min();
+	}
+	public static T _Min<T>(this ReadOnlySpan<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	{
+		var toReturn = T.MaxValue;
 
-	//	foreach (var val in values)
-	//	{
-	//		if (toReturn > val)
-	//		{
-	//			toReturn = val;
-	//		}
-	//	}
-	//	return toReturn;
-	//}
-	//public static T _Max<T>(this Span<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
-	//{
-	//	return values._AsReadOnly()._Max();
-	//}
-	//public static T _Max<T>(this ReadOnlySpan<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
-	//{
-	//	var toReturn = T.MinValue;
+		foreach (var val in values)
+		{
+			if (toReturn > val)
+			{
+				toReturn = val;
+			}
+		}
+		return toReturn;
+	}
+	public static T _Max<T>(this Span<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	{
+		return values._AsReadOnly()._Max();
+	}
+	public static T _Max<T>(this ReadOnlySpan<T> values) where T : IMinMaxValue<T>, IComparisonOperators<T, T>
+	{
+		var toReturn = T.MinValue;
 
-	//	foreach (var val in values)
-	//	{
-	//		if (toReturn < val)
-	//		{
-	//			toReturn = val;
-	//		}
-	//	}
-	//	return toReturn;
-	//}
-	//MISSING GENERIC MATH
+		foreach (var val in values)
+		{
+			if (toReturn < val)
+			{
+				toReturn = val;
+			}
+		}
+		return toReturn;
+	}
+	//MISSING GENERIC MATH  requires System.Runtime.Experimental nuget package matching the current DotNet runtime.
 	public static float _Sum(this Span<float> values) 
 	{
 		return values._AsReadOnly()._Sum();
