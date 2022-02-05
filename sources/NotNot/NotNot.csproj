@@ -52,10 +52,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="DotNext" Version="4.1.3" />
-    <PackageReference Include="DotNext.Reflection" Version="4.1.3" />
-    <PackageReference Include="DotNext.Threading" Version="4.1.3" />
-    <PackageReference Include="DotNext.Unsafe" Version="4.1.3" />
+    <PackageReference Include="DotNext" Version="4.2.0-beta.3" />
+    <PackageReference Include="DotNext.Reflection" Version="4.2.0-beta.3" />
+    <PackageReference Include="DotNext.Threading" Version="4.2.0-beta.3" />
+    <PackageReference Include="DotNext.Unsafe" Version="4.2.0-beta.3" />
   </ItemGroup>
 
   <ItemGroup>
