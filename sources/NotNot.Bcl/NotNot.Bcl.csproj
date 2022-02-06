@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 
     <PropertyGroup>
@@ -36,7 +36,7 @@
     <PropertyGroup>
         <!--nuget package stuff-->
         <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-        <RepositoryUrl>https://github.com/NotNotTech/NotNot/tree/main/sources/NotNot.Bcl</RepositoryUrl>
+        <ProjectUrl>https://github.com/NotNotTech/NotNot/tree/main/sources/NotNot.Bcl</ProjectUrl>
         <PackageReleaseNotes>https://github.com/NotNotTech/NotNot/commits/main/sources/NotNot.Bcl</PackageReleaseNotes>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <Authors>Novaleaf</Authors>
@@ -48,12 +48,21 @@
         <!--pick from https://spdx.org/licenses/-->
         <PackageLicenseExpression>MPL-2.0</PackageLicenseExpression>
         <Copyright>(C) NotNotTech and Contribs</Copyright>
-        <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+        <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
         <!--include pdb in nuget package, as per: https://stackoverflow.com/a/48391188 -->
         <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
         <IsPublishable>True</IsPublishable>
         <PackageIcon>[!!]-logos.jpeg</PackageIcon>
     </PropertyGroup>
+
+    <!--coherse the MinVer package to generate timestamped nuget packages whenever a prerelease package is made.   see https://github.com/adamralph/minver/discussions/670 -->
+    <Target Name="MyTarget" AfterTargets="MinVer" Condition="'$(MinVerPreRelease)' != ''" >
+        <PropertyGroup>
+            <PackageVersion>$(MinVerMajor).$(MinVerMinor).$(MinVerPatch)-$(MinVerPreRelease)-$([System.DateTime]::Now.ToString(yyyyMMdd-hhmmss))</PackageVersion>
+            <PackageVersion Condition="'$(MinVerBuildMetadata)' != ''">$(PackageVersion)+$(MinVerBuildMetadata)</PackageVersion>
+            <Version>$(PackageVersion)</Version>
+        </PropertyGroup>
+    </Target>
 
 
     <ItemGroup>
