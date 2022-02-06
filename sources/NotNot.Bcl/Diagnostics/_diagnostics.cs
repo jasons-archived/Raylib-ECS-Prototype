@@ -14,6 +14,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime;
 using System.Runtime.CompilerServices;
+using ANSIConsole;
 using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
 
@@ -79,21 +80,21 @@ namespace NotNot.Bcl.Diagnostics
 	{
 		[Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void Assert(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
+		public static void Assert(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
 		{
-			_internal.DiagHelper.Assert(condition, message, conditionName);
+			_internal.DiagHelper.Assert(condition, message, conditionName, memberName, sourceFilePath,sourceLineNumber);
 		}
 		[Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void AssertOnce(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
+		public static void AssertOnce(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
 		{
-			_internal.DiagHelper.AssertOnce(condition, message, conditionName);
+			_internal.DiagHelper.AssertOnce(condition, message, conditionName, memberName, sourceFilePath,sourceLineNumber);
 		}
 		[Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void Throw(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
+		public static void Throw(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
 		{
-			_internal.DiagHelper.Throw(condition, message, conditionName);
+			_internal.DiagHelper.Throw(condition, message, conditionName, memberName, sourceFilePath,sourceLineNumber);
 		}
 		[Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
@@ -103,9 +104,9 @@ namespace NotNot.Bcl.Diagnostics
 		}
 		[DebuggerNonUserCode, DebuggerHidden]
 		[Conditional("CHECKED")]
-		public static void WriteLine(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
+		public static void WriteLine(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
 		{
-			_internal.DiagHelper.WriteLine(condition, message, conditionName);
+			_internal.DiagHelper.WriteLine(condition, message, conditionName, memberName, sourceFilePath,sourceLineNumber);
 		}
 	}
 	[DebuggerNonUserCode]
@@ -119,21 +120,21 @@ namespace NotNot.Bcl.Diagnostics
 		/// <param name="conditionName"></param>
 		[Conditional("DEBUG"), Conditional("CHECKED")]
 		[DebuggerNonUserCode]//, DebuggerHidden]
-		public static void Assert(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
+		public static void Assert(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
 		{
-			_internal.DiagHelper.Assert(condition, message, conditionName);
+			_internal.DiagHelper.Assert(condition, message, conditionName, memberName, sourceFilePath,sourceLineNumber);
 		}
 		[Conditional("DEBUG"), Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void AssertOnce(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
+		public static void AssertOnce(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
 		{
-			_internal.DiagHelper.AssertOnce(condition, message, conditionName);
+			_internal.DiagHelper.AssertOnce(condition, message, conditionName, memberName, sourceFilePath,sourceLineNumber);
 		}
 		[Conditional("DEBUG"), Conditional("CHECKED")]
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void Throw(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
+		public static void Throw(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
 		{
-			_internal.DiagHelper.Throw(condition, message, conditionName);
+			_internal.DiagHelper.Throw(condition, message, conditionName, memberName, sourceFilePath,sourceLineNumber);
 		}
 		[DebuggerNonUserCode, DebuggerHidden]
 		[Conditional("DEBUG"), Conditional("CHECKED")]
@@ -143,30 +144,30 @@ namespace NotNot.Bcl.Diagnostics
 		}
 		[DebuggerNonUserCode, DebuggerHidden]
 		[Conditional("DEBUG"), Conditional("CHECKED")]
-		public static void WriteLine(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
+		public static void WriteLine(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
 		{
-			_internal.DiagHelper.WriteLine(condition, message, conditionName);
+			_internal.DiagHelper.WriteLine(condition, message, conditionName, memberName, sourceFilePath,sourceLineNumber);
 		}
 	}
 	[DebuggerNonUserCode]
 	public static class __ERROR
 	{
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void Assert(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
+		public static void Assert(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
 		{
-			_internal.DiagHelper.Assert(condition, message, conditionName);
+			_internal.DiagHelper.Assert(condition, message, conditionName, memberName, sourceFilePath,sourceLineNumber);
 		}
 
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void AssertOnce(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
+		public static void AssertOnce(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
 		{
-			_internal.DiagHelper.AssertOnce(condition, message, conditionName);
+			_internal.DiagHelper.AssertOnce(condition, message, conditionName, memberName, sourceFilePath,sourceLineNumber);
 		}
 
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void Throw(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
+		public static void Throw(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
 		{
-			_internal.DiagHelper.Throw(condition, message, conditionName);
+			_internal.DiagHelper.Throw(condition, message, conditionName, memberName, sourceFilePath,sourceLineNumber);
 		}
 
 		[DebuggerNonUserCode, DebuggerHidden]
@@ -175,9 +176,9 @@ namespace NotNot.Bcl.Diagnostics
 			_internal.DiagHelper.WriteLine(message);
 		}
 		[DebuggerNonUserCode, DebuggerHidden]
-		public static void WriteLine(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
+		public static void WriteLine(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
 		{
-			_internal.DiagHelper.WriteLine(condition, message, conditionName);
+			_internal.DiagHelper.WriteLine(condition, message, conditionName, memberName, sourceFilePath,sourceLineNumber);
 		}
 	}
 
@@ -189,9 +190,11 @@ namespace NotNot.Bcl.Diagnostics
 		[DebuggerNonUserCode]
 		public static class DiagHelper
 		{
+
+
 			//private static System.Diagnostics.DebugProvider _provider;
 			[DebuggerNonUserCode]//, DebuggerHidden]
-			public static void Assert(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
+			public static void Assert(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
 			{
 				if (condition)
 				{
@@ -200,7 +203,8 @@ namespace NotNot.Bcl.Diagnostics
 				message ??= "Assert condition failed";
 
 				//Debug.Assert(false, (string)$"ASSERT({conditionName}) {message}");
-				DoAssertFail($"ASSERT_ONCE({conditionName}) {message}");
+				//DoAssertFail($"ASSERT({conditionName}) {message}");
+				DoAssertFail("ASSERT",message,conditionName, memberName, sourceFilePath, sourceLineNumber);
 
 			}
 
@@ -214,17 +218,17 @@ namespace NotNot.Bcl.Diagnostics
 			/// <param name="condition"></param>
 			/// <param name="message"></param>
 			[DebuggerNonUserCode, DebuggerHidden]
-			public static void AssertOnce(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
+			public static void AssertOnce(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
 			{
 				if (condition)
 				{
 					return;
 				}
-				message ??= "Assert condition failed";
-
+				//message ??= "Assert condition failed";
+				var assertKey = $"{sourceFilePath}:{sourceLineNumber}:{message}";
 				lock (_assertOnceLookup)
 				{
-					if (_assertOnceLookup.Add(message) == false)
+					if (_assertOnceLookup.Add(assertKey) == false)
 					{
 						return;
 					}
@@ -232,10 +236,11 @@ namespace NotNot.Bcl.Diagnostics
 
 				//Debug.Assert(false, "ASSERT ONCE: " + message);
 				//Debug.Assert(false,(string)$"ASSERT_ONCE({conditionName}) {message}");
-				DoAssertFail($"ASSERT_ONCE({conditionName}) {message}");
+				//DoAssertFail($"ASSERT_ONCE({conditionName}) {message}");
+				DoAssertFail("ASSERT_ONCE", message, conditionName, memberName, sourceFilePath, sourceLineNumber);
 			}
 			[DebuggerNonUserCode, DebuggerHidden]
-			public static void Throw(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
+			public static void Throw(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
 			{
 				if (condition == true)
 				{
@@ -243,37 +248,47 @@ namespace NotNot.Bcl.Diagnostics
 				}
 				message ??= "Throw condition failed";
 
-				//Assert(false, message, conditionName);
+				//Assert(false, message, conditionName, memberName, sourceFilePath,sourceLineNumber);
 				//throw new(message);
 				throw new($"THROW({conditionName}) {message}");
 			}
 
 			[DebuggerNonUserCode, DebuggerHidden]
-			public static void WriteLine(string message)
+			public static void WriteLine(string message, [CallerArgumentExpression("condition")] string? conditionName = null, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
 			{
-				Console.WriteLine(message);
+				//Console.WriteLine(message);
+				DoWrite("WriteLine", message, conditionName, memberName, sourceFilePath, sourceLineNumber);
 			}
 
 			[DebuggerNonUserCode, DebuggerHidden]
-			public static void WriteLine(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
+			public static void WriteLine(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = 0)
 			{
 				if (condition == true)
 				{
 					return;
 				}
-				//Console.WriteLine(message);
-				Console.WriteLine($"WRITE({conditionName}) {message}");
+				DoWrite("WriteLine", message, conditionName, memberName, sourceFilePath, sourceLineNumber);
 			}
 
-			[DoesNotReturn]
-			private static void DoAssertFail(string message)
+			[DebuggerNonUserCode, DebuggerHidden]
+			private static void DoWrite(string eventName, string message, string? conditionName = null, string memberName = "", string sourceFilePath = "",int sourceLineNumber = 0)
 			{
-				//var x = new Microsoft.Extensions.Logging.Debug.DebugLoggerProvider();
-				//var defaultLogger = x.CreateLogger("default");
-				//defaultLogger.lo
-				//var x = new DebugLoggingProvider();
+				//pretty color printout to console
+				var timeFormat = DateTime.Now.ToString("hh:mm:ss.ffff").Color(ConsoleColor.Gray).Bold();
+				var eventFormat = $"{eventName}".Color(ConsoleColor.DarkBlue).Bold().Background(ConsoleColor.White);
+				var conditionFormat = $"{conditionName}".Color(ConsoleColor.Red).Bold().Background(ConsoleColor.Black);
+				var callsiteFormat = $"{sourceFilePath}:{sourceLineNumber}({memberName})".Color(ConsoleColor.Magenta).Background(ConsoleColor.Black).Bold();
+				var messageFormat = message.Color(ConsoleColor.White).Bold().Background(ConsoleColor.Black);
+				Console.WriteLine($"{timeFormat} - {callsiteFormat} - [{eventFormat}({conditionFormat})]\n{messageFormat}");
+			}
 
-				//Console.WriteLine
+
+			[DebuggerNonUserCode, DebuggerHidden]
+			[DoesNotReturn]
+			private static void DoAssertFail(string eventName, string message, string? conditionName = null, string memberName = "", string sourceFilePath = "", int sourceLineNumber = 0)
+			{
+				//log that an assert occurs to the console
+				DoWrite(eventName,message,conditionName,memberName,sourceFilePath,sourceLineNumber);
 				if (Debugger.IsAttached == false)
 				{
 					Debugger.Launch();
@@ -285,10 +300,8 @@ namespace NotNot.Bcl.Diagnostics
 				}
 				else
 				{
-					// In Core, we do not show a dialog.
-					// Fail in order to avoid anyone catching an exception and masking
-					// an assert failure.
-					var ex = new Exception(message);// + detailMessage, stackTrace);
+					//failed to break into debugger.  crash the app instead.
+					var ex = new Exception(message);
 					Environment.FailFast(ex.Message, ex);
 				}
 			}
@@ -322,14 +335,14 @@ public class PerfSpikeWatch
 			name = "";
 		}
 
-		
+
 		//name += $"({sourceFilePath._GetAfter('\\', true)}:{sourceLineNumber})";
 
-		Name = name.PadRight(20); 
+		Name = name.PadRight(20);
 	}
 
-	public Stopwatch sw=new Stopwatch();
-	public PercentileSampler800<TimeSpan> sampler=new();
+	public Stopwatch sw = new Stopwatch();
+	public PercentileSampler800<TimeSpan> sampler = new();
 	public int pollSkipFrequency = 100;
 	private int _lapCount = 0;
 	private Percentiles<TimeSpan> _lastPollPercentiles;
@@ -364,7 +377,7 @@ public class PerfSpikeWatch
 		_lapCount++;
 
 		//once we fill up, do logging if circumstances dictate
-		if (sampler.IsFilled && _lapCount%pollSkipFrequency==0)
+		if (sampler.IsFilled && _lapCount % pollSkipFrequency == 0)
 		{
 			var percentiles = sampler.GetPercentiles();
 			if (_lastPollPercentiles.sampleCount == 0)
@@ -373,8 +386,8 @@ public class PerfSpikeWatch
 				return;
 			}
 
-			if (percentiles.p100 >= percentiles.p50* 2
-			    && percentiles.p100 > _lastPollPercentiles.p100 * 2
+			if (percentiles.p100 >= percentiles.p50 * 2
+				&& percentiles.p100 > _lastPollPercentiles.p100 * 2
 				)
 			{
 				if (_caller == null)
@@ -382,16 +395,16 @@ public class PerfSpikeWatch
 					_caller = $"{sourceFilePath._GetAfter('\\', true)}:{sourceLineNumber}";
 				}
 				__ERROR.WriteLine($"PERFSPIKEWATCH {Name}({_caller}): spike p100={percentiles.p100.TotalMilliseconds._Round(2)}ms.  " +
-				                  $"currentStats={percentiles.ToString((val)=>val.TotalMilliseconds._Round(2))}   " +
-				                  $"priorStats={_lastPollPercentiles.ToString((val) => val.TotalMilliseconds._Round(2))}");
+								  $"currentStats={percentiles.ToString((val) => val.TotalMilliseconds._Round(2))}   " +
+								  $"priorStats={_lastPollPercentiles.ToString((val) => val.TotalMilliseconds._Round(2))}");
 			}
-			_lastPollPercentiles=percentiles;
+			_lastPollPercentiles = percentiles;
 		}
 	}
 	//[Conditional("CHECKED")]
 	public void LapAndReset([CallerFilePath] string sourceFilePath = "???", [CallerLineNumber] int sourceLineNumber = 0)
 	{
-		Lap(sourceFilePath,sourceLineNumber);
+		Lap(sourceFilePath, sourceLineNumber);
 		sw.Reset();
 	}
 }

@@ -41,9 +41,7 @@
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <Authors>Novaleaf</Authors>
         <Company>NotNotTech</Company>
-        <Description>
-            an Extended Base Class Library (BCL) for use in DotNet6+ projects. Generally focused on performance and diagnostics.
-        </Description>
+        <Description>an Extended Base Class Library (BCL) for use in DotNet6+ projects. Generally focused on performance and diagnostics.</Description>
         <PackageTags>NotNot;Bcl;</PackageTags>
         <!--pick from https://spdx.org/licenses/-->
         <PackageLicenseExpression>MPL-2.0</PackageLicenseExpression>
@@ -56,9 +54,9 @@
     </PropertyGroup>
 
     <!--coherse the MinVer package to generate timestamped nuget packages whenever a prerelease package is made.   see https://github.com/adamralph/minver/discussions/670 -->
-    <Target Name="MyTarget" AfterTargets="MinVer" Condition="'$(MinVerPreRelease)' != ''" >
+    <Target Name="MyTarget" AfterTargets="MinVer" Condition="'GITHUB_ACTIONS' != 'true' AND '$(MinVerPreRelease)' != ''">
         <PropertyGroup>
-            <PackageVersion>$(MinVerMajor).$(MinVerMinor).$(MinVerPatch)-$(MinVerPreRelease)-$([System.DateTime]::Now.ToString(yyyyMMdd-hhmmss))</PackageVersion>
+            <PackageVersion>$(MinVerMajor).$(MinVerMinor).$(MinVerPatch)-$(MinVerPreRelease)-$([System.DateTime]::UtcNow.ToString(yyyyMMdd-hhmmss))</PackageVersion>
             <PackageVersion Condition="'$(MinVerBuildMetadata)' != ''">$(PackageVersion)+$(MinVerBuildMetadata)</PackageVersion>
             <Version>$(PackageVersion)</Version>
         </PropertyGroup>
@@ -66,9 +64,8 @@
 
 
     <ItemGroup>
+    <PackageReference Include="ANSI.Console" Version="2.5.0" />
     <PackageReference Include="CommunityToolkit.HighPerformance" Version="8.0.0-preview1" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="6.0.2-mauipre.1.22054.8" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="6.0.2-mauipre.1.22054.8" />
     <PackageReference Include="MinVer" Version="3.0.0-rc.1">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
