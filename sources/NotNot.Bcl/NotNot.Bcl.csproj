@@ -56,7 +56,7 @@
     <!--coherse the MinVer package to generate timestamped nuget packages whenever a prerelease package is made.   see https://github.com/adamralph/minver/discussions/670 -->
     <Target Name="MyTarget" AfterTargets="MinVer" Condition="'GITHUB_ACTIONS' != 'true' AND '$(MinVerPreRelease)' != ''">
         <PropertyGroup>
-            <PackageVersion>$(MinVerMajor).$(MinVerMinor).$(MinVerPatch)-$(MinVerPreRelease)-$([System.DateTime]::UtcNow.ToString(yyyyMMdd-hhmmss))</PackageVersion>
+            <PackageVersion>$(MinVerMajor).$(MinVerMinor).$(MinVerPatch)-$(MinVerPreRelease)-$([System.DateTime]::UtcNow.ToString(yyyyMMdd-HHmmss))</PackageVersion>
             <PackageVersion Condition="'$(MinVerBuildMetadata)' != ''">$(PackageVersion)+$(MinVerBuildMetadata)</PackageVersion>
             <Version>$(PackageVersion)</Version>
         </PropertyGroup>

@@ -274,7 +274,7 @@ namespace NotNot.Bcl.Diagnostics
 			private static void DoWrite(string eventName, string message, string? conditionName = null, string memberName = "", string sourceFilePath = "",int sourceLineNumber = 0)
 			{
 				//pretty color printout to console
-				var timeFormat = DateTime.Now.ToString("hh:mm:ss.ffff").Color(ConsoleColor.Gray).Bold();
+				var timeFormat = DateTime.Now.ToString("HH:mm:ss.ffff").Color(ConsoleColor.Gray).Bold();
 				var eventFormat = $"{eventName}".Color(ConsoleColor.DarkBlue).Bold().Background(ConsoleColor.White);
 				var conditionFormat = $"{conditionName}".Color(ConsoleColor.Red).Bold().Background(ConsoleColor.Black);
 				var callsiteFormat = $"{sourceFilePath}:{sourceLineNumber}({memberName})".Color(ConsoleColor.Magenta).Background(ConsoleColor.Black).Bold();
