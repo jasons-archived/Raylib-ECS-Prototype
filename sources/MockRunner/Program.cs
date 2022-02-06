@@ -6,6 +6,10 @@ using Raylib_CsLo;
 using System.Numerics;
 using System.Threading.Tasks;
 
+
+//NotNot.Bcl.Diagnostics.__DEBUG.WriteLine("burrito");
+//NotNot.Bcl.Diagnostics.__DEBUG.Assert(false, "tacho");
+
 //create basic engine
 var engine = new Engine();
 engine.Initialize();

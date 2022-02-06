@@ -11,6 +11,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime;
 using System.Runtime.CompilerServices;
 using NotNot.Bcl;
@@ -188,6 +189,7 @@ namespace NotNot.Bcl.Diagnostics
 		[DebuggerNonUserCode]
 		public static class DiagHelper
 		{
+			//private static System.Diagnostics.DebugProvider _provider;
 			[DebuggerNonUserCode]//, DebuggerHidden]
 			public static void Assert(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
 			{
@@ -197,7 +199,9 @@ namespace NotNot.Bcl.Diagnostics
 				}
 				message ??= "Assert condition failed";
 
-				Debug.Assert(false, (string)$"ASSERT({conditionName}) {message}");
+				//Debug.Assert(false, (string)$"ASSERT({conditionName}) {message}");
+				DoAssertFail($"ASSERT_ONCE({conditionName}) {message}");
+
 			}
 
 
@@ -227,7 +231,8 @@ namespace NotNot.Bcl.Diagnostics
 				}
 
 				//Debug.Assert(false, "ASSERT ONCE: " + message);
-				Debug.Assert(false,(string)$"ASSERT_ONCE({conditionName}) {message}");
+				//Debug.Assert(false,(string)$"ASSERT_ONCE({conditionName}) {message}");
+				DoAssertFail($"ASSERT_ONCE({conditionName}) {message}");
 			}
 			[DebuggerNonUserCode, DebuggerHidden]
 			public static void Throw(bool condition, string message = null, [CallerArgumentExpression("condition")] string? conditionName = null)
@@ -258,6 +263,34 @@ namespace NotNot.Bcl.Diagnostics
 				}
 				//Console.WriteLine(message);
 				Console.WriteLine($"WRITE({conditionName}) {message}");
+			}
+
+			[DoesNotReturn]
+			private static void DoAssertFail(string message)
+			{
+				//var x = new Microsoft.Extensions.Logging.Debug.DebugLoggerProvider();
+				//var defaultLogger = x.CreateLogger("default");
+				//defaultLogger.lo
+				//var x = new DebugLoggingProvider();
+
+				//Console.WriteLine
+				if (Debugger.IsAttached == false)
+				{
+					Debugger.Launch();
+				}
+
+				if (Debugger.IsAttached)
+				{
+					Debugger.Break();
+				}
+				else
+				{
+					// In Core, we do not show a dialog.
+					// Fail in order to avoid anyone catching an exception and masking
+					// an assert failure.
+					var ex = new Exception(message);// + detailMessage, stackTrace);
+					Environment.FailFast(ex.Message, ex);
+				}
 			}
 		}
 	}
