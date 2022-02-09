@@ -1,11 +1,7 @@
 // [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] 
 // [!!] Copyright ©️ NotNot Project and Contributors. 
-// [!!] By default, this file is licensed to you under the AGPL-3.0.
-// [!!] However a Private Commercial License is available. 
+// [!!] This file is licensed to you under the MPL-2.0.
 // [!!] See the LICENSE.md file in the project root for more info. 
-// [!!] ------------------------------------------------- 
-// [!!] Contributions Guarantee Citizenship! 
-// [!!] Would you like to know more? https://github.com/NotNotTech/NotNot 
 // [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!]  [!!] [!!] [!!] [!!]
 
 using System;
@@ -273,13 +269,20 @@ namespace NotNot.Bcl.Diagnostics
 			[DebuggerNonUserCode, DebuggerHidden]
 			private static void DoWrite(string eventName, string message, string? conditionName = null, string memberName = "", string sourceFilePath = "",int sourceLineNumber = 0)
 			{
-				//pretty color printout to console
+				//pretty color printout to console using the ANSI.Console nuget package.   
 				var timeFormat = DateTime.Now.ToString("HH:mm:ss.ffff").Color(ConsoleColor.Gray).Bold();
 				var eventFormat = $"{eventName}".Color(ConsoleColor.DarkBlue).Bold().Background(ConsoleColor.White);
 				var conditionFormat = $"{conditionName}".Color(ConsoleColor.Red).Bold().Background(ConsoleColor.Black);
 				var callsiteFormat = $"{sourceFilePath}:{sourceLineNumber}({memberName})".Color(ConsoleColor.Magenta).Background(ConsoleColor.Black).Bold();
 				var messageFormat = message.Color(ConsoleColor.White).Bold().Background(ConsoleColor.Black);
 				Console.WriteLine($"{timeFormat} - {callsiteFormat} - [{eventFormat}({conditionFormat})]\n{messageFormat}");
+
+				// If a different ansi color package is needed, can try Spectre.Console.  https://spectreconsole.net/
+				//new Spectre.Console.Markup("test",
+				//	Spectre.Console.Style.WithForeground(Spectre.Console.Color.Grey)
+				//		.Combine(Spectre.Console.Style.WithDecoration(Spectre.Console.Decoration.Bold)));
+
+				//Spectre.Console.AnsiConsole.
 			}
 
 
