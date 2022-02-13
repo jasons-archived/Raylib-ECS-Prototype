@@ -32,7 +32,7 @@ public readonly struct EntityHandle : IComparable<EntityHandle>
 	/// this entityHandle stored as a long
 	/// </summary>
 	[FieldOffset(0)]
-	public readonly long _packValue;
+	public readonly ulong _packValue;
 
 	/// <summary>
 	/// can be used to access slot into the entityRegistry
@@ -46,7 +46,7 @@ public readonly struct EntityHandle : IComparable<EntityHandle>
 	[FieldOffset(4)]
 	public readonly int version;
 
-	public EntityHandle(long packValue) : this()
+	public EntityHandle(ulong packValue) : this()
 	{
 		_packValue = packValue;
 	}
@@ -63,7 +63,7 @@ public readonly struct EntityHandle : IComparable<EntityHandle>
 
 	public override string ToString()
 	{
-		return $"{id}.{version}";
+		return $"{id}.{version}({_packValue:x16})";
 		//try
 		//{
 		//	return $"{id}.{version}";
@@ -166,7 +166,7 @@ public class EntityRegistry
 			return ref toReturn;
 		}
 	}
-	public ref EntityData this[long packedHandle]
+	public ref EntityData this[ulong packedHandle]
 	{
 		get
 		{
@@ -222,7 +222,7 @@ public readonly record struct AccessToken : IComparable<AccessToken>
 	/// <summary>
 	/// needs to match Page._packVersion, otherwise a pack took place and the token needs to be refreshed.
 	/// </summary>
-	public readonly int packVersion { get; init; }
+	public readonly uint packVersion { get; init; }
 	//	/// <summary>
 	//	/// can be used to directly find a chunk from `Chunk[TComponent]._GLOBAL_LOOKUP(chunkId)`
 	//	/// </summary>
@@ -1363,14 +1363,14 @@ public partial class Page  //alloc/free/pack logic
 	/// <summary>
 	/// when we pack, we move entities around.  This is used to determine if a PageAccessToken is out of date.
 	/// </summary>
-	public int _packVersion = 0;
+	public uint _packVersion = 0;
 	/// <summary>
 	/// entities registered with this page.  
 	/// <para>OBSOLETE: kind of expensive any maybe not so helpful?   can access all entities via entityRegistry, or all this page entitites by enumerating it's Column{EntityMeta}</para>
 	/// </summary>
 	/// <remarks><para>given an entityHandle, find current token.  this allows decoupling our internal storage location from external callers, allowing packing.</para></remarks>
 	[Obsolete("kind of expensive any maybe not so helpful?   can access all entities via entityRegistry, or all this page entitites by enumerating it's Column<EntityMeta>")]
-	public Dictionary<long, AccessToken> _entityLookup = new();
+	public Dictionary<ulong, AccessToken> _entityLookup = new();
 
 	/// <summary>
 	/// temp listing of free entities, we will pack and/or deallocate at a specific time each frame

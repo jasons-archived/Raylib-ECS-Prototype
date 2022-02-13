@@ -40,7 +40,7 @@ public class RenderPacket3d : IRenderPacketNew
 		{
 			if(technique == null){ return true; }
 
-			if (instances.length > 0) return false;
+			if (instances.Length > 0) return false;
 
 			return true;
 		}

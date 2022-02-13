@@ -298,18 +298,18 @@ public ref struct SpanGuard<T>
 
 	public SpanGuard(SpanOwner<T> owner)
 	{
-		_owner = owner;
+		_poolOwner = owner;
 #if CHECKED
 		_disposeGuard = new();
 #endif
 	}
 
-	public SpanOwner<T> _owner;
+	public SpanOwner<T> _poolOwner;
 
-	public Span<T> Span { get => _owner.Span; }
+	public Span<T> Span { get => _poolOwner.Span; }
 	public ArraySegment<T> DangerousGetArray()
 	{
-		return _owner.DangerousGetArray();
+		return _poolOwner.DangerousGetArray();
 	}
 
 
@@ -318,7 +318,7 @@ public ref struct SpanGuard<T>
 #endif
 	public void Dispose()
 	{
-		_owner.Dispose();
+		_poolOwner.Dispose();
 
 #if CHECKED
 		_disposeGuard.Dispose();
@@ -359,34 +359,40 @@ public static class ReadMem
 /// <typeparam name="T"></typeparam>
 public readonly struct Mem<T>
 {
-	private readonly MemoryOwner_Custom<T>? _owner;
+	/// <summary>
+	/// if pooled, this will be set.  a reference to the pooled location so it can be recycled
+	/// </summary>
+	private readonly MemoryOwner_Custom<T>? _poolOwner;
+	/// <summary>
+	/// details the backing storage
+	/// </summary>
 	private readonly ArraySegment<T> _segment;
-	private readonly T[] _array;
-	private readonly int _offset;
-	public readonly int length;
 
-	public static readonly Mem<T> Empty = new(null, null, null, 0, 0);
-	internal Mem(MemoryOwner_Custom<T> owner, ArraySegment<T> segment, T[] array, int offset, int length)
+	//private readonly T[] _array;
+	//private readonly int _offset;
+	//public readonly int length;
+
+	public static readonly Mem<T> Empty = new(null, ArraySegment<T>.Empty);
+	internal Mem(MemoryOwner_Custom<T> owner) : this(owner, owner.DangerousGetArray()) { }
+	internal Mem(ArraySegment<T> segment) : this(null, segment) { }
+
+	internal Mem(MemoryOwner_Custom<T> owner, ArraySegment<T> segment, int subOffset, int length) : this(owner,
+		new ArraySegment<T>(segment.Array, segment.Offset + subOffset, length))
 	{
-		_owner = owner;
+		__DEBUG.Assert(subOffset + segment.Offset + length <= segment.Count);
+		//__DEBUG.Assert(length <= segment.Count);
+	}
+	internal Mem(T[] array, int offset, int length) : this(null, new ArraySegment<T>(array, offset, length)) { }
+
+	internal Mem(T[] array) : this(null, new ArraySegment<T>(array)) { }
+	internal Mem(MemoryOwner_Custom<T> owner, ArraySegment<T> segment)
+	{
+		_poolOwner = owner;
 		_segment = segment;
-		_array = array;
-		_offset = offset;
-		this.length = length;
 	}
 
-	internal Mem(ArraySegment<T> segment)
-	{
-		_owner = null;
-		_segment = segment;
-		_array = segment.Array!;
-		_offset = segment.Offset;
-		length = segment.Count;
-	}
-	internal Mem(MemoryOwner_Custom<T> owner) : this(owner.DangerousGetArray())
-	{
-		_owner = owner;
-	}
+
+
 	/// <summary>
 	/// allocate memory from the shared pool.
 	/// If your Type is a reference type or contains references, be sure to use clearOnDispose otherwise you will have memory leaks.
@@ -434,7 +440,8 @@ public readonly struct Mem<T>
 
 	public Mem<T> Slice(int offset, int count)
 	{
-		var toReturn = new Mem<T>(_owner, new(_array, _offset + offset, count), _array, _offset + offset, count);
+		//var toReturn = new Mem<T>(_poolOwner, new(_array, _offset + offset, count), _array, _offset + offset, count);
+		var toReturn = new Mem<T>(_poolOwner, _segment,offset,count);
 		return toReturn;
 	}
 
@@ -453,14 +460,16 @@ public readonly struct Mem<T>
 	{
 		get
 		{
-			return new Span<T>(_array, _offset, length);
+			//return new Span<T>(_array, _offset, length);
+			return _segment.AsSpan();
 		}
 	}
 	public Memory<T> Memory
 	{
 		get
 		{
-			return new Memory<T>(_array, _offset, length);
+			//return new Memory<T>(_array, _offset, length);
+			return _segment.AsMemory();
 		}
 	}
 
@@ -468,27 +477,46 @@ public readonly struct Mem<T>
 	{
 		get
 		{
-			return length;
+			return _segment.Count;
 		}
 	}
 
+	/// <summary>
+	/// if owned by a pook, recycles.   DANGER: any other references to the same backing pool slot are also disposed at this time!
+	/// </summary>
 	public void Dispose()
 	{
-		if (_owner != null)
+		//only do work if backed by an owner, and if so, recycle
+		if (_poolOwner != null)
 		{
-			_owner.Dispose();
-		}
-#if DEBUG
-		Array.Clear(_array, _offset, Length);
-#endif
-	}
+			AssertNotDisposed();
+			__DEBUG.Assert(_poolOwner.IsDisposed, "backing _poolOwner is already disposed!");
 
+			var array = _segment.Array;
+			Array.Clear(array, 0, array.Length);
+			_poolOwner.Dispose();
+		}
+
+//#if DEBUG
+//		Array.Clear(_array, _offset, Length);
+//#endif
+	}
+	[Conditional("CHECKED")]
+	private void AssertNotDisposed()
+	{
+		if (_poolOwner != null)
+		{
+			__CHECKED.Assert(_poolOwner?.IsDisposed != true, "disposed while in use");
+		}
+	}
 	public ref T this[int index]
 	{
 		get
 		{
-			__DEBUG.Throw(index >= 0 && index < length);
-			return ref _array[_offset + index];
+			AssertNotDisposed();
+			return ref Span[index];
+			//__DEBUG.Throw(index >= 0 && index < length);
+			//return ref _array[_offset + index];
 		}
 	}
 	public Span<T>.Enumerator GetEnumerator()
@@ -498,99 +526,114 @@ public readonly struct Mem<T>
 
 	public ReadMem<T> AsReadMem()
 	{
-		return new ReadMem<T>(_owner,_segment,_array,_offset,length);
+		return new ReadMem<T>(_poolOwner,_segment);
 	}
 	public override string ToString()
 	{
-		return $"{this.GetType().Name}<{typeof(T).Name}>[{this.length}]";
+		return $"{this.GetType().Name}<{typeof(T).Name}>[{this._segment.Count}]";
 	}
 }
+
+
 /// <summary>
 ///  a read-only capable view into an array/span
 /// </summary>
 /// <typeparam name="T"></typeparam>
 //[DebuggerTypeProxy(typeof(NotNot.Bcl.Collections.Advanced.CollectionDebugView<>))]
 //[DebuggerDisplay("{ToString(),raw}")]
-[DebuggerDisplay("{ToString(),raw,nq}")]
+//[DebuggerDisplay("{ToString(),nq}")]
 public readonly struct ReadMem<T>
 {
-	private readonly MemoryOwner_Custom<T>? _owner;
+	/// <summary>
+	/// if pooled, this will be set.  a reference to the pooled location so it can be recycled
+	/// </summary>
+	private readonly MemoryOwner_Custom<T>? _poolOwner;
+	/// <summary>
+	/// details the backing storage
+	/// </summary>
 	private readonly ArraySegment<T> _segment;
-	private readonly T[] _array;
-	private readonly int _offset;
-	public readonly int length;
 
-	
-	public override string ToString()
+	//private readonly T[] _array;
+	//private readonly int _offset;
+	//public readonly int length;
+	//public int Length => _segment.Count;
+
+	public static readonly ReadMem<T> Empty = new(null, ArraySegment<T>.Empty);
+	internal ReadMem(MemoryOwner_Custom<T> owner) : this(owner, owner.DangerousGetArray()) { }
+	internal ReadMem(ArraySegment<T> segment) : this(null, segment) { }
+
+	internal ReadMem(MemoryOwner_Custom<T> owner, ArraySegment<T> segment, int subOffset, int length) : this(owner,
+		new ArraySegment<T>(segment.Array, segment.Offset + subOffset, length))
 	{
-		return $"{this.GetType().Name}<{typeof(T).Name}>[{this.length}]";
+		__DEBUG.Assert(subOffset + segment.Offset + length < segment.Count);
+		__DEBUG.Assert(length <= segment.Count);
 	}
+	internal ReadMem(T[] array, int offset, int length) : this(null, new ArraySegment<T>(array, offset, length)) { }
 
-	public static readonly ReadMem<T> Empty = new(null, null, null, 0, 0);
-	internal ReadMem(MemoryOwner_Custom<T> owner, ArraySegment<T> segment, T[] array, int offset, int length)
+	internal ReadMem(T[] array) : this(null, new ArraySegment<T>(array)) { }
+	internal ReadMem(MemoryOwner_Custom<T> owner, ArraySegment<T> segment)
 	{
-		_owner = owner;
+		_poolOwner = owner;
 		_segment = segment;
-		_array = array;
-		_offset = offset;
-		this.length = length;
-	}
-	internal ReadMem(ArraySegment<T> segment)
-	{
-		_owner = null;
-		_segment = segment;
-		_array = segment.Array;
-		_offset = segment.Offset;
-		length = segment.Count;
-	}
-	internal ReadMem(MemoryOwner_Custom<T> owner) : this(owner.DangerousGetArray())
-	{
-		_owner = owner;
 	}
 
+
+
+	/// <summary>
+	/// allocate memory from the shared pool.
+	/// If your Type is a reference type or contains references, be sure to use clearOnDispose otherwise you will have memory leaks.
+	/// also note that the memory is not cleared by default.
+	/// </summary>
 	public static ReadMem<T> Allocate(int size, bool clearOnDispose)
 	{
-		__DEBUG.AssertOnce(System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<T>() || clearOnDispose, "alloc of classes via memPool can/will cause leaks");
-		var mo = MemoryOwner_Custom<T>.Allocate(size);
+		__DEBUG.AssertOnce(System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<T>() == false || clearOnDispose, "alloc of classes via memPool can/will cause leaks");
+		var mo = MemoryOwner_Custom<T>.Allocate(size, clearOnDispose ? AllocationMode.Clear : AllocationMode.Default);
 		mo.ClearOnDispose = clearOnDispose;
-		return new ReadMem<T>(mo);
+		return new (mo);
 	}
+	/// <summary>
+	/// allocate memory from the shared pool and copy the contents of the specified span into it
+	/// </summary>
 	public static ReadMem<T> Allocate(ReadOnlySpan<T> span, bool clearOnDispose)
 	{
 		var toReturn = Allocate(span.Length, clearOnDispose);
 		span.CopyTo(toReturn.AsWriteSpan());
 		return toReturn;
 	}
+
 	public static ReadMem<T> CreateUsing(T[] array)
 	{
-		return new ReadMem<T>(new ArraySegment<T>(array));
+		return new (new ArraySegment<T>(array));
 	}
 	public static ReadMem<T> CreateUsing(T[] array, int offset, int count)
 	{
-		return new ReadMem<T>(new ArraySegment<T>(array, offset, count));
+		return new (new ArraySegment<T>(array, offset, count));
 	}
 	public static ReadMem<T> CreateUsing(ArraySegment<T> backingStore)
 	{
-		return new ReadMem<T>(backingStore);
+		return new (backingStore);
 	}
 	internal static ReadMem<T> CreateUsing(MemoryOwner_Custom<T> MemoryOwnerNew)
 	{
-		return new ReadMem<T>(MemoryOwnerNew);
+		return new(MemoryOwnerNew);
+	}
+	public static ReadMem<T> CreateUsing(Mem<T> mem)
+	{
+		return mem.AsReadMem();
 	}
 
-	public static ReadMem<T> CreateUsing(Mem<T> writeMem)
-	{
-		return writeMem.AsReadMem();
-	}
 
-	public ReadMem<T> Slice(int offset, int count)
+
+	public Mem<T> Slice(int offset, int count)
 	{
-		var toReturn = new ReadMem<T>(_owner, new(_array, _offset + offset, count), _array, _offset + offset, count);
+		//var toReturn = new Mem<T>(_poolOwner, new(_array, _offset + offset, count), _array, _offset + offset, count);
+		var toReturn = new Mem<T>(_poolOwner, _segment, offset, count);
 		return toReturn;
 	}
 
+
+
 	/// <summary>
-	/// <para>Returns the backing array segment, NOT READONLY protected.</para>
 	/// beware: the size of the array allocated may be larger than the size requested by this Mem.  
 	/// As such, beware if using the backing Array directly.  respect the offset+length described in this segment.
 	/// </summary>
@@ -603,69 +646,77 @@ public readonly struct ReadMem<T>
 	{
 		get
 		{
-			//var x = new ReadOnlySpan<T>(_array, _offset, length);
-			//for(var i = 0; i < x.Length; i++)
-			//{
-			//	ref readonly var item = ref x[i];
-			//	//do stuff
-
-			//}
-			//foreach(ref readonly var item in x)
-			//{
-			//	//do stuff
-			//}
-
-			return new ReadOnlySpan<T>(_array, _offset, length);
+			//return new Span<T>(_array, _offset, length);
+			return _segment.AsSpan();
 		}
 	}
-	public ReadOnlyMemory<T> Memory
+	public Span<T> AsWriteSpan()=> _segment.AsSpan();
+	public Memory<T> Memory
 	{
 		get
 		{
-			return new ReadOnlyMemory<T>(_array, _offset, length);
+			//return new Memory<T>(_array, _offset, length);
+			return _segment.AsMemory();
 		}
 	}
 
+	public int Length
+	{
+		get
+		{
+			return _segment.Count;
+		}
+	}
+
+	/// <summary>
+	/// if owned by a pook, recycles.   DANGER: any other references to the same backing pool slot are also disposed at this time!
+	/// </summary>
 	public void Dispose()
 	{
-		if (_owner != null)
+		//only do work if backed by an owner, and if so, recycle
+		if (_poolOwner != null)
 		{
-			_owner.Dispose();
+			AssertNotDisposed();
+			__DEBUG.Assert(_poolOwner.IsDisposed, "backing _poolOwner is already disposed!");
+
+			var array = _segment.Array;
+			Array.Clear(array, 0, array.Length);
+			_poolOwner.Dispose();
 		}
+
+		//#if DEBUG
+		//		Array.Clear(_array, _offset, Length);
+		//#endif
 	}
-#if DEBUG
-	public readonly T this[int index]
+	[Conditional("CHECKED")]
+	private void AssertNotDisposed()
+	{
+		__CHECKED.Assert(_poolOwner?.IsDisposed != true, "disposed while in use");
+	}
+	public T this[int index]
 	{
 		get
 		{
-			__DEBUG.Throw(index >= 0 && index < length);
-			return _array[_offset + index];
+			AssertNotDisposed();
+			return _segment[index];
+			//return ref Span[index];
+			//__DEBUG.Throw(index >= 0 && index < length);
+			//return ref _array[_offset + index];
 		}
 	}
-#else
-public ref readonly T this[int index]
-	{
-		get
-		{
-			__DEBUG.Throw(index >= 0 && index < length);
-			return ref _array[_offset + index];
-		}
-	}
-#endif
 	public ReadOnlySpan<T>.Enumerator GetEnumerator()
 	{
 		return Span.GetEnumerator();
 	}
+
 	public Mem<T> AsWriteMem()
 	{
-		return new Mem<T>(_owner, _segment, _array, _offset, length);
+		return new (_poolOwner, _segment);
 	}
-	public Span<T> AsWriteSpan()
+	public override string ToString()
 	{
-		return new Span<T>(_array, _offset, length);
+		return $"{this.GetType().Name}<{typeof(T).Name}>[{this._segment.Count}]";
 	}
-
-
 }
 
 

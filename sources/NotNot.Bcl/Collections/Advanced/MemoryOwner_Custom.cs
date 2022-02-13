@@ -307,9 +307,16 @@ public sealed class MemoryOwner_Custom<T> : IMemoryOwner<T>
 		return new MemoryOwner_Custom<T>(start, length, this.pool, array!);
 	}
 
+	public bool IsDisposed{ get; private set; }
 	/// <inheritdoc/>
 	public void Dispose()
 	{
+		if (IsDisposed)
+		{
+			return;
+		}
+		IsDisposed = true;
+
 		T[]? array = this.array;
 
 		if (array is null)

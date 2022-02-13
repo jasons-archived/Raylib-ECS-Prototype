@@ -222,7 +222,7 @@ public class TestInputSystem : NotNot.Ecs.System
 			var totalTime = (float)frame._stats._wallTime.TotalSeconds * 2;
 
 
-			for (var i = 0; i < meta.length; i++)
+			for (var i = 0; i < meta.Length; i++)
 			{
 				__ERROR.Throw(metaSpan[i].IsAlive, "why dead being enumerated?  we are forcing autopack");
 
@@ -272,7 +272,7 @@ public class MoveSystem : NotNot.Ecs.System
 
 			var elapsed = (float)frame._stats._wallTime.TotalSeconds * 2;
 
-			for (var i = 0; i < meta.length; i++)
+			for (var i = 0; i < meta.Length; i++)
 			{
 				//apply move vector onto translation vector
 				transforms[i].Position += moves[i].pos;
@@ -319,14 +319,15 @@ public class RenderPacketGenerationSystem : NotNot.Ecs.System
 		ReadMem<WorldXform> transforms
 		) =>
 		{
+			var debugText = 0;
 			//get the shared components for this chunk
 			var sharedComponents = meta[0].SharedComponents;
 			//we already filtered the query to require a RenderDescription (above), so get it now
 			var renderDescription = sharedComponents.Get<RenderDescription>();
 
 			
-			var instances = Mem<Matrix4x4>.Allocate(meta.length, false);
-			for (var i = 0; i < meta.length; i++)
+			var instances = Mem<Matrix4x4>.Allocate(meta.Length, false);
+			for (var i = 0; i < meta.Length; i++)
 			{
 				//instances[i] = Matrix4x4.Identity;
 				//Console.WriteLine($"entity={meta[i]}, pos={translations[i].value}, move={moves[i].value}");

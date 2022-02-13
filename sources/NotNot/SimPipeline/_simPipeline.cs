@@ -315,7 +315,7 @@ public abstract partial class SimNode   //tree logic
 		var writeable = toReturn.AsWriteMem();
 
 
-		if (toReturn.length == 0)
+		if (toReturn.Length == 0)
 		{
 			return toReturn;
 		}

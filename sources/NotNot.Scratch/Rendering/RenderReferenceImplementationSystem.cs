@@ -239,6 +239,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 		var pswDrawText = new PerfSpikeWatch("DrawText");
 		var pswDrawFps = new PerfSpikeWatch("DrawFps");
 		var pswEndDrawing = new PerfSpikeWatch("EndDrawing");
+		var pswBogus = new PerfSpikeWatch("[-----Bogus---]");
 
 		//var x = new SynchronizationContext();
 		//Thread.BeginThreadAffinity();
@@ -247,7 +248,8 @@ public class RenderReferenceImplementationSystem : SystemBase
 		try
 		{
 			Raylib.InitWindow(screenSize.Width, screenSize.Height, windowTitle);
-			//Raylib.SetTargetFPS(240);
+			//Raylib.SetTargetFPS(120);
+			//Raylib.SetWindowState(ConfigFlags.FLAG_VSYNC_HINT);
 			
 			var swElapsed = Stopwatch.StartNew();
 			var swTotal = Stopwatch.StartNew();
@@ -261,7 +263,14 @@ public class RenderReferenceImplementationSystem : SystemBase
 				//	Console.WriteLine((int)hWindow);
 				//}
 
-				pswRenderLoop.Lap();
+				pswRenderLoop.LapAndReset();
+				pswRenderLoop.Start();
+
+				//pswBogus.Start();
+				////some non-trivial work to see if GC gets hit here some percent of time
+				//Thread.SpinWait(100000);
+				//pswBogus.LapAndReset();
+
 				var elapsed = (float)swElapsed.Elapsed.TotalSeconds;
 				swElapsed.Restart();
 				var totalTime = (float)swTotal.Elapsed.TotalSeconds;
@@ -409,8 +418,8 @@ public class RenderReferenceImplementationSystem : SystemBase
 
 				pswRaylibDraw.LapAndReset();
 
-				Thread.EndCriticalRegion();
-				Thread.EndThreadAffinity();
+				//Thread.EndCriticalRegion();
+				//Thread.EndThreadAffinity();
 			}
 			Raylib.CloseWindow();
 		}

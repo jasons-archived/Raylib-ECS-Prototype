@@ -19,7 +19,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RaylibScratch", "RaylibScra
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Raylib-CsLo", "sub-modules\Raylib-CsLo\Raylib-CsLo\Raylib-CsLo.csproj", "{07DCCB20-4A6C-4EFA-845C-D1A8C304FA69}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NotNot.Bcl", "NotNot.Bcl\NotNot.Bcl.csproj", "{906A77E4-09AE-4B06-A267-A276FD2ED3B7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NotNot.Bcl", "NotNot.Bcl\NotNot.Bcl.csproj", "{906A77E4-09AE-4B06-A267-A276FD2ED3B7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -76,8 +76,8 @@ Global
 		{07DCCB20-4A6C-4EFA-845C-D1A8C304FA69}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{07DCCB20-4A6C-4EFA-845C-D1A8C304FA69}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{07DCCB20-4A6C-4EFA-845C-D1A8C304FA69}.Release|Any CPU.Build.0 = Release|Any CPU
-		{906A77E4-09AE-4B06-A267-A276FD2ED3B7}.Checked|Any CPU.ActiveCfg = Debug|Any CPU
-		{906A77E4-09AE-4B06-A267-A276FD2ED3B7}.Checked|Any CPU.Build.0 = Debug|Any CPU
+		{906A77E4-09AE-4B06-A267-A276FD2ED3B7}.Checked|Any CPU.ActiveCfg = Checked|Any CPU
+		{906A77E4-09AE-4B06-A267-A276FD2ED3B7}.Checked|Any CPU.Build.0 = Checked|Any CPU
 		{906A77E4-09AE-4B06-A267-A276FD2ED3B7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{906A77E4-09AE-4B06-A267-A276FD2ED3B7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{906A77E4-09AE-4B06-A267-A276FD2ED3B7}.Release|Any CPU.ActiveCfg = Release|Any CPU

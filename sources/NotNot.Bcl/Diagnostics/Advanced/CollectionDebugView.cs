@@ -31,13 +31,31 @@ public sealed class CollectionDebugView<T>
         this.Items = collection?.ToArray();
     }
     public CollectionDebugView(Mem<T>? collection)
+	{
+		if (collection?.Length == 0)
+		{
+			this.Items = new T[0];
+		}
+		else
+		{
+			this.Items = collection?.DangerousGetArray().ToArray();
+		}
+	}
+    public CollectionDebugView(ReadMem<T> collection)
     {
-        this.Items = collection?.DangerousGetArray().ToArray();
-    }
-    public CollectionDebugView(ReadMem<T>? collection)
-    {
-        this.Items = collection?.DangerousGetArray().ToArray();
-    }
+	   //this.Items = new T[0];
+
+		if (collection.Length == 0)
+		{
+			this.Items = new T[0];
+		}
+		else
+		{
+			this.Items = collection.DangerousGetArray().ToArray();
+		}
+	}
+
     [DebuggerBrowsable(DebuggerBrowsableState.Collapsed)]
     public T[]? Items { get; }
+	public int Length{ get; }
 }
