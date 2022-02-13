@@ -500,11 +500,18 @@ public readonly struct Mem<T>
 	{
 		return new ReadMem<T>(_owner,_segment,_array,_offset,length);
 	}
+	public override string ToString()
+	{
+		return $"{this.GetType().Name}<{typeof(T).Name}>[{this.length}]";
+	}
 }
 /// <summary>
 ///  a read-only capable view into an array/span
 /// </summary>
 /// <typeparam name="T"></typeparam>
+//[DebuggerTypeProxy(typeof(NotNot.Bcl.Collections.Advanced.CollectionDebugView<>))]
+//[DebuggerDisplay("{ToString(),raw}")]
+[DebuggerDisplay("{ToString(),raw,nq}")]
 public readonly struct ReadMem<T>
 {
 	private readonly MemoryOwner_Custom<T>? _owner;
@@ -512,6 +519,12 @@ public readonly struct ReadMem<T>
 	private readonly T[] _array;
 	private readonly int _offset;
 	public readonly int length;
+
+	
+	public override string ToString()
+	{
+		return $"{this.GetType().Name}<{typeof(T).Name}>[{this.length}]";
+	}
 
 	public static readonly ReadMem<T> Empty = new(null, null, null, 0, 0);
 	internal ReadMem(MemoryOwner_Custom<T> owner, ArraySegment<T> segment, T[] array, int offset, int length)

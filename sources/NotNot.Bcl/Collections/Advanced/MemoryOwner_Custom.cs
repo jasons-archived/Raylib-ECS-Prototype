@@ -25,10 +25,12 @@ namespace NotNot.Bcl.Collections.Advanced;
 /// <para>This <see cref="MemoryOwner_Custom{T}"/> is different from <see cref="MemoryOwner{T}"/> in that this adds a <see cref="ClearOnDispose"/> property.</para>
 /// </summary>
 /// <typeparam name="T">The type of items to store in the current instance.</typeparam>
-[DebuggerTypeProxy(typeof(CollectionDebugView<>))]
-[DebuggerDisplay("{ToString(),raw}")]
+//[DebuggerTypeProxy(typeof(CollectionDebugView<>))]
+//[DebuggerDisplay("{ToString(),raw}")]
+//[DebuggerDisplay("{raw}")]
 public sealed class MemoryOwner_Custom<T> : IMemoryOwner<T>
 {
+	
 	/// <summary>
 	/// set to true if you want the memory cleared upon disposal/collection. 
 	/// </summary>
@@ -322,24 +324,27 @@ public sealed class MemoryOwner_Custom<T> : IMemoryOwner<T>
 
 		this.pool.Return(array);
 	}
-
-	/// <inheritdoc/>
-	[Pure]
 	public override string ToString()
 	{
-		// Normally we would throw if the array has been disposed,
-		// but in this case we'll just return the non formatted
-		// representation as a fallback, since the ToString method
-		// is generally expected not to throw exceptions.
-		if (typeof(T) == typeof(char) &&
-			this.array is char[] chars)
-		{
-			return new string(chars, this.start, this.length);
-		}
-
-		// Same representation used in Span<T>
-		return $"CommunityToolkit.HighPerformance.Buffers.MemoryOwner<{typeof(T)}>[{this.length}]";
+		return $"{this.GetType().Name}<{typeof(T).Name}>[{this.length}]";
 	}
+	///// <inheritdoc/>
+	//[Pure]
+	//public override string ToString()
+	//{
+	//	// Normally we would throw if the array has been disposed,
+	//	// but in this case we'll just return the non formatted
+	//	// representation as a fallback, since the ToString method
+	//	// is generally expected not to throw exceptions.
+	//	if (typeof(T) == typeof(char) &&
+	//		this.array is char[] chars)
+	//	{
+	//		return new string(chars, this.start, this.length);
+	//	}
+
+	//	// Same representation used in Span<T>
+	//	return $"CommunityToolkit.HighPerformance.Buffers.MemoryOwner<{typeof(T)}>[{this.length}]";
+	//}
 
 	/// <summary>
 	/// Throws an <see cref="ObjectDisposedException"/> when <see cref="array"/> is <see langword="null"/>.
