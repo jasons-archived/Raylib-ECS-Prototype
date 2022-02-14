@@ -319,6 +319,11 @@ public class RenderPacketGenerationSystem : NotNot.Ecs.System
 		ReadMem<WorldXform> transforms
 		) =>
 		{
+			if (meta.Length == 0)
+			{
+				//no results from query
+				return;
+			}
 			var debugText = 0;
 			//get the shared components for this chunk
 			var sharedComponents = meta[0].SharedComponents;
