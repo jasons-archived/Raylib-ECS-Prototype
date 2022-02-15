@@ -165,10 +165,15 @@ public class Phase0_StateSync : SystemBase
 	/// <summary>
 	/// render packets for frame n-1.  these are ready to be picked up (swapped out) by the rendering system
 	/// </summary>
-	private RecycleChannel<ConcurrentQueue<IRenderPacketNew>> renderPackets_PriorFrame=new(1,()=>new(),
-		(toClean) => { toClean.Clear();
+	private RecycleChannel<ConcurrentQueue<IRenderPacketNew>> renderPackets_PriorFrame=new(
+		1,
+		()=>new(),
+		(toClean) => {
+			toClean.Clear();
 			return toClean;
-		});
+		},
+		(toDispose)=> { }
+		);
 
 
 	//private ConcurrentQueue<IRenderPacketNew> _renderPacketsPrior = new();
@@ -248,7 +253,7 @@ public class Phase0_StateSync : SystemBase
 
 
 
-		_renderPackets = renderPackets_PriorFrame.WriteAndSwap(_renderPackets);
+		 renderPackets_PriorFrame.WriteAndSwap(_renderPackets, out _renderPackets);
 
 
 //////		//clear and swap

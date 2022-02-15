@@ -111,7 +111,7 @@ public record struct WorldXform
 	}
 	public Matrix4x4 xformMatrix = Matrix4x4.Identity;
 
-	public WorldXform() 
+	public WorldXform()
 	{
 	}
 
@@ -182,7 +182,7 @@ public class RenderMesh
 	}
 }
 
-public class RenderInfo 
+public class RenderInfo
 {
 
 	Dictionary<CombinedHash, object> test;
@@ -209,6 +209,7 @@ public class TestInputSystem : NotNot.Ecs.System
 
 	protected override async Task OnUpdate(Frame frame)
 	{
+
 #if DEBUG
 		__ERROR.Throw(Thread.CurrentThread.ManagedThreadId != RenderReferenceImplementationSystem.mtId);
 		if (Thread.CurrentThread.ManagedThreadId == RenderReferenceImplementationSystem.mtId)
@@ -303,9 +304,12 @@ public class RenderPacketGenerationSystem : NotNot.Ecs.System
 		base.OnInitialize();
 		//create a query that selects all entities that have a Move and Translation component
 		//for performance reasons this should be cached as a class member,
-		positionQuery = entityManager.Query(new() { all = { typeof(WorldXform), typeof(IsVisible) },
+		positionQuery = entityManager.Query(new()
+		{
+			all = { typeof(WorldXform), typeof(IsVisible) },
 			//only itterate entities that have a RenderDescription
-			sharedComponentTypes = {typeof(RenderDescription) } });
+			sharedComponentTypes = { typeof(RenderDescription) }
+		});
 
 		//notify our need for read/write access so systems can be multithreaded safely
 		RegisterReadLock<WorldXform>();
@@ -313,27 +317,27 @@ public class RenderPacketGenerationSystem : NotNot.Ecs.System
 	protected override Task OnUpdate(Frame frame)
 	{
 		positionQuery.Run((
-		//metadata about the entity
-		ReadMem<EntityMetadata> meta,
-		//write access to Translation component
-		ReadMem<WorldXform> transforms
-		) =>
-		{
-			if (meta.Length == 0)
-			{
+	   //metadata about the entity
+	   ReadMem<EntityMetadata> meta,
+	   //write access to Translation component
+	   ReadMem<WorldXform> transforms
+	   ) =>
+	   {
+		   if (meta.Length == 0)
+		   {
 				//no results from query
 				return;
-			}
-			var debugText = 0;
+		   }
+		   var debugText = 0;
 			//get the shared components for this chunk
 			var sharedComponents = meta[0].SharedComponents;
 			//we already filtered the query to require a RenderDescription (above), so get it now
 			var renderDescription = sharedComponents.Get<RenderDescription>();
 
-			
-			var instances = Mem<Matrix4x4>.Allocate(meta.Length, false);
-			for (var i = 0; i < meta.Length; i++)
-			{
+
+		   var instances = Mem<Matrix4x4>.Allocate(meta.Length, false);
+		   for (var i = 0; i < meta.Length; i++)
+		   {
 				//instances[i] = Matrix4x4.Identity;
 				//Console.WriteLine($"entity={meta[i]}, pos={translations[i].value}, move={moves[i].value}");
 				//Console.WriteLine($"entity={meta[i]}, pos={translations[i].value}");
@@ -343,18 +347,18 @@ public class RenderPacketGenerationSystem : NotNot.Ecs.System
 														 //instances[i].Translation = new Vector3(0,0,1.1f);
 														 //instances[i] = Raymath.MatrixTranslate(0, 0, 1);
 			}
-
+		   
 
 			//loop through the render techniques and generate render packets for them.
 			foreach (var iTechnique in renderDescription.techniques)
-			{
-				var renderPacket = new RenderPacket3d(iTechnique);
-				renderPacket.instances = instances.AsReadMem();
-				renderPacket.entityMetadata = meta;
-				this.manager.engine.StateSync.EnqueueRenderPacket(renderPacket);
-			}
+		   {
+			   var renderPacket = new RenderPacket3d(iTechnique);
+			   renderPacket.instances = instances.AsReadMem();
+			   renderPacket.entityMetadata = meta;
+			   this.manager.engine.StateSync.EnqueueRenderPacket(renderPacket);
+		   }
 
-		});
+	   });
 
 		return Task.CompletedTask;
 

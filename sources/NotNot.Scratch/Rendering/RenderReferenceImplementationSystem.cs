@@ -182,7 +182,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 			__ERROR.Throw(pooked.IsEmpty == false);
 		}
 		
-		_tempRenderPackets = renderThreadInput.WriteAndSwap(_tempRenderPackets);
+		renderThreadInput.WriteAndSwap(_tempRenderPackets, out _tempRenderPackets);
 	}
 
 
@@ -217,7 +217,8 @@ public class RenderReferenceImplementationSystem : SystemBase
 		{
 			toClean.Clear();
 			return toClean;
-		}
+		},
+		(toDispose)=>{ }
 	);
 
 	public static int mtId;
@@ -363,7 +364,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 						//#if CHECKED
 						if (packetsCurrent.Count == 0)
 						{
-							Console.WriteLine("NO PACKETS");
+							__ERROR.WriteLine("NO PACKETS, this is somewhat expected when the engine starts, but after the first real render packets arive, this should NEVER happen, as the rendering should be run gated to the main engine thread");
 						}
 
 						//#endif
@@ -405,7 +406,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 					Raylib.EndMode3D();
 					pswEnd3d.LapAndReset();
 					pswDrawText.Start();
-					Raylib.DrawText($"Reference Rendering {this.renderThreadInput._reader.Count}", 10, 40, 20, Raylib.DARKGRAY);
+					Raylib.DrawText($"Reference Rendering Frames Behind {this.renderThreadInput._channel.Reader.Count}", 10, 40, 20, Raylib.DARKGRAY);
 					pswDrawText.LapAndReset();
 					pswDrawFps.Start();
 					Raylib.DrawFPS(10, 10);
