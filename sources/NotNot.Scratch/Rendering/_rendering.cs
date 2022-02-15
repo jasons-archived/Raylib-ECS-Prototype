@@ -26,6 +26,7 @@ using static Raylib_CsLo.MaterialMapIndex;
 using static Raylib_CsLo.CameraMode;
 using static Raylib_CsLo.KeyboardKey;
 using NotNot.Bcl;
+using NotNot.Bcl.Diagnostics;
 
 namespace NotNot.Rendering;
 
@@ -129,7 +130,7 @@ public class StaticModelTechnique : IRenderTechnique3d
 		if (xforms.Length == 0)
 		{
 			
-			Console.WriteLine($"Packet is EMPTY!!>?!?!  packet.IsEmpty={renderPacket.IsEmpty}");
+			__ERROR.WriteLine($"Packet is EMPTY!!>?!?!  packet.IsEmpty={renderPacket.IsEmpty}");
 		}
 
 		//Console.WriteLine($"cpuId={Thread.GetCurrentProcessorId()}, mtId={Thread.CurrentThread.ManagedThreadId}");

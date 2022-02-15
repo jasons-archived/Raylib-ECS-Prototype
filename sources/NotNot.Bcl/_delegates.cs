@@ -13,6 +13,8 @@ using System.Threading.Tasks;
 namespace NotNot.Bcl;
 
 public delegate ref T Func_Ref<T>();
+public delegate ref TReturn Func_Ref<T1, TReturn>(ref T1 arg1);
+
 public delegate void Action_Span<T>(Span<T> span);
 public delegate void Action_RoSpan<TSpan>(ReadOnlySpan<TSpan> span);
 public delegate void Action_RoSpan<TSpan, TArg>(ReadOnlySpan<TSpan> span, TArg arg);

@@ -128,36 +128,59 @@ public class RenderReferenceImplementationSystem : SystemBase
 
 
 	/// <summary>
-	/// render packets obtained from the Phase0_SyncState system
+	/// a temp render packets obtained from the Phase0_SyncState system,
+	/// used as a temp variable when swapping out with the rendering system.
 	/// </summary>
 	private ConcurrentQueue<IRenderPacketNew> _tempRenderPackets = new();
 
 
+	///// <summary>
+	///// used to synchronize the critical section that must not be raced by the main simulation's render update task and the render loop
+	///// <para>The protected section obtains the frame N-1 render packets and allows the render loop to run once.</para>
+	///// </summary>
+	///// <remarks>
+	///// <para>The original problem was that there was flickering every so often with the packet rendering.
+	///// More analysis showed that maybe 1/10000 loops the renderLoopThread did not have any packets to render, causing a blank frame to be shown.
+	///// A lazy solution would have been to skip rendering that frame, but that would lead to jitters and so I needed to solve the root cause.
+	///// It turns out that I was having system A (rendering loop) synchronizing with system B (rendering system) but reading data from system C (frame start cache of render packets).
+	///// This meant that occasionally, the render thread gets behind, then catches up, effectively running twice in a frame.
+	///// In more detail:
+	///// The frame would start, provide renderPackets(Frame N-1).
+	///// The renderLoopThread would aquire those renderPackets(N-1) and render.
+	///// The renderSystem would run, unblocking renderLoopThread to run.
+	///// That same frame, renderLoopThread would loop again, aquiring renderPackets again.
+	///// But since the next frame didn't start, there would be no new renderPackets.  so no work to do, resulting in the blank frame.
+	///// </para>
+	///// <para> The solution was to have A read and synchronize from B, and B reads from C.
+	///// Since RenderSystem is part of the SimPipeline, it's order is gurenteed to run once per frame, after the Phase0StateSync.
+	///// RenderSystem reads the renderPackets(N-1), then allows RenderLoopThread to run once.
+	///// RenderLoopThread aquires renderPackets(N-1) then blocks itself from running until next RenderSystem update unblocks it.
+	///// This last statement (blocks itself) is very important to avoid the race condition that is the original problem.</para>
+	///// <para>Basically this is just a long-winded way of me saying it took 3 days to get a cube rendering without flickering</para>
+	///// </remarks>
+	//private SemaphoreSlim _updateSyncCriticalSectionLock = new(1, 1);
+
+
+
 	/// <summary>
-	/// used to synchronize the critical section that must not be raced by the main simulation's render update task and the render loop
-	/// <para>The protected section obtains the frame N-1 render packets and allows the render loop to run once.</para>
+	/// main thread passes render packets to this render thread once per tick.
 	/// </summary>
-	/// <remarks>
-	/// <para>The original problem was that there was flickering every so often with the packet rendering.
-	/// More analysis showed that maybe 1/10000 loops the renderLoopThread did not have any packets to render, causing a blank frame to be shown.
-	/// A lazy solution would have been to skip rendering that frame, but that would lead to jitters and so I needed to solve the root cause.
-	/// It turns out that I was having system A (rendering loop) synchronizing with system B (rendering system) but reading data from system C (frame start cache of render packets).
-	/// This meant that occasionally, the render thread gets behind, then catches up, effectively running twice in a frame.
-	/// In more detail:
-	/// The frame would start, provide renderPackets(Frame N-1).
-	/// The renderLoopThread would aquire those renderPackets(N-1) and render.
-	/// The renderSystem would run, unblocking renderLoopThread to run.
-	/// That same frame, renderLoopThread would loop again, aquiring renderPackets again.
-	/// But since the next frame didn't start, there would be no new renderPackets.  so no work to do, resulting in the blank frame.
-	/// </para>
-	/// <para> The solution was to have A read and synchronize from B, and B reads from C.
-	/// Since RenderSystem is part of the SimPipeline, it's order is gurenteed to run once per frame, after the Phase0StateSync.
-	/// RenderSystem reads the renderPackets(N-1), then allows RenderLoopThread to run once.
-	/// RenderLoopThread aquires renderPackets(N-1) then blocks itself from running until next RenderSystem update unblocks it.
-	/// This last statement (blocks itself) is very important to avoid the race condition that is the original problem.</para>
-	/// <para>Basically this is just a long-winded way of me saying it took 3 days to get a cube rendering without flickering</para>
-	/// </remarks>
-	private SemaphoreSlim _updateSyncCriticalSectionLock = new(1, 1);
+	public RecycleChannel<ConcurrentQueue<IRenderPacketNew>> renderThreadInput = new(
+		1,
+		() => new(),
+		(toClean) =>
+		{
+			toClean.Clear();
+			return toClean;
+		},
+		(toDispose) => { }
+	);
+
+	/// <summary>
+	/// managed thread ID of the render thread.  used for debugging to ensure the thread ID doesn't ever change, which would break openGl.
+	/// </summary>
+	public static int mtId;
+
 
 	protected override async Task OnUpdate(Frame frame)
 	{
@@ -175,14 +198,18 @@ public class RenderReferenceImplementationSystem : SystemBase
 		//////}
 
 		//get our render packets from prior frame and pass it to the render thread
-		_tempRenderPackets = await manager.engine.StateSync.RenderPacketsSwapPrior_New(_tempRenderPackets);
+		//_tempRenderPackets = await manager.engine.StateSync.RenderPacketsSwapPrior_New(_tempRenderPackets);
+		//manager.engine.StateSync.renderPackets.ReadFrame(_tempRenderPackets)
+		_tempRenderPackets = await manager.engine.StateSync.renderPackets.ReadFrame(_tempRenderPackets);
 		if (_tempRenderPackets.TryPeek(out var pooked))
 		{
 			
-			__ERROR.Throw(pooked.IsEmpty == false);
+			__ERROR.Throw(pooked.IsEmpty == false,"render packet is empty.   why?");
 		}
 		
 		renderThreadInput.WriteAndSwap(_tempRenderPackets, out _tempRenderPackets);
+
+		
 	}
 
 
@@ -209,19 +236,6 @@ public class RenderReferenceImplementationSystem : SystemBase
 
 
 	}
-
-	public RecycleChannel<ConcurrentQueue<IRenderPacketNew>> renderThreadInput = new(
-		1,
-		() => new(),
-		(toClean) =>
-		{
-			toClean.Clear();
-			return toClean;
-		},
-		(toDispose)=>{ }
-	);
-
-	public static int mtId;
 	private async Task _RenderThread_Worker()
 	{
 		//the render packets currently being consumed by this render thread.
@@ -258,6 +272,8 @@ public class RenderReferenceImplementationSystem : SystemBase
 
 			while (!Raylib.WindowShouldClose() && IsRegistered && IsDisposed == false)
 			{
+				__DEBUG.Assert(mtId == Thread.CurrentThread.ManagedThreadId,"changing mtid breaks opengl");
+
 				//unsafe
 				//{
 				//	var hWindow = Raylib.GetWindowHandle();

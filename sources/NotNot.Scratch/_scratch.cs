@@ -355,7 +355,8 @@ public class RenderPacketGenerationSystem : NotNot.Ecs.System
 			   var renderPacket = new RenderPacket3d(iTechnique);
 			   renderPacket.instances = instances.AsReadMem();
 			   renderPacket.entityMetadata = meta;
-			   this.manager.engine.StateSync.EnqueueRenderPacket(renderPacket);
+			   //this.manager.engine.StateSync.EnqueueRenderPacket(renderPacket);
+			   this.manager.engine.StateSync.renderPackets.WriteFramePacketData(renderPacket);
 		   }
 
 	   });
