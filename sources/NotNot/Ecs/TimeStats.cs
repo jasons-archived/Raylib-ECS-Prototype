@@ -71,10 +71,10 @@ public unsafe struct TimeStats
 	}
 	public override string ToString()
 	{
-		var gcTime = GC.GetGCMemoryInfo().PauseDurations._Aggregate(TimeSpan.Zero, (time, sum) => time + sum);//..._Sum();
+		//var gcTime = GC.GetGCMemoryInfo().PauseDurations._Aggregate(TimeSpan.Zero, (time, sum) => time + sum);//..._Sum();
 		var frameInfo = $"frame= {_frameId} @ {_wallTime.TotalSeconds._Round(0)}sec ";
 		var historyInfo = $" history = {_frameElapsed.TotalMilliseconds._Round(2)}cur {_maxMs._Round(1)}max {_avgMs._Round(1)}avg {_minMs._Round(1)}min  ";
-		var gcInfo = $" GC={GC.CollectionCount(0)} ({gcTime.TotalMilliseconds._Round(1)} ms)";
+		var gcInfo = $" GC={NotNot.Bcl.Diagnostics.__GcHelper.GetGcTimings()}";// $" GC={GC.CollectionCount(0)} ({gcTime.TotalMilliseconds._Round(1)} ms)";
 
 		return frameInfo + historyInfo + gcInfo;
 	}
