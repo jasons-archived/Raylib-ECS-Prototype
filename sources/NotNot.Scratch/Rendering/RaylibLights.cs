@@ -37,7 +37,7 @@ namespace NotNot.Rendering;
 *     3. This notice may not be removed or altered from any source distribution.
 *
 **********************************************************************************************/
-public unsafe class RLights
+public unsafe class RaylibLightHelper
 {
 
 

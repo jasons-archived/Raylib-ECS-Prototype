@@ -22,7 +22,11 @@ links for tangental educational stuff here.
 # gamedev
 - general gamedev
   - Game Programming Patterns, free web book: https://gameprogrammingpatterns.com/
-  - 
+  - Write a game, not an engine.  https://geometrian.com/programming/tutorials/write-games-not-engines/
+  - https://www.reddit.com/r/gameenginedevs/
+  - good video series on building an engine https://www.reddit.com/user/GameEngineSeries
+- https://github.com/OneLoneCoder/videos/tree/master/olcRolePlayingGame
+
 - spatial stuff, A*, etc
   - https://simblob.blogspot.com/
   - https://www.redblobgames.com/grids/hexagons/

@@ -67,8 +67,8 @@ public class StaticModelTechnique : IRenderTechnique3d
 		int ambientLoc = GetShaderLocation(shader, "ambient");
 		Raylib.SetShaderValue(shader, ambientLoc, new float[] { 0.2f, 0.2f, 0.2f, 1.0f }, SHADER_UNIFORM_VEC4);
 
-		lights = new RLights();
-		lights.CreateLight(RLights.LightType.LIGHT_DIRECTIONAL, new Vector3(50, 50, 0), Vector3.Zero, WHITE, shader);
+		lightHelper = new RaylibLightHelper();
+		directionalLight = lightHelper.CreateLight(RaylibLightHelper.LightType.LIGHT_DIRECTIONAL, new Vector3(50, 50, 0), Vector3.Zero, WHITE, shader);
 
 
 		OnInitialize(this);
@@ -92,7 +92,8 @@ public class StaticModelTechnique : IRenderTechnique3d
 	public Mesh mesh;
 	public Shader shader;
 	public Material material;
-	public RLights lights;
+	public RaylibLightHelper lightHelper;
+	public RaylibLightHelper.Light directionalLight;
 
 
 	public unsafe void DoDraw(RenderPacket3d renderPacket)
@@ -103,8 +104,12 @@ public class StaticModelTechnique : IRenderTechnique3d
 		}
 		//__DEBUG.Throw(IsInitialized);
 
+		//lightHelper.UpdateLightValues(shader, directionalLight);
+
 		Raylib.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, new Vector3[] { RenderReferenceImplementationSystem.camera.position }, SHADER_UNIFORM_VEC3);
 		Raylib.SetShaderValue(shader, (int)SHADER_LOC_VECTOR_VIEW, RenderReferenceImplementationSystem.camera.position, SHADER_UNIFORM_VEC3);
+
+
 
 		var xforms = renderPacket.instances.Span;
 		//var mesh = renderMesh.mesh;
@@ -127,6 +132,8 @@ public class StaticModelTechnique : IRenderTechnique3d
 				Raylib.DrawMesh(mesh, material, Matrix4x4.Transpose(xforms[i])); //IMPORTANT: raylib is row-major.   need to transpose dotnet (column major) to match
 			}
 		}
+
+
 		if (xforms.Length == 0)
 		{
 			

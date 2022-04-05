@@ -113,8 +113,8 @@ public class shaders_mesh_instancing
 		int ambientLoc = GetShaderLocation(shader, "ambient");
 		Raylib.SetShaderValue(shader, ambientLoc, new float[] { 0.2f, 0.2f, 0.2f, 1.0f }, SHADER_UNIFORM_VEC4);
 
-		var rLights = new NotNot.Rendering.RLights();
-		rLights.CreateLight(NotNot.Rendering.RLights.LightType.LIGHT_DIRECTIONAL, new Vector3(50, 50, 0), Vector3.Zero, WHITE, shader);
+		var rLights = new NotNot.Rendering.RaylibLightHelper();
+		rLights.CreateLight(NotNot.Rendering.RaylibLightHelper.LightType.LIGHT_DIRECTIONAL, new Vector3(50, 50, 0), Vector3.Zero, WHITE, shader);
 
 		Material material = LoadMaterialDefault();
 		material.shader = shader;
