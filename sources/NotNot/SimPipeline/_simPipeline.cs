@@ -414,13 +414,13 @@ public abstract partial class SimNode   //tree logic
 		}
 
 		OnRegister();
-		if (IsInitialized == false)
-		{
-			Initialize();
-		}
 		foreach (var child in children)
 		{
 			child.Register(manager);
+		}
+		if (IsInitialized == false)
+		{
+			Initialize();
 		}
 	}
 
@@ -1398,7 +1398,9 @@ public partial class Frame //resource locking
 
 }
 
-
+/// <summary>
+/// stores state for this node's frame of execution.     This is temporary, only should be used/modified during the current execution frame.
+/// </summary>
 public class NodeFrameState
 {
 	/// <summary>
