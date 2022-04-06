@@ -762,6 +762,48 @@ public class DisposeGuard : IDisposable
 	}
 }
 
+public abstract class FramePacketBase
+{
+	/// <summary>
+	/// internal helper used to track writes, to help catch race conditions (misuse)
+	/// </summary>
+	public int _version;
+	public bool IsInitialized{ get; private set; }
+
+	public bool IsSealed{ get; private set; }
+
+	public void NotifyWrite()
+	{
+		__ERROR.Throw(IsInitialized && _version > 0 && IsSealed==false);
+		_version++;
+	}
+
+	public void Seal()
+	{
+		IsSealed = true;
+	}
+
+	public void Recycle()
+	{
+		__ERROR.Throw(IsInitialized && _version> 0);
+		IsInitialized = false;
+		_version = -1;
+		OnRecycle();
+	}
+
+	public void Initialize()
+	{
+		__ERROR.Throw(IsInitialized==false && _version<=0);
+		IsInitialized = true;
+		_version = 1;
+		IsSealed = false;
+		OnInitialize();
+	}
+
+	protected abstract void OnRecycle();
+	protected abstract void OnInitialize();
+}
+
 
 /// <summary>
 /// efficiently get/set a value for a given type. 

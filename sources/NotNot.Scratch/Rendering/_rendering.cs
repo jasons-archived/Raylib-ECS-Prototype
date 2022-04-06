@@ -31,12 +31,35 @@ using NotNot.Bcl.Diagnostics;
 namespace NotNot.Rendering;
 
 
+/// <summary>
+/// hack to abstract everything render related away from the core engine
+/// </summary>
+public struct RenderProp
+{
+	public RenderShader shader;
+	public uint propId;
+}
 
+public struct RenderShader
+{
+
+}
+
+public static class WellKnownRenderAssets
+{
+	public static RenderShader shaderDefault = new() { };
+	public static RenderProp box = new() { shader = shaderDefault };
+}
+
+
+public static class WellKnownRenderShader
+{
+}
 
 
 public class StaticModelTechnique : IRenderTechnique3d
 {
-	public bool doBatching=false;
+	public bool doBatching = true;
 	public bool IsInitialized { get; set; }
 	public void Initialize()
 	{

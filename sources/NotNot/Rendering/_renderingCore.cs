@@ -12,6 +12,7 @@ using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
 using NotNot.Ecs.Allocation;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -94,6 +95,25 @@ public interface IRenderTechnique3d
 
 	public void Initialize();
 }
+public class RenderFrame : FramePacketBase
+{
+	public ConcurrentQueue<IRenderPacketNew> renderPackets = new();
+	public Vector3 position = new(0.0f, 10.0f, 10.0f); // Camera3D position
+	public Vector3 target = new(0.0f, 0.0f, 0.0f); // Camera3D looking at point
+	public Vector3 up = new(0.0f, 1.0f, 0.0f); // Camera3D up vector (rotation towards target)
+
+	protected override void OnInitialize()
+	{
+	}
+
+	protected override void OnRecycle()
+	{
+		renderPackets.Clear();
+		position = default;
+		target = default;
+		up = default;
+	}
+}
 
 public interface IRenderPacketNew : IComparable<IRenderPacketNew>
 {
@@ -116,3 +136,5 @@ public class RenderDescription
 {
 	public List<IRenderTechnique3d> techniques = new();
 }
+
+

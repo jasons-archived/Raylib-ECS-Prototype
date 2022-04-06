@@ -34,7 +34,6 @@ public class RenderReferenceImplementationSystem : SystemBase
 		projection_ = CameraProjection.CAMERA_PERSPECTIVE, // Camera3D mode type
 	};
 
-	//private CustomTaskScheduler renderScheduler = new CustomTaskScheduler(1);
 
 	protected override void OnRegister()
 	{
@@ -52,67 +51,14 @@ public class RenderReferenceImplementationSystem : SystemBase
 
 
 		//start rendering on it's own thread
-		//_renderTask = new Task(_RenderThread, TaskCreationOptions.LongRunning); //runs for entire app duration
-		//_renderTask.Start();
-
-
 		_renderThread = new Nito.AsyncEx.AsyncContextThread();
 		_renderTask = _renderThread.Factory.Run(_RenderThread_Worker);
 
-
-
-
-		//////_renderTask = new Task(() => StartRender2());
-		//////_renderTask.Start(renderScheduler);
-
-		//////renderScheduler
-		//////_renderTask = Task.Factory.StartNew(_RenderThread,CancellationToken.None,TaskCreationOptions.LongRunning,renderScheduler);
-		//////new Task(_RenderThread,TaskCreationOptions.LongRunning)
-
-		//////TaskScheduler.con
-		//////var x = new Thread()
-		//////Task.Factory.
 	}
 
-	//private void _RenderThread()
-	//{
-	//	Nito.AsyncEx.AsyncContext.Run(_RenderThread_Worker);
-
-
-	//	Console.WriteLine("DONE");
-	//}
-	//private Task StartRender()
-	//{
-	//	try
-	//	{
-	//		return _RenderThread_Worker();
-	//	}
-	//	catch (Exception ex)
-	//	{
-	//		Console.WriteLine(ex.Message);
-	//	}
-	//	finally
-	//	{
-	//		Console.WriteLine("DONE");
-	//	}
-	//	return Task.CompletedTask;
-
-	//}
 	private Nito.AsyncEx.AsyncContextThread _renderThread;
 	private Task _renderTask;
 
-	//private SemaphoreSlim _swapPacketsLock = new(1, 1);
-
-	///// <summary>
-	///// packets obtained from the Engine.SyncState  (packets from frame N-1)
-	///// <para>this is swapped back-and-forth with <see cref="_packetsPending"/></para>
-	///// </summary>
-	//private ConcurrentQueue<IRenderPacket> _packetsPending = new();
-	///// <summary>
-	///// the packets used by the render thread loop   (consumed by each pass of that loop)
-	///// <para>this is swapped back-and-forth with <see cref="_packetsPending"/></para>
-	///// </summary>
-	//private ConcurrentQueue<IRenderPacket> _packetsCurrent = new();
 
 	/// <summary>
 	/// sync point that prevents the render thread from running faster than the simulation frame rate
@@ -132,35 +78,6 @@ public class RenderReferenceImplementationSystem : SystemBase
 	/// used as a temp variable when swapping out with the rendering system.
 	/// </summary>
 	private ConcurrentQueue<IRenderPacketNew> _tempRenderPackets = new();
-
-
-	///// <summary>
-	///// used to synchronize the critical section that must not be raced by the main simulation's render update task and the render loop
-	///// <para>The protected section obtains the frame N-1 render packets and allows the render loop to run once.</para>
-	///// </summary>
-	///// <remarks>
-	///// <para>The original problem was that there was flickering every so often with the packet rendering.
-	///// More analysis showed that maybe 1/10000 loops the renderLoopThread did not have any packets to render, causing a blank frame to be shown.
-	///// A lazy solution would have been to skip rendering that frame, but that would lead to jitters and so I needed to solve the root cause.
-	///// It turns out that I was having system A (rendering loop) synchronizing with system B (rendering system) but reading data from system C (frame start cache of render packets).
-	///// This meant that occasionally, the render thread gets behind, then catches up, effectively running twice in a frame.
-	///// In more detail:
-	///// The frame would start, provide renderPackets(Frame N-1).
-	///// The renderLoopThread would aquire those renderPackets(N-1) and render.
-	///// The renderSystem would run, unblocking renderLoopThread to run.
-	///// That same frame, renderLoopThread would loop again, aquiring renderPackets again.
-	///// But since the next frame didn't start, there would be no new renderPackets.  so no work to do, resulting in the blank frame.
-	///// </para>
-	///// <para> The solution was to have A read and synchronize from B, and B reads from C.
-	///// Since RenderSystem is part of the SimPipeline, it's order is gurenteed to run once per frame, after the Phase0StateSync.
-	///// RenderSystem reads the renderPackets(N-1), then allows RenderLoopThread to run once.
-	///// RenderLoopThread aquires renderPackets(N-1) then blocks itself from running until next RenderSystem update unblocks it.
-	///// This last statement (blocks itself) is very important to avoid the race condition that is the original problem.</para>
-	///// <para>Basically this is just a long-winded way of me saying it took 3 days to get a cube rendering without flickering</para>
-	///// </remarks>
-	//private SemaphoreSlim _updateSyncCriticalSectionLock = new(1, 1);
-
-
 
 	/// <summary>
 	/// main thread passes render packets to this render thread once per tick.
@@ -184,18 +101,6 @@ public class RenderReferenceImplementationSystem : SystemBase
 
 	protected override async Task OnUpdate(Frame frame)
 	{
-
-		//////await _updateSyncCriticalSectionLock.WaitAsync();
-		//////try
-		//////{
-		//////	_tempRenderPackets = await manager.engine.StateSync.RenderPacketsSwapPrior_New(_tempRenderPackets);
-		//////	_renderLoopAutoResetEvent.Set();
-		//////	_tempRenderPackets = renderThreadInput.WriteAndSwap(_tempRenderPackets);
-		//////}
-		//////finally
-		//////{
-		//////	_updateSyncCriticalSectionLock.Release();
-		//////}
 
 		//get our render packets from prior frame and pass it to the render thread
 		//_tempRenderPackets = await manager.engine.StateSync.RenderPacketsSwapPrior_New(_tempRenderPackets);

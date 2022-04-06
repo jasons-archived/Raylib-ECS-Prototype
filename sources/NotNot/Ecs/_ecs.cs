@@ -23,6 +23,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading.Channels;
 
 namespace NotNot.Ecs;
 
@@ -101,6 +102,128 @@ public abstract class SystemBase : FixedTimestepNode
 	protected abstract Task OnUpdate(Frame frame);
 }
 
+/// <summary>
+/// simplified data channel, where the TFramePacket needs to manage concurrency
+/// This should only be added to the Phase0 StateSync System, as it takes the past frame's work and readies it for asynchronous systems to use.
+/// </summary>
+public class FrameDataChannelSlim<TFramePacket> : SystemBase where TFramePacket : FramePacketBase, new()
+{
+	public ConcurrentQueue<TFramePacket> recycled = new();
+	public TFramePacket CurrentFrameData;
+	private Channel<TFramePacket> _channel;
+	
+	/// <summary>
+	/// Max number of frames to buffer for async systems to use.
+	/// </summary>
+	public int MaxFrames{ get; private set; }
+
+	public FrameDataChannelSlim(int maxFrames)
+	{
+		MaxFrames = maxFrames;
+		_channel = Channel.CreateBounded<TFramePacket>(new BoundedChannelOptions(maxFrames+1){FullMode=BoundedChannelFullMode.DropOldest});
+	//	Reader = _channel.Reader;
+	}
+
+	protected override void OnInitialize()
+	{
+		if (CurrentFrameData == null)
+		{
+			CurrentFrameData = new();
+			CurrentFrameData.Initialize();
+		}
+		base.OnInitialize();
+	}
+
+	protected override void OnRegister()
+	{
+		base.OnRegister();
+	}
+
+
+	public async ValueTask<TFramePacket> Read(TFramePacket toRecycle=null)
+	{
+		//recycle done frame
+		if (toRecycle != null)
+		{
+			if (toRecycle.IsInitialized)
+			{
+				toRecycle.Recycle();
+			}
+			recycled.Enqueue(toRecycle);
+		}
+
+		//get frame
+		TFramePacket toReturn=null;
+		do
+		{
+			if (toReturn != null)
+			{
+				toReturn.Recycle();
+				recycled.Enqueue(toReturn);
+			}
+			toRecycle = await _channel.Reader.ReadAsync();
+		} while (_channel.Reader.Count >= MaxFrames); //recycle any older than our max
+
+		return toReturn;
+	}
+
+
+
+	///// <summary>
+	///// 
+	///// </summary>
+	///// <returns></returns>
+	//public ValueTask<TFramePacket> GetFinishedFramePacket()
+
+	protected override async Task OnUpdate(Frame frame)
+	{
+		var _curVersion = CurrentFrameData._version;
+		CurrentFrameData.Seal();
+		
+		var reader = _channel.Reader;
+		var writer = _channel.Writer;
+
+
+
+		//__DEBUG.AssertOnce(reader.Count < MaxFrames,
+		//	"why are we at max frames enqueued?  async worker isn't processing fast enough?");
+
+
+		//while (reader.Count > MaxFrames && reader.TryRead(out var staleFramePacket))
+		//{
+		//	//only here if exceeding 2 extra frames   usually an extra frame is culled by reader.
+		//	__DEBUG.WriteLine($"dropped frame packet due to count exceeding MaxFrames ({MaxFrames})");
+		//	staleFramePacket.Recycle();
+		//	recycled.Enqueue(staleFramePacket);
+		//}
+
+		await writer.WriteAsync(CurrentFrameData);
+
+		__DEBUG.Throw(CurrentFrameData._version == _curVersion,"race condition failed.   still being written as we are prepping for read by async systems");
+
+		//ready next (current frame starting)
+		if (!recycled.TryDequeue(out CurrentFrameData))
+		{
+			CurrentFrameData = new();
+		}
+		CurrentFrameData.Initialize();
+
+	}
+	protected override void OnDispose()
+	{
+		base.OnDispose();
+		CurrentFrameData.Recycle();
+		_channel.Writer.Complete();
+		while (_channel.Reader.TryRead(out var packet))
+		{
+			packet.Recycle();
+		}
+		recycled.Clear();
+	}
+
+
+
+}
 
 /// <summary>
 /// A system that is a child of a world
@@ -121,7 +244,7 @@ public abstract class System : SystemBase
 		}
 		catch (Exception ex)
 		{
-			throw new ApplicationException("could not find world in hiearchy. a WorldSystem should be registered as a child of a World", ex);
+			throw new ApplicationException("could not find world in hiearchy. a System should be registered as a child of a World.  Otherwise inherit from SystemBase directly", ex);
 		}
 
 		//ensure that nodes execute after entityManager finishes.  
@@ -140,7 +263,6 @@ public abstract class System : SystemBase
 
 	}
 }
-
 
 /// <summary>
 /// internal helper used to ensure components are not read+write at the same time.   for better performance, only checks during DEBUG builds

@@ -159,6 +159,18 @@ public class Phase0_StateSync : SystemBase
 
 	public FrameDataChannel<IRenderPacketNew> renderPackets = new(1);
 
+
+	public FrameDataChannelSlim<RenderFrame> renderChannel = new(1);
+
+	protected override void OnInitialize()
+	{
+		AddChild(renderChannel);
+
+
+		base.OnInitialize();
+
+	}
+
 	///// <summary>
 	///// the current simulation frame writes packets here
 	///// </summary>

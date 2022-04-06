@@ -44,7 +44,6 @@
   <ItemGroup>
     <Folder Include="Bcl\" />
     <Folder Include="Ecs\Scheduling\" />
-    <Folder Include="EngineOld\Internal\" />
   </ItemGroup>
 
   <ItemGroup>
