@@ -735,12 +735,20 @@ public class DisposeGuard : IDisposable
 			__ERROR.Assert(false, "why is dipose called twice?");
 			return;
 		}
-		IsDisposed = true;
 		OnDispose();
+
+#if DEBUG
+		__DEBUG.Throw(IsDisposed, "Your override didn't call base.OnDispose() like you are supposed to");
+#endif
+
 	}
 
+	/// <summary>
+	/// Override to implement the dispose pattern.  Be sure to call base.OnDispose() if you do.
+	/// </summary>
 	protected virtual void OnDispose()
 	{
+		IsDisposed = true;
 
 	}
 

@@ -66,11 +66,11 @@ public class World : SystemBase
 		base.OnInitialize();
 	}
 
-	protected override Task OnUpdate(Frame frame)
-	{
-		//throw new NotImplementedException();
-		return Task.CompletedTask;
-	}
+	//protected override Task OnUpdate(Frame frame)
+	//{
+	//	//throw new NotImplementedException();
+	//	return Task.CompletedTask;
+	//}
 }
 
 
@@ -81,10 +81,10 @@ public class World : SystemBase
 /// </summary>
 public class ContainerNode : SystemBase
 {
-	protected override Task OnUpdate(Frame frame)
-	{
-		return Task.CompletedTask;
-	}
+	//protected override Task OnUpdate(Frame frame)
+	//{
+	//	return Task.CompletedTask;
+	//}
 }
 
 /// <summary>
@@ -92,21 +92,96 @@ public class ContainerNode : SystemBase
 /// </summary>
 public abstract class SystemBase : FixedTimestepNode
 {
+#if DEBUG
+	private bool _DEBUG_calledUpdate;
+#endif
 	protected NodeFrameState _lastUpdateState;
-	sealed protected override Task OnUpdate(Frame frame, NodeFrameState nodeState)
+
+	/// <summary>
+	/// a lightweight node that is meant to be used as a "field" of the simNode.  never detached and lives for the lifetime of the parent simNode.
+	/// </summary>
+	private List<ISystemField> _fieldNodeChildren = new();
+
+	/// <summary>
+	/// add a "Field" to this System.  SystemField get notified on Initialize/Update/Dispose and can be considered "lightweight" nodes.
+	/// </summary>
+	/// <param name="systemField"></param>
+	public void AddField(ISystemField systemField)
 	{
-		_lastUpdateState = nodeState;
-		return OnUpdate(frame);
+		__DEBUG.Throw(IsDisposed == false);
+		_fieldNodeChildren.Add(systemField);
+		if (IsInitialized)
+		{
+			systemField.OnInitialize(this);
+		}
 	}
 
-	protected abstract Task OnUpdate(Frame frame);
+	sealed protected override async Task OnUpdate(Frame frame, NodeFrameState nodeState)
+	{
+		_lastUpdateState = nodeState;
+#if DEBUG
+		_DEBUG_calledUpdate = false;
+#endif
+		await OnUpdate(frame);
+#if DEBUG
+		__DEBUG.Throw(_DEBUG_calledUpdate, $"Your System of type '{this.GetType().FullName}' override of OnUpdate() didn't call base.OnUpdate() like you are supposed to");
+#endif
+	}
+
+	/// <summary>
+	/// when overriding, be sure to call the base.OnUpdate() method
+	/// </summary>
+	protected virtual async Task OnUpdate(Frame frame)
+	{
+#if DEBUG
+		_DEBUG_calledUpdate = true;
+#endif
+		foreach (var fieldNode in _fieldNodeChildren)
+		{
+			await fieldNode.OnUpdate(frame);
+		}
+	}
+
+	/// <inheritdoc />
+	protected override void OnInitialize()
+	{
+
+		foreach (var fieldNode in _fieldNodeChildren)
+		{
+			fieldNode.OnInitialize(this);
+		}
+
+		base.OnInitialize();
+	}
+
+	/// <inheritdoc />
+	protected override void OnDispose()
+	{
+		foreach (var fieldNode in _fieldNodeChildren)
+		{
+			fieldNode.OnDispose();
+		}
+
+		base.OnDispose();
+	}
 }
 
+/// <summary>
+/// a lightweight node that can be attached to a SimNode to hook into the Initialize/Dispose/Update workflow
+/// </summary>
+public interface ISystemField
+{
+	void OnInitialize(SystemBase parent);
+
+	Task OnUpdate(Frame frame);
+
+	void OnDispose();
+}
 /// <summary>
 /// simplified data channel, where the TFramePacket needs to manage concurrency
 /// This should only be added to the Phase0 StateSync System, as it takes the past frame's work and readies it for asynchronous systems to use.
 /// </summary>
-public class FrameDataChannelSlim<TFramePacket> : SystemBase where TFramePacket : FramePacketBase, new()
+public class FrameDataChannelSlim<TFramePacket> : ISystemField where TFramePacket : FramePacketBase, new()
 {
 	public ConcurrentQueue<TFramePacket> recycled = new();
 	public TFramePacket CurrentFrameData;
@@ -120,26 +195,24 @@ public class FrameDataChannelSlim<TFramePacket> : SystemBase where TFramePacket 
 	public FrameDataChannelSlim(int maxFrames)
 	{
 		MaxFrames = maxFrames;
-		_channel = Channel.CreateBounded<TFramePacket>(new BoundedChannelOptions(maxFrames+1){FullMode=BoundedChannelFullMode.DropOldest});
+		_channel = Channel.CreateBounded<TFramePacket>(new BoundedChannelOptions(maxFrames){FullMode=BoundedChannelFullMode.DropOldest});
 	//	Reader = _channel.Reader;
 	}
 
-	protected override void OnInitialize()
+	void ISystemField.OnInitialize(SystemBase parent)
 	{
 		if (CurrentFrameData == null)
 		{
 			CurrentFrameData = new();
 			CurrentFrameData.Initialize();
 		}
-		base.OnInitialize();
 	}
 
-	protected override void OnRegister()
-	{
-		base.OnRegister();
-	}
-
-
+	/// <summary>
+	/// read one packet, blocking if none is available.
+	/// </summary>
+	/// <param name="toRecycle"></param>
+	/// <returns></returns>
 	public async ValueTask<TFramePacket> Read(TFramePacket toRecycle=null)
 	{
 		//recycle done frame
@@ -153,18 +226,20 @@ public class FrameDataChannelSlim<TFramePacket> : SystemBase where TFramePacket 
 		}
 
 		//get frame
-		TFramePacket toReturn=null;
-		do
-		{
-			if (toReturn != null)
-			{
-				toReturn.Recycle();
-				recycled.Enqueue(toReturn);
-			}
-			toRecycle = await _channel.Reader.ReadAsync();
-		} while (_channel.Reader.Count >= MaxFrames); //recycle any older than our max
-
+		var toReturn = await _channel.Reader.ReadAsync();
 		return toReturn;
+		//TFramePacket toReturn=null;
+		//do
+		//{
+		//	if (toReturn != null)
+		//	{
+		//		toReturn.Recycle();
+		//		recycled.Enqueue(toReturn);
+		//	}
+		//	toReturn = await _channel.Reader.ReadAsync();
+		//} while (_channel.Reader.Count >= MaxFrames); //recycle any older than our max
+
+		//return toReturn;
 	}
 
 
@@ -175,7 +250,7 @@ public class FrameDataChannelSlim<TFramePacket> : SystemBase where TFramePacket 
 	///// <returns></returns>
 	//public ValueTask<TFramePacket> GetFinishedFramePacket()
 
-	protected override async Task OnUpdate(Frame frame)
+	async Task ISystemField.OnUpdate(Frame frame)
 	{
 		var _curVersion = CurrentFrameData._version;
 		CurrentFrameData.Seal();
@@ -209,9 +284,8 @@ public class FrameDataChannelSlim<TFramePacket> : SystemBase where TFramePacket 
 		CurrentFrameData.Initialize();
 
 	}
-	protected override void OnDispose()
+	void ISystemField.OnDispose()
 	{
-		base.OnDispose();
 		CurrentFrameData.Recycle();
 		_channel.Writer.Complete();
 		while (_channel.Reader.TryRead(out var packet))
@@ -220,8 +294,6 @@ public class FrameDataChannelSlim<TFramePacket> : SystemBase where TFramePacket 
 		}
 		recycled.Clear();
 	}
-
-
 
 }
 
@@ -665,13 +737,13 @@ public partial class EntityManager //entity creation
 	//	throw new NotImplementedException();
 	//}
 
-	protected override Task OnUpdate(Frame frame)
+	protected override async Task OnUpdate(Frame frame)
 	{
 		_accessGuard._enabled = false;
 		ProcessEnqueued_Phase0();
 		_accessGuard._enabled = true;
 		//TryRepackEntities_Sync();
-		return Task.CompletedTask;
+		await base.OnUpdate(frame);
 	}
 }
 

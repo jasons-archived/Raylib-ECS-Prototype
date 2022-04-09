@@ -83,7 +83,7 @@ public class FrameDataChannel<T> : DisposeGuard
 		_allowWriteWhileEndingFrame = allowWriteWhileEndingFrame;
 		_recycleChannel = new RecycleChannel<_FramePacketWrapper<T>>(maxFrames,
 			newFactory: () => new(new()),
-			cleanHelper: (framePacket) =>
+			recycleHelper: (framePacket) =>
 			{
 				//this FramePacketChannel class should already clear, so lets just check to verify it's clear
 				__DEBUG.Throw(framePacket.getQueue().Count == 0);
@@ -210,9 +210,9 @@ public class RecycleChannel<T> : DisposeGuard
 	/// </summary>
 	public Func<T> _newFactory;
 	/// <summary>
-	/// a custom callback to recycle the data object.  usually just .Clear() it
+	/// a custom callback to recycle the data object.  usually just .Recycle() it
 	/// </summary>
-	private Func<T, T> _cleanHelper;
+	private Func<T, T> _recycleHelper;
 	/// <summary>
 	/// helper to dispose of data objects stored internally.  called when disposed and items still exist in the channel.
 	/// </summary>
@@ -224,10 +224,10 @@ public class RecycleChannel<T> : DisposeGuard
 	/// </summary>
 	public ConcurrentQueue<T> _recycled = new();
 
-	public RecycleChannel(int capacity, Func<T> newFactory, Func<T, T> cleanHelper, Action<T> disposeHelper)
+	public RecycleChannel(int capacity, Func<T> newFactory, Func<T, T> recycleHelper, Action<T> disposeHelper)
 	{
 		_newFactory = newFactory;
-		_cleanHelper = cleanHelper;
+		_recycleHelper = recycleHelper;
 		_capacity = capacity;
 		_channel = Channel.CreateBounded<T>(new BoundedChannelOptions(capacity)
 		{
@@ -248,7 +248,7 @@ public class RecycleChannel<T> : DisposeGuard
 		{
 			if (IsDisposed)
 			{
-				recycled = _cleanHelper(toEnqueue);
+				recycled = _recycleHelper(toEnqueue);
 				return;
 			}
 			if (_channel.Writer.TryWrite(toEnqueue))
@@ -268,7 +268,7 @@ public class RecycleChannel<T> : DisposeGuard
 				if (_channel.Reader.TryRead(out var toReturn))
 				{
 					//sacrificing oldest enqueued so clean it before returning it
-					_cleanHelper(toReturn);
+					_recycleHelper(toReturn);
 				}
 				else
 				{
@@ -293,7 +293,7 @@ public class RecycleChannel<T> : DisposeGuard
 			_recycled.Clear();
 			while (_channel.Reader.TryRead(out var enqueued))
 			{
-				_cleanHelper(enqueued);
+				_recycleHelper(enqueued);
 				_disposeHelper(enqueued);
 			}
 			//_cleanHelper = null;
@@ -319,7 +319,7 @@ public class RecycleChannel<T> : DisposeGuard
 	public void Recycle(T toRecycle)
 	{
 		//clean it first
-		_cleanHelper(toRecycle);
+		_recycleHelper(toRecycle);
 		_recycled.Enqueue(toRecycle);
 	}
 

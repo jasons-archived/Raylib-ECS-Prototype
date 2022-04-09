@@ -198,13 +198,7 @@ public partial class SimManager //thread execution
 		await _frame.ExecuteNodeGraph();
 		// }
 
-
-
-
-
 	}
-
-
 }
 
 /// <summary>
@@ -298,6 +292,7 @@ public abstract partial class SimNode   //tree logic
 	public SimManager manager;
 
 	public List<SimNode> children = new();
+
 	/// <summary>
 	/// how far down the node hiearchy this is.  RootNode has depth 0.  
 	/// <para>when not registered with the SimManager (not attached to a running simulation) the depth is -1</para>
@@ -475,6 +470,8 @@ public abstract partial class SimNode   //tree logic
 		}
 
 	}
+
+
 
 	private void Added(SimNode parent)
 	{
@@ -833,7 +830,7 @@ public abstract partial class SimNode : DisposeGuard, IComparable<SimNode> //fra
 
 
 	/// <summary>
-	/// dispose self and all children
+	/// dispose self and all children.  be sure to call base.OnDispose() when overriding.
 	/// </summary>
 	protected override void OnDispose()
 	{
@@ -844,6 +841,7 @@ public abstract partial class SimNode : DisposeGuard, IComparable<SimNode> //fra
 				child.Dispose();
 			}
 		}
+
 		base.OnDispose();
 	}
 
@@ -856,8 +854,10 @@ public abstract partial class SimNode : DisposeGuard, IComparable<SimNode> //fra
 		{
 			return;
 		}
-		IsInitialized = true;
 		OnInitialize();
+#if DEBUG
+		__DEBUG.Throw(IsInitialized, "Your override didn't call base.OnInitialize() like you are supposed to");
+#endif
 	}
 	/// <summary>
 	/// if your node has initialization steps, override this method, but be sure to call it's base.OnInitialize();
@@ -866,7 +866,7 @@ public abstract partial class SimNode : DisposeGuard, IComparable<SimNode> //fra
 	/// </summary>
 	protected virtual void OnInitialize()
 	{
-
+		IsInitialized = true;
 	}
 
 }
@@ -1115,13 +1115,13 @@ public partial class Frame ////node graph setup and execution
 					activeNodes.Add(nodeState);
 
 
-					static async Task taskRunner(SimNode node, NodeFrameState nodeState,Frame _this)
-					{
-						var _task = node.DoUpdate(_this, nodeState);
-						await _task;
-						doneUpdateTask_Helper(_task, nodeState);
-						//return _task;
-					}
+					//static async Task taskRunner(SimNode node, NodeFrameState nodeState,Frame _this)
+					//{
+					//	var _task = node.DoUpdate(_this, nodeState);
+					//	await _task;
+					//	doneUpdateTask_Helper(_task, nodeState);
+					//	//return _task;
+					//}
 
 					if (node is IIgnoreUpdate)
 					{

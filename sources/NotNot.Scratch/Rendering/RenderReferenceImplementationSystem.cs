@@ -77,18 +77,22 @@ public class RenderReferenceImplementationSystem : SystemBase
 	/// a temp render packets obtained from the Phase0_SyncState system,
 	/// used as a temp variable when swapping out with the rendering system.
 	/// </summary>
-	private ConcurrentQueue<IRenderPacketNew> _tempRenderPackets = new();
+	//private ConcurrentQueue<IRenderPacketNew> _tempRenderPackets = new();
+	private RenderFrame _tempRenderFrame;
 
 	/// <summary>
 	/// main thread passes render packets to this render thread once per tick.
 	/// </summary>
-	public RecycleChannel<ConcurrentQueue<IRenderPacketNew>> renderThreadInput = new(
+	public RecycleChannel<RenderFrame> renderThreadInput = new(
 		1,
 		() => new(),
-		(toClean) =>
+		(toRecycle) =>
 		{
-			toClean.Clear();
-			return toClean;
+			if (toRecycle.IsInitialized)
+			{
+				toRecycle.Recycle();
+			}
+			return toRecycle;
 		},
 		(toDispose) => { }
 	);
@@ -105,15 +109,20 @@ public class RenderReferenceImplementationSystem : SystemBase
 		//get our render packets from prior frame and pass it to the render thread
 		//_tempRenderPackets = await manager.engine.StateSync.RenderPacketsSwapPrior_New(_tempRenderPackets);
 		//manager.engine.StateSync.renderPackets.ReadFrame(_tempRenderPackets)
-		_tempRenderPackets = await manager.engine.StateSync.renderPackets.ReadFrame(_tempRenderPackets);
-		if (_tempRenderPackets.TryPeek(out var pooked))
+		//_tempRenderPackets = await manager.engine.StateSync.renderPackets.ReadFrame(_tempRenderPackets);
+		_tempRenderFrame = await manager.engine.StateSync.renderChannel.Read(_tempRenderFrame);
+
+
+
+		if (_tempRenderFrame.renderPackets.TryPeek(out var pooked))
 		{
 			
 			__ERROR.Throw(pooked.IsEmpty == false,"render packet is empty.   why?");
 		}
 		
-		renderThreadInput.WriteAndSwap(_tempRenderPackets, out _tempRenderPackets);
+		renderThreadInput.WriteAndSwap(_tempRenderFrame, out _tempRenderFrame);
 
+		await base.OnUpdate(frame);
 		
 	}
 
@@ -145,7 +154,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 	{
 		//the render packets currently being consumed by this render thread.
 		//note that this gets swapped out for the queue stored in Engine.Phase0_StateSync every loop via some complex swap logic below.
-		ConcurrentQueue<IRenderPacketNew> packetsCurrent = new();
+		RenderFrame currentRenderFrame = new();
 		var pswRenderLoop = new PerfSpikeWatch("RenderLoop");
 		var pswRenderPacketSync = new PerfSpikeWatch("RenderPacketSync");
 		var pswRaylibDraw = new PerfSpikeWatch("RaylibDraw");
@@ -243,7 +252,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 				//		_updateSyncCriticalSectionLock.Release();
 				//	}
 				//}
-				packetsCurrent = await renderThreadInput.ReadAndSwap(packetsCurrent);
+				currentRenderFrame = await renderThreadInput.ReadAndSwap(currentRenderFrame);
 
 				pswRenderPacketSync.LapAndReset();
 
@@ -283,7 +292,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 					//debug logic
 					{
 						//#if CHECKED
-						if (packetsCurrent.Count == 0)
+						if (currentRenderFrame.renderPackets.Count == 0)
 						{
 							__ERROR.WriteLine("NO PACKETS, this is somewhat expected when the engine starts, but after the first real render packets arive, this should NEVER happen, as the rendering should be run gated to the main engine thread");
 						}
@@ -294,7 +303,7 @@ public class RenderReferenceImplementationSystem : SystemBase
 
 					//sort render packets according to their internal priority
 					{
-						while (packetsCurrent.TryDequeue(out var renderPacket))
+						while (currentRenderFrame.renderPackets.TryDequeue(out var renderPacket))
 						{
 							_thread_renderPackets.Add(renderPacket);
 						}

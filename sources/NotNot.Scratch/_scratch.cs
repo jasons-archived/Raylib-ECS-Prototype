@@ -235,6 +235,7 @@ public class TestInputSystem : NotNot.Ecs.System
 			}
 
 		});
+		await base.OnUpdate(frame);
 	}
 }
 /// <summary>
@@ -285,6 +286,7 @@ public class MoveSystem : NotNot.Ecs.System
 			}
 
 		});
+		await base.OnUpdate(frame);
 	}
 }
 public struct IsVisible : IEcsComponent
@@ -314,8 +316,10 @@ public class RenderPacketGenerationSystem : NotNot.Ecs.System
 		//notify our need for read/write access so systems can be multithreaded safely
 		RegisterReadLock<WorldXform>();
 	}
-	protected override Task OnUpdate(Frame frame)
+	protected override async Task OnUpdate(Frame frame)
 	{
+		var i = 0;
+
 		positionQuery.Run((
 	   //metadata about the entity
 	   ReadMem<EntityMetadata> meta,
@@ -356,12 +360,12 @@ public class RenderPacketGenerationSystem : NotNot.Ecs.System
 			   renderPacket.instances = instances.AsReadMem();
 			   renderPacket.entityMetadata = meta;
 			   //this.manager.engine.StateSync.EnqueueRenderPacket(renderPacket);
-			   this.manager.engine.StateSync.renderPackets.WriteFramePacketData(renderPacket);
+			   this.manager.engine.StateSync.renderChannel.CurrentFrameData.renderPackets.Enqueue(renderPacket);//.p.renderPackets.WriteFramePacketData(renderPacket);
 		   }
 
 	   });
 
-		return Task.CompletedTask;
+		await base.OnUpdate(frame);
 
 	}
 }
