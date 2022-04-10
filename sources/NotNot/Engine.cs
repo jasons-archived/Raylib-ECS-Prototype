@@ -8,6 +8,7 @@
 // [!!] Would you like to know more? https://github.com/NotNotTech/NotNot 
 // [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!]  [!!] [!!] [!!] [!!]
 
+using Nito.AsyncEx;
 using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
 using NotNot.Bcl.Threading;
@@ -22,6 +23,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using NotNot.Bcl.Threading.Advanced;
 
 namespace NotNot;
 
@@ -102,7 +104,7 @@ public class HeadlessUpdater : DisposeGuard, IUpdatePump
 {
 	//System.Threading.SemaphoreSlim runningLock = new(1);
 
-
+	public bool singleThreaded = false;
 	public event Func<TimeSpan, ValueTask> OnUpdate;
 
 
@@ -111,7 +113,12 @@ public class HeadlessUpdater : DisposeGuard, IUpdatePump
 
 	public void Start()
 	{
-		MainLoop = _MainLoop();
+		if (singleThreaded)
+		{
+			DebuggableTaskFactory.singleThreaded = true;
+		}
+		MainLoop = DebuggableTaskFactory.Run(_MainLoop);
+
 
 		async Task _MainLoop()
 		{
@@ -139,13 +146,19 @@ public class HeadlessUpdater : DisposeGuard, IUpdatePump
 	public bool ShouldStop { get; set; }
 
 
-	public async Task Stop()
+	public Task Stop()
 	{
 		ShouldStop = true;
-		await MainLoop;
+		return MainLoop;
 		//await runningLock.WaitAsync();
 		//IsRunning= false;
 		//runningLock.Release();
+	}
+
+	protected override void OnDispose()
+	{
+		ShouldStop = true;
+		base.OnDispose();
 	}
 }
 
@@ -180,5 +193,6 @@ public class Phase0_StateSync : SystemBase
 		//__DEBUG.Assert(renderPackets.CurrentFramePacketDataCount == 0,
 		//	"should not race with main thread to write packets");
 		await base.OnUpdate(frame);
+		//return Task.CompletedTask;
 	}
 }

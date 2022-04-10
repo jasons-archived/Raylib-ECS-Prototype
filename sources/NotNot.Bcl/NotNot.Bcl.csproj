@@ -70,6 +70,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
     <PackageReference Include="System.Runtime.Experimental" Version="6.0.2-mauipre.1.22054.8" />
   </ItemGroup>
 

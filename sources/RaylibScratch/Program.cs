@@ -12,7 +12,7 @@ renderSystem.Start();
 var swMainLoop = new Stopwatch();
 var loopCount = 0;
 
-ThreadPool.SetMaxThreads(4, 4);
+//ThreadPool.SetMaxThreads(4, 4);
 while (true)
 {
 	await renderSystem.renderGate.WaitAsync();

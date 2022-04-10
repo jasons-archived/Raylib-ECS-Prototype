@@ -18,6 +18,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using NotNot.Bcl;
 using NotNot.Bcl.Diagnostics;
+using NotNot.Bcl.Threading.Advanced;
 using NotNot.Ecs;
 
 namespace NotNot.SimPipeline;
@@ -1115,13 +1116,13 @@ public partial class Frame ////node graph setup and execution
 					activeNodes.Add(nodeState);
 
 
-					//static async Task taskRunner(SimNode node, NodeFrameState nodeState,Frame _this)
-					//{
-					//	var _task = node.DoUpdate(_this, nodeState);
-					//	await _task;
-					//	doneUpdateTask_Helper(_task, nodeState);
-					//	//return _task;
-					//}
+					static async Task taskRunner(SimNode node, NodeFrameState nodeState, Frame _this)
+					{
+						var _task = node.DoUpdate(_this, nodeState);
+						await _task;
+						doneUpdateTask_Helper(_task, nodeState);
+						//return _task;
+					}
 
 					if (node is IIgnoreUpdate)
 					{
@@ -1131,17 +1132,23 @@ public partial class Frame ////node graph setup and execution
 						DEBUG_finishedNodeUpdate++;
 					}
 					else
-					{						
-						//node update() may be async, so need to monitor it to track when it completes.
-						var updateTask = Task.Run(async () =>
+					{
+						////node update() may be async, so need to monitor it to track when it completes.
+
+						var updateTask = DebuggableTaskFactory.Run(async () =>
 						{
-							var _task = node.DoUpdate(this, nodeState);
-							await _task;
-							doneUpdateTask_Helper(_task,nodeState);
+							//var _task = node.DoUpdate(this, nodeState);
+							//await _task;
+							await node.DoUpdate(this, nodeState);
+							doneUpdateTask_Helper(Task.CompletedTask, nodeState);
 							//return _task;
 						});//.ContinueWith(doneUpdateTask);
 
 						//Task.Run(taskRunner(node,nodeState,this))
+						//var updateTask =  taskRunner(node, nodeState, this);
+						
+						
+
 
 						currentTasks.Add(updateTask);
 						nodeState.UpdateTask = updateTask;

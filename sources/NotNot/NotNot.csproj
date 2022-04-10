@@ -55,6 +55,7 @@
     <PackageReference Include="DotNext.Reflection" Version="4.2.0-beta.3" />
     <PackageReference Include="DotNext.Threading" Version="4.2.0-beta.3" />
     <PackageReference Include="DotNext.Unsafe" Version="4.2.0-beta.3" />
+    <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
   </ItemGroup>
 
   <ItemGroup>
