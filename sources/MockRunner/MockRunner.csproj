@@ -4,7 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
       <EnablePreviewFeatures>true</EnablePreviewFeatures>
-      <LangVersion>Preview</LangVersion>
+      <LangVersion>preview</LangVersion>
       <Nullable>enable</Nullable>
     <Configurations>Debug;Release;Checked</Configurations>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
