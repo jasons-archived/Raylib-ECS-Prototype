@@ -31,6 +31,10 @@ public static class DebuggerInfo
 	///Not having a Debugger.IsPaused solution means that whenever I step through in a debugger, my "deadlock assert" code would trigger because everything runs too long
 	/// </remarks>
 	public static bool IsPaused { get; private set; }
+	/// <summary>
+	/// if a debugger ever stepped through, this will be true
+	/// </summary>
+	public static bool WasPaused{ get; private set; }
 
 	static DebuggerInfo()
 	{
@@ -62,6 +66,7 @@ public static class DebuggerInfo
 					if (elapsed > TimeSpan.FromSeconds(1))
 					{
 						IsPaused = true;
+						WasPaused = true;
 					}
 				}
 			}

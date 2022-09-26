@@ -1,0 +1,15 @@
+<Project Sdk="Godot.NET.Sdk/4.0.0-beta1">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+
+      <Nullable>enable</Nullable>
+      <EnablePreviewFeatures>true</EnablePreviewFeatures>
+      <LangVersion>preview</LangVersion>
+
+      <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\NotNot.Bcl\NotNot.Bcl.csproj" />
+  </ItemGroup>
+</Project>

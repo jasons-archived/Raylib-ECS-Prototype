@@ -286,6 +286,8 @@ public static class ParallelFor
 
 
 /// <summary>
+/// Use an array of {T} from the ArrayPool, without allocating any objects upon use. (no gc pressure)
+///
 /// use this instead of <see cref="SpanOwner{T}"/>.  This will alert you if you do not dispose properly.  
 /// </summary>
 /// <typeparam name="T"></typeparam>
@@ -772,108 +774,6 @@ public class DisposeGuard : IDisposable
 		{
 			__ERROR.Assert(false, $"Did not call {this.GetType().Name}.Dispose() of the embedding type properly.    Callstack: " + CtorStackTrace);
 		}
-	}
-}
-
-public abstract class FramePacketBase
-{
-	/// <summary>
-	/// internal helper used to track writes, to help catch race conditions (misuse)
-	/// </summary>
-	public int _version;
-	public bool IsInitialized{ get; private set; }
-
-	public bool IsSealed{ get; private set; }
-
-	public void NotifyWrite()
-	{
-		__ERROR.Throw(IsInitialized && _version > 0 && IsSealed==false);
-		_version++;
-	}
-
-	public void Seal()
-	{
-		IsSealed = true;
-	}
-
-	public void Recycle()
-	{
-		__ERROR.Throw(IsInitialized && _version> 0);
-		IsInitialized = false;
-		_version = -1;
-		OnRecycle();
-	}
-
-	public void Initialize()
-	{
-		__ERROR.Throw(IsInitialized==false && _version<=0);
-		IsInitialized = true;
-		_version = 1;
-		IsSealed = false;
-		OnInitialize();
-	}
-
-	protected abstract void OnRecycle();
-	protected abstract void OnInitialize();
-}
-
-
-/// <summary>
-/// efficiently get/set a value for a given type. 
-/// <para>similar use as a <see cref="ThreadLocal{T}"/></para>
-/// </summary>
-/// <remarks>because of implementation, should only be used for a max of about 100 types, otherwise storage gets large</remarks>
-/// <typeparam name="TValue"></typeparam>
-
-public struct TypeLocal<TValue>
-{
-	private static volatile int _typeCounter = -1;
-
-
-	private static class TypeSlot<TType>
-	{
-		internal static readonly int _index = Interlocked.Increment(ref _typeCounter);
-	}
-
-	/// <summary>
-	/// A small inefficiency:  will have 1 slot for each TType ever used for a TypeLocal call, regardless of if it's used in this instance or not
-	/// </summary>
-	private TValue[] _storage;
-
-	public TypeLocal()
-	{
-		_storage = new TValue[Math.Max(10, _typeCounter + 1)];
-	}
-
-	private TValue[] EnsureStorageCapacity<TType>()
-	{
-		if (TypeSlot<TType>._index >= _storage.Length)
-		{
-			Array.Resize(ref _storage, (_typeCounter + 1) * 2);
-		}
-		return _storage;
-	}
-
-	public void Set<TType>(TValue value)
-	{
-		//Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(EnsureStorageCapacity<T>()), TypeSlot<T>.Index) = value;
-		var storage = EnsureStorageCapacity<TType>();
-		storage[TypeSlot<TType>._index] = value;
-	}
-
-	public TValue Get<TType>()
-	{
-		//return Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(EnsureStorageCapacity<T>()), TypeSlot<T>.Index);
-		//return Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(_storage), TypeSlot<T>.Index);
-		return _storage[TypeSlot<TType>._index];
-	}
-
-	public ref TValue GetRef<TType>()
-	{
-		//return ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(_storage), TypeSlot<T>.Index);
-		//return ref _storage[TypeSlot<TType>._index].value;
-
-		return ref _storage[TypeSlot<TType>._index];
 	}
 }
 

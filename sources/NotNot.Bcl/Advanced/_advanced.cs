@@ -4,6 +4,7 @@
 // [!!] See the LICENSE.md file in the project root for more info. 
 // [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!]  [!!] [!!] [!!] [!!]
 
+using NotNot.Bcl.Diagnostics;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,8 +14,113 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace NotNot.Bcl._advanced;
+namespace NotNot.Bcl.Advanced;
 
+
+/// <summary>
+/// holdover from Raylib work.  keeping cuz not sure if still needed?
+/// </summary>
+public abstract class FramePacketBase
+{
+	/// <summary>
+	/// internal helper used to track writes, to help catch race conditions (misuse)
+	/// </summary>
+	public int _version;
+	public bool IsInitialized { get; private set; }
+
+	public bool IsSealed { get; private set; }
+
+	public void NotifyWrite()
+	{
+		__ERROR.Throw(IsInitialized && _version > 0 && IsSealed == false);
+		_version++;
+	}
+
+	public void Seal()
+	{
+		IsSealed = true;
+	}
+
+	public void Recycle()
+	{
+		__ERROR.Throw(IsInitialized && _version > 0);
+		IsInitialized = false;
+		_version = -1;
+		OnRecycle();
+	}
+
+	public void Initialize()
+	{
+		__ERROR.Throw(IsInitialized == false && _version <= 0);
+		IsInitialized = true;
+		_version = 1;
+		IsSealed = false;
+		OnInitialize();
+	}
+
+	protected abstract void OnRecycle();
+	protected abstract void OnInitialize();
+}
+
+
+/// <summary>
+/// efficiently get/set a value for a given type.
+/// This should be used in singleton type lookups.
+/// <para>similar use as a <see cref="ThreadLocal{T}"/></para>
+/// </summary>
+/// <remarks>because of implementation, should only be used for a max of about 100 types, otherwise storage gets large</remarks>
+/// <typeparam name="TValue"></typeparam>
+public struct TypeLocal<TValue>
+{
+	private static volatile int _typeCounter = -1;
+
+
+	private static class TypeSlot<TType>
+	{
+		internal static readonly int _index = Interlocked.Increment(ref _typeCounter);
+	}
+
+	/// <summary>
+	/// A small inefficiency:  will have 1 slot for each TType ever used for a TypeLocal call, regardless of if it's used in this instance or not
+	/// </summary>
+	private TValue[] _storage;
+
+	public TypeLocal()
+	{
+		_storage = new TValue[Math.Max(10, _typeCounter + 1)];
+	}
+
+	private TValue[] EnsureStorageCapacity<TType>()
+	{
+		if (TypeSlot<TType>._index >= _storage.Length)
+		{
+			Array.Resize(ref _storage, (_typeCounter + 1) * 2);
+		}
+		return _storage;
+	}
+
+	public void Set<TType>(TValue value)
+	{
+		//Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(EnsureStorageCapacity<T>()), TypeSlot<T>.Index) = value;
+		var storage = EnsureStorageCapacity<TType>();
+		storage[TypeSlot<TType>._index] = value;
+	}
+
+	public TValue Get<TType>()
+	{
+		//return Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(EnsureStorageCapacity<T>()), TypeSlot<T>.Index);
+		//return Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(_storage), TypeSlot<T>.Index);
+		return _storage[TypeSlot<TType>._index];
+	}
+
+	public ref TValue GetRef<TType>()
+	{
+		//return ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(_storage), TypeSlot<T>.Index);
+		//return ref _storage[TypeSlot<TType>._index].value;
+
+		return ref _storage[TypeSlot<TType>._index];
+	}
+}
 
 
 /// <summary>

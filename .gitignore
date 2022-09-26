@@ -354,3 +354,4 @@ sources/Tests/resources/
 sources/RaylibScratch/resources/
 assets-ignore
 *.gdlog
+tools/.godot-bin

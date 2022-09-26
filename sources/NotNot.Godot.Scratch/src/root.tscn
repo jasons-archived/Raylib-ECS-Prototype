@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://330vd4i261at"]
+
+[ext_resource type="Script" path="res://src/Root.cs" id="1_vbcfg"]
+
+[node name="Root" type="Node2D"]
+script = ExtResource("1_vbcfg")
