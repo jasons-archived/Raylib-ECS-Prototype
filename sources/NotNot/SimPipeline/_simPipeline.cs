@@ -1148,7 +1148,7 @@ public partial class Frame ////node graph setup and execution
 						//var updateTask =  taskRunner(node, nodeState, this);
 
 
-
+						//updateTask.ConfigureAwait(false)
 
 						currentTasks.Add(updateTask);
 						nodeState.UpdateTask = updateTask;
@@ -1177,6 +1177,13 @@ public partial class Frame ////node graph setup and execution
 
 			}
 
+			unsafe
+			{
+				byte[] byteArray = new byte[100];
+				fixed(byte)
+
+			}
+
 			if (currentTasks.Count != 0)
 			{
 				//wait on at least one task	
@@ -1187,7 +1194,7 @@ public partial class Frame ////node graph setup and execution
 				}
 				catch (TimeoutException ex)
 				{
-					__DEBUG.Throw(Bcl.Diagnostics.Advanced.DebuggingDetection.IsPaused, "SimPipeline appears deadlocked, as no executing task has completed in less than 2 seconds.");
+					__DEBUG.Throw(Bcl.Diagnostics.Advanced.DebuggerInfo.IsPaused, "SimPipeline appears deadlocked, as no executing task has completed in less than 2 seconds.");
 				}
 #else
 				await Task.WhenAny(currentTasks);
@@ -1289,7 +1296,7 @@ public partial class Frame ////node graph setup and execution
 		}
 		catch (TimeoutException ex)
 		{
-			__DEBUG.Throw(Bcl.Diagnostics.Advanced.DebuggingDetection.IsPaused, "SimPipeline appears deadlocked, as no executing task has completed in less than 2 seconds.");
+			__DEBUG.Throw(Bcl.Diagnostics.Advanced.DebuggerInfo.IsPaused, "SimPipeline appears deadlocked, as no executing task has completed in less than 2 seconds.");
 		}
 #else
 				await Task.WhenAll(currentTasks);

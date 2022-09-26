@@ -23,6 +23,8 @@ public static class DebuggableTaskFactory
 	/// set to TRUE to run tasks synchronously.
 	/// </summary>
 	static public bool singleThreaded = false;
+
+	/// <remarks>From https://docs.microsoft.com/en-us/dotnet/api/system.threading.tasks.taskscheduler?view=net-6.0</remarks>
 	static LimitedConcurrencyLevelTaskScheduler lcts = new(1);
 	static TaskFactory singleThreadedFactory = new(lcts);
 	/// <summary>
@@ -32,6 +34,7 @@ public static class DebuggableTaskFactory
 	{
 		get
 		{
+
 			if (singleThreaded)
 			{
 				return singleThreadedFactory;

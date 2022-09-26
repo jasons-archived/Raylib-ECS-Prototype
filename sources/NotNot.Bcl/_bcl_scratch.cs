@@ -291,6 +291,11 @@ public static class ParallelFor
 /// <typeparam name="T"></typeparam>
 public ref struct SpanGuard<T>
 {
+	/// <summary>
+	/// should dispose prior to exit function.   easiest way is to ex:  `using var spanGuard = SpanGuard[int](42)
+	/// </summary>
+	/// <param name="size"></param>
+	/// <returns></returns>
 	public static SpanGuard<T> Allocate(int size)
 	{
 		return new SpanGuard<T>(SpanOwner<T>.Allocate(size));
