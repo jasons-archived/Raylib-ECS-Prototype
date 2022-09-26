@@ -353,3 +353,4 @@ sources/NotNot.Scratch/resources/
 sources/Tests/resources/
 sources/RaylibScratch/resources/
 assets-ignore
+*.gdlog
