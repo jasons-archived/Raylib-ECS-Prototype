@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 
     <PropertyGroup>
@@ -6,8 +6,8 @@
         <TargetFramework>net6.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <EnablePreviewFeatures>True</EnablePreviewFeatures>
-        <LangVersion>Preview</LangVersion>
+        <EnablePreviewFeatures>true</EnablePreviewFeatures>
+        <LangVersion>preview</LangVersion>
         <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
         <GenerateDocumentationFile>True</GenerateDocumentationFile>
         <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
@@ -22,15 +22,21 @@
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
         <DefineConstants>$(DefineConstants);DEBUG;TEST</DefineConstants>
+        <WarningLevel>9999</WarningLevel>
+        <NoWarn>1701;1702;1591</NoWarn>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Checked|AnyCPU'">
         <DefineConstants>$(DefineConstants);DEBUG;CHECKED;TEST</DefineConstants>
+        <WarningLevel>9999</WarningLevel>
+        <NoWarn>1701;1702;1591</NoWarn>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
         <DefineConstants>$(DefineConstants);TEST</DefineConstants>
         <Optimize>True</Optimize>
+        <WarningLevel>9999</WarningLevel>
+        <NoWarn>1701;1702;1591</NoWarn>
     </PropertyGroup>
 
     <PropertyGroup>
@@ -65,13 +71,13 @@
 
     <ItemGroup>
     <PackageReference Include="ANSI.Console" Version="2.5.0" />
-    <PackageReference Include="CommunityToolkit.HighPerformance" Version="8.0.0-preview1" />
-    <PackageReference Include="MinVer" Version="3.0.0-rc.1">
+    <PackageReference Include="CommunityToolkit.HighPerformance" Version="8.0.0" />
+    <PackageReference Include="MinVer" Version="4.2.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
-    <PackageReference Include="System.Runtime.Experimental" Version="6.0.2-mauipre.1.22054.8" />
+    <PackageReference Include="System.Runtime.Experimental" Version="6.0.2" />
   </ItemGroup>
 
 
