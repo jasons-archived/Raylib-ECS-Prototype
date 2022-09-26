@@ -30,7 +30,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="BepuPhysics" Version="2.4.0" />
     <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
   </ItemGroup>
 

@@ -13,11 +13,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BepuPhysics" Version="2.4.0" />
-    <PackageReference Include="BepuUtilities" Version="2.4.0" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\NotNot.Scratch\NotNot.Scratch.csproj" />
     <ProjectReference Include="..\NotNot\NotNot.csproj" />
     <ProjectReference Include="..\sub-modules\Raylib-CsLo\Raylib-CsLo\Raylib-CsLo.csproj" />
