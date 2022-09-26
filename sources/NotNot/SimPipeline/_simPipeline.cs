@@ -1177,12 +1177,12 @@ public partial class Frame ////node graph setup and execution
 
 			}
 
-			unsafe
-			{
-				byte[] byteArray = new byte[100];
-				fixed(byte)
+			//unsafe
+			//{
+			//	byte[] byteArray = new byte[100];
+			//	fixed(byte)
 
-			}
+			//}
 
 			if (currentTasks.Count != 0)
 			{

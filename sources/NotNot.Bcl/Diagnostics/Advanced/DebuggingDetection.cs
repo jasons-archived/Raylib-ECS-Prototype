@@ -35,8 +35,7 @@ public static class DebuggerInfo
 	static DebuggerInfo()
 	{
 		//new Task<int>(() => { }).
-		Task.Factory.StartNew()
-		Task.Factory.StartNew()
+		
 		
 		//Task.Run()
 		//new Task(() => { }).st
