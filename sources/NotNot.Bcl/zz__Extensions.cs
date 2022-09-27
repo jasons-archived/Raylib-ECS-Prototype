@@ -502,10 +502,12 @@ public static class zz_Extensions_TaskCompletionSource
 /// </summary>
 public static class zz_Extensions_Numeric
 {
+#if GENERIC_MATH
 	public static T _Round<T>(this T value, int digits, MidpointRounding mode = MidpointRounding.AwayFromZero) where T : IFloatingPoint<T>
 	{
 		return T.Round(value, digits, mode);
 	}
+#endif
 	public static double _Round(this double value, int digits, MidpointRounding mode = MidpointRounding.AwayFromZero)
 	{
 		return Math.Round(value, digits, mode);
@@ -938,6 +940,7 @@ public static class zz_Extensions_Span
 	//	return System.Runtime.InteropServices.MemoryMarshal.GetReference(span);
 	//}
 
+#if GENERIC_MATH
 
 	//// GENERIC MATH  requires System.Runtime.Experimental nuget package matching the current DotNet runtime.
 	public static T _Sum<T>(this Span<T> values) where T : IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
@@ -1004,13 +1007,27 @@ public static class zz_Extensions_Span
 		return toReturn;
 	}
 	//MISSING GENERIC MATH  requires System.Runtime.Experimental nuget package matching the current DotNet runtime.
-	public static float _Sum(this Span<float> values) 
+#endif
+	public static float _Sum(this Span<float> values)
 	{
 		return values._AsReadOnly()._Sum();
 	}
-	public static float _Sum(this ReadOnlySpan<float> values) 
+	public static float _Sum(this ReadOnlySpan<float> values)
 	{
-		float toReturn =0;
+		float toReturn = 0;
+		foreach (var val in values)
+		{
+			toReturn += val;
+		}
+		return toReturn;
+	}
+	public static TimeSpan _Sum(this Span<TimeSpan> values)
+	{
+		return values._AsReadOnly()._Sum();
+	}
+	public static TimeSpan _Sum(this ReadOnlySpan<TimeSpan> values)
+	{
+		TimeSpan toReturn = TimeSpan.Zero;
 		foreach (var val in values)
 		{
 			toReturn += val;
@@ -2403,7 +2420,7 @@ public static class zz__Extensions_TimeSpan
 public static class zz__Extensions_String
 {
 
-	#region globalization
+#region globalization
 
 	public static string _FormatInvariant(this string format, params object[] args)
 	{
@@ -2413,9 +2430,9 @@ public static class zz__Extensions_String
 	{
 		return string.Compare(strA, strB, comparison);
 	}
-	#endregion globalization
+#endregion globalization
 
-	#region Common string extensions
+#region Common string extensions
 
 
 	/// <summary>
@@ -3086,8 +3103,8 @@ public static class zz__Extensions_String
 	}
 
 
-	#endregion
-	#region Regex based extension methods
+#endregion
+#region Regex based extension methods
 
 	/// <summary>
 	/// 	Uses regular expressions to determine if the string matches to a given regex pattern.
@@ -3327,8 +3344,8 @@ public static class zz__Extensions_String
 
 
 
-	#endregion
-	#region Bytes & Base64
+#endregion
+#region Bytes & Base64
 
 
 
@@ -3361,7 +3378,7 @@ public static class zz__Extensions_String
 			return encoding.GetBytes(value);
 		}
 	}
-	#endregion
+#endregion
 
 }
 

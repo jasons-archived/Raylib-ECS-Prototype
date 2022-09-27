@@ -275,10 +275,400 @@ public static class Unsafe2
 		//pointer to location 2 references backward in memory.   This is the location of the method table  (what object references point to).
 		ref T r1 = ref Unsafe.SubtractByteOffset(ref r0, (nuint)(IntPtr.Size * 2));
 
+		
 
 		return Unsafe.As<T, T[]>(ref r1);
 		//fancy coersion if the above fails at runtime
 		//var cast = (delegate*<ref T, T[]>)(delegate*<ref byte, ref byte>)&Unsafe.As<byte, byte>;
 		//return cast(ref r1);
 	}
+
+
+
 }
+
+
+///// <summary>Contains generic, low-level functionality for manipulating pointers.</summary>
+//public static class SRC_Unsafe
+//{
+//	/// <summary>Reads a value of type <typeparamref name="T" /> from the given location.</summary>
+//	/// <param name="source">The location to read from.</param>
+//	/// <typeparam name="T">The type to read.</typeparam>
+//	/// <returns>An object of type <typeparamref name="T" /> read from the given location.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe T Read<T>(void* source) => *(T*)source;
+
+//	/// <summary>Reads a value of type <typeparamref name="T" /> from the given location without assuming architecture dependent alignment of the addresses.</summary>
+//	/// <param name="source">The location to read from.</param>
+//	/// <typeparam name="T">The type to read.</typeparam>
+//	/// <returns>An object of type <typeparamref name="T" /> read from the given location.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe T ReadUnaligned<T>(void* source) => *(T*)source;
+
+//	/// <summary>Reads a value of type <typeparamref name="T" /> from the given location without assuming architecture dependent alignment of the addresses.</summary>
+//	/// <param name="source">The location to read from.</param>
+//	/// <typeparam name="T">The type to read.</typeparam>
+//	/// <returns>An object of type <typeparamref name="T" /> read from the given location.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static T ReadUnaligned<T>(ref byte source) => ^(T &) ref source;
+
+//    /// <summary>Writes a value of type <typeparamref name="T" /> to the given location.</summary>
+//    /// <param name="destination">The location to write to.</param>
+//    /// <param name="value">The value to write.</param>
+//    /// <typeparam name="T">The type of value to write.</typeparam>
+//    [NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe void Write<T>(void* destination, T value) => *(T*)destination = value;
+
+//	/// <summary>Writes a value of type <typeparamref name="T" /> to the given location without assuming architecture dependent alignment of the addresses.</summary>
+//	/// <param name="destination">The location to write to.</param>
+//	/// <param name="value">The value to write.</param>
+//	/// <typeparam name="T">The type of value to write.</typeparam>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe void WriteUnaligned<T>(void* destination, T value) => *(T*)destination = value;
+
+//	/// <summary>Writes a value of type <typeparamref name="T" /> to the given location without assuming architecture dependent alignment of the addresses.</summary>
+//	/// <param name="destination">The location to write to.</param>
+//	/// <param name="value">The value to write.</param>
+//	/// <typeparam name="T">The type of value to write.</typeparam>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static void WriteUnaligned<T>(ref byte destination, T value) => ^(T &) ref destination = value;
+
+//    /// <summary>Copies a value of type <typeparamref name="T" /> to the given location.</summary>
+//    /// <param name="destination">The location to copy to.</param>
+//    /// <param name="source">A reference to the value to copy.</param>
+//    /// <typeparam name="T">The type of value to copy.</typeparam>
+//    [NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe void Copy<T>(void* destination, ref T source) => *(T*)destination = source;
+
+//	/// <summary>Copies a value of type <typeparamref name="T" /> to the given location.</summary>
+//	/// <param name="destination">The location to copy to.</param>
+//	/// <param name="source">A pointer to the value to copy.</param>
+//	/// <typeparam name="T">The type of value to copy.</typeparam>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe void Copy<T>(ref T destination, void* source) => destination = *(T*)source;
+
+//	/// <summary>Returns a pointer to the given by-ref parameter.</summary>
+//	/// <param name="value">The object whose pointer is obtained.</param>
+//	/// <typeparam name="T">The type of object.</typeparam>
+//	/// <returns>A pointer to the given value.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe void* AsPointer<T>(ref T value) => (void*)ref value;
+
+//	/// <summary>Bypasses definite assignment rules for a given value.</summary>
+//	/// <param name="value">The uninitialized object.</param>
+//	/// <typeparam name="T">The type of the uninitialized object.</typeparam>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static void SkipInit<T>(out T value)
+//	{
+//	}
+
+//	/// <summary>Returns the size of an object of the given type parameter.</summary>
+//	/// <typeparam name="T">The type of object whose size is retrieved.</typeparam>
+//	/// <returns>The size of an object of type <typeparamref name="T" />.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static int SizeOf<T>() => sizeof(T);
+
+//	/// <summary>Copies bytes from the source address to the destination address.</summary>
+//	/// <param name="destination">The destination address to copy to.</param>
+//	/// <param name="source">The source address to copy from.</param>
+//	/// <param name="byteCount">The number of bytes to copy.</param>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe void CopyBlock(void* destination, void* source, uint byteCount)
+//	{
+//		// ISSUE: cpblk instruction
+//		__memcpy((IntPtr)destination, (IntPtr)source, (int)byteCount);
+//	}
+
+//	/// <summary>Copies bytes from the source address to the destination address.</summary>
+//	/// <param name="destination">The destination address to copy to.</param>
+//	/// <param name="source">The source address to copy from.</param>
+//	/// <param name="byteCount">The number of bytes to copy.</param>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static void CopyBlock(ref byte destination, ref byte source, uint byteCount)
+//	{
+//		// ISSUE: cpblk instruction
+//		__memcpy(ref destination, ref source, (int)byteCount);
+//	}
+
+//	/// <summary>Copies bytes from the source address to the destination address without assuming architecture dependent alignment of the addresses.</summary>
+//	/// <param name="destination">The destination address to copy to.</param>
+//	/// <param name="source">The source address to copy from.</param>
+//	/// <param name="byteCount">The number of bytes to copy.</param>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe void CopyBlockUnaligned(void* destination, void* source, uint byteCount)
+//	{
+//		// ISSUE: cpblk instruction
+//		__memcpy((IntPtr)destination, (IntPtr)source, (int)byteCount);
+//	}
+
+//	/// <summary>Copies bytes from the source address to the destination address without assuming architecture dependent alignment of the addresses.</summary>
+//	/// <param name="destination">The destination address to copy to.</param>
+//	/// <param name="source">The source address to copy from.</param>
+//	/// <param name="byteCount">The number of bytes to copy.</param>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static void CopyBlockUnaligned(ref byte destination, ref byte source, uint byteCount)
+//	{
+//		// ISSUE: cpblk instruction
+//		__memcpy(ref destination, ref source, (int)byteCount);
+//	}
+
+//	/// <summary>Initializes a block of memory at the given location with a given initial value.</summary>
+//	/// <param name="startAddress">The address of the start of the memory block to initialize.</param>
+//	/// <param name="value">The value to initialize the block to.</param>
+//	/// <param name="byteCount">The number of bytes to initialize.</param>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe void InitBlock(void* startAddress, byte value, uint byteCount)
+//	{
+//		// ISSUE: initblk instruction
+//		__memset((IntPtr)startAddress, (int)value, (int)byteCount);
+//	}
+
+//	/// <summary>Initializes a block of memory at the given location with a given initial value.</summary>
+//	/// <param name="startAddress">The address of the start of the memory block to initialize.</param>
+//	/// <param name="value">The value to initialize the block to.</param>
+//	/// <param name="byteCount">The number of bytes to initialize.</param>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static void InitBlock(ref byte startAddress, byte value, uint byteCount)
+//	{
+//		// ISSUE: initblk instruction
+//		__memset(ref startAddress, (int)value, (int)byteCount);
+//	}
+
+//	/// <summary>Initializes a block of memory at the given location with a given initial value without assuming architecture dependent alignment of the address.</summary>
+//	/// <param name="startAddress">The address of the start of the memory block to initialize.</param>
+//	/// <param name="value">The value to initialize the block to.</param>
+//	/// <param name="byteCount">The number of bytes to initialize.</param>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe void InitBlockUnaligned(void* startAddress, byte value, uint byteCount)
+//	{
+//		// ISSUE: initblk instruction
+//		__memset((IntPtr)startAddress, (int)value, (int)byteCount);
+//	}
+
+//	/// <summary>Initializes a block of memory at the given location with a given initial value without assuming architecture dependent alignment of the address.</summary>
+//	/// <param name="startAddress">The address of the start of the memory block to initialize.</param>
+//	/// <param name="value">The value to initialize the block to.</param>
+//	/// <param name="byteCount">The number of bytes to initialize.</param>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static void InitBlockUnaligned(ref byte startAddress, byte value, uint byteCount)
+//	{
+//		// ISSUE: initblk instruction
+//		__memset(ref startAddress, (int)value, (int)byteCount);
+//	}
+
+//	/// <summary>Casts the given object to the specified type.</summary>
+//	/// <param name="o">The object to cast.</param>
+//	/// <typeparam name="T">The type which the object will be cast to.</typeparam>
+//	/// <returns>The original object, casted to the given type.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static T As<T>(object o) where T : class => (T)o;
+
+//	/// <summary>Reinterprets the given location as a reference to a value of type <typeparamref name="T" />.</summary>
+//	/// <param name="source">The location of the value to reference.</param>
+//	/// <typeparam name="T">The type of the interpreted location.</typeparam>
+//	/// <returns>A reference to a value of type <typeparamref name="T" />.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe ref T AsRef<T>(void* source) => ref (*(T*)source);
+
+//	/// <summary>Reinterprets the given read-only reference as a reference.</summary>
+//	/// <param name="source">The read-only reference to reinterpret.</param>
+//	/// <typeparam name="T">The type of reference.</typeparam>
+//	/// <returns>A reference to a value of type <typeparamref name="T" />.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static ref T AsRef<T>(in T source) => ref source;
+
+//	/// <summary>Reinterprets the given reference as a reference to a value of type <typeparamref name="TTo" />.</summary>
+//	/// <param name="source">The reference to reinterpret.</param>
+//	/// <typeparam name="TFrom">The type of reference to reinterpret.</typeparam>
+//	/// <typeparam name="TTo">The desired type of the reference.</typeparam>
+//	/// <returns>A reference to a value of type <typeparamref name="TTo" />.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static ref TTo As<TFrom, TTo>(ref TFrom source) => (TTo &) ref source;
+
+//    /// <summary>Returns a <see langword="mutable ref" /> to a boxed value.</summary>
+//    /// <param name="box">The value to unbox.</param>
+//    /// <typeparam name="T">The type to be unboxed.</typeparam>
+//    /// <exception cref="T:System.NullReferenceException">
+//    /// <paramref name="box" /> is <see langword="null" />, and <typeparamref name="T" /> is a non-nullable value type.</exception>
+//    /// <exception cref="T:System.InvalidCastException">
+//    ///         <paramref name="box" /> is not a boxed value type.
+//    /// 
+//    /// -or-
+//    /// 
+//    /// <paramref name="box" /> is not a boxed <typeparamref name="T" />.</exception>
+//    /// <exception cref="T:System.TypeLoadException">
+//    /// <typeparamref name="T" /> cannot be found.</exception>
+//    /// <returns>A <see langword="mutable ref" /> to the boxed value <paramref name="box" />.</returns>
+//    [NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static ref T Unbox<T>(object box) where T : struct => @(T) box;
+
+//	/// <summary>Adds an element offset to the given reference.</summary>
+//	/// <param name="source">The reference to add the offset to.</param>
+//	/// <param name="elementOffset">The offset to add.</param>
+//	/// <typeparam name="T">The type of reference.</typeparam>
+//	/// <returns>A new reference that reflects the addition of offset to pointer.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static ref T Add<T>(ref T source, int elementOffset) => (T &)((IntPtr)ref source + elementOffset * (IntPtr)sizeof(T));
+
+//	/// <summary>Adds an element offset to the given void pointer.</summary>
+//	/// <param name="source">The void pointer to add the offset to.</param>
+//	/// <param name="elementOffset">The offset to add.</param>
+//	/// <typeparam name="T">The type of void pointer.</typeparam>
+//	/// <returns>A new void pointer that reflects the addition of offset to the specified pointer.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe void* Add<T>(void* source, int elementOffset) => (void*)((IntPtr)source + elementOffset * (IntPtr)sizeof(T));
+
+//	/// <summary>Adds an element offset to the given reference.</summary>
+//	/// <param name="source">The reference to add the offset to.</param>
+//	/// <param name="elementOffset">The offset to add.</param>
+//	/// <typeparam name="T">The type of reference.</typeparam>
+//	/// <returns>A new reference that reflects the addition of offset to pointer.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe ref T Add<T>(ref T source, IntPtr elementOffset) => @((T*) ref source)[elementOffset.ToInt64()];
+
+//    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe ref T Add<T>(ref T source, [NonVersionable, NativeInteger] UIntPtr elementOffset) => @((T*) ref source)[elementOffset];
+
+//    /// <summary>Adds a byte offset to the given reference.</summary>
+//    /// <param name="source">The reference to add the offset to.</param>
+//    /// <param name="byteOffset">The offset to add.</param>
+//    /// <typeparam name="T">The type of reference.</typeparam>
+//    /// <returns>A new reference that reflects the addition of byte offset to pointer.</returns>
+//    [NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static ref T AddByteOffset<T>(ref T source, IntPtr byteOffset) => (T &)((IntPtr)ref source + byteOffset);
+
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static ref T AddByteOffset<T>(ref T source, [NativeInteger, NonVersionable] UIntPtr byteOffset) => (T &)((IntPtr)ref source + (IntPtr)byteOffset);
+
+//	/// <summary>Subtracts an element offset from the given reference.</summary>
+//	/// <param name="source">The reference to subtract the offset from.</param>
+//	/// <param name="elementOffset">The offset to subtract.</param>
+//	/// <typeparam name="T">The type of reference.</typeparam>
+//	/// <returns>A new reference that reflects the subtraction of offset from pointer.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static ref T Subtract<T>(ref T source, int elementOffset) => (T &)((IntPtr)ref source - elementOffset * (IntPtr)sizeof(T));
+
+//	/// <summary>Subtracts an element offset from the given void pointer.</summary>
+//	/// <param name="source">The void pointer to subtract the offset from.</param>
+//	/// <param name="elementOffset">The offset to subtract.</param>
+//	/// <typeparam name="T">The type of the void pointer.</typeparam>
+//	/// <returns>A new void pointer that reflects the subtraction of offset from the specified pointer.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe void* Subtract<T>(void* source, int elementOffset) => (void*)((IntPtr)source - elementOffset * (IntPtr)sizeof(T));
+
+//	/// <summary>Subtracts an element offset from the given reference.</summary>
+//	/// <param name="source">The reference to subtract the offset from.</param>
+//	/// <param name="elementOffset">The offset to subtract.</param>
+//	/// <typeparam name="T">The type of reference.</typeparam>
+//	/// <returns>A new reference that reflects the subtraction of offset from pointer.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe ref T Subtract<T>(ref T source, IntPtr elementOffset) => ref (*((T*)ref source - elementOffset.ToInt64()));
+
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static unsafe ref T Subtract<T>(ref T source, [NativeInteger, NonVersionable] UIntPtr elementOffset) => ref (*((T*)ref source - elementOffset));
+
+//	/// <summary>Subtracts a byte offset from the given reference.</summary>
+//	/// <param name="source">The reference to subtract the offset from.</param>
+//	/// <param name="byteOffset">The offset to subtract.</param>
+//	/// <typeparam name="T">The type of reference.</typeparam>
+//	/// <returns>A new reference that reflects the subtraction of byte offset from pointer.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static ref T SubtractByteOffset<T>(ref T source, IntPtr byteOffset) => (T &)((IntPtr)ref source - byteOffset);
+
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static ref T SubtractByteOffset<T>(ref T source, [NonVersionable, NativeInteger] UIntPtr byteOffset) => (T &)((IntPtr)ref source - (IntPtr)byteOffset);
+
+//	/// <summary>Determines the byte offset from origin to target from the given references.</summary>
+//	/// <param name="origin">The reference to origin.</param>
+//	/// <param name="target">The reference to target.</param>
+//	/// <typeparam name="T">The type of reference.</typeparam>
+//	/// <returns>Byte offset from origin to target i.e. <paramref name="target" /> - <paramref name="origin" />.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static IntPtr ByteOffset<T>(ref T origin, ref T target) => (IntPtr)ref target - (IntPtr)ref origin;
+
+//	/// <summary>Determines whether the specified references point to the same location.</summary>
+//	/// <param name="left">The first reference to compare.</param>
+//	/// <param name="right">The second reference to compare.</param>
+//	/// <typeparam name="T">The type of reference.</typeparam>
+//	/// <returns>
+//	/// <see langword="true" /> if <paramref name="left" /> and <paramref name="right" /> point to the same location; otherwise, <see langword="false" />.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static bool AreSame<T>(ref T left, ref T right) => ref left == ref right;
+
+//	/// <summary>Returns a value that indicates whether a specified reference is greater than another specified reference.</summary>
+//	/// <param name="left">The first value to compare.</param>
+//	/// <param name="right">The second value to compare.</param>
+//	/// <typeparam name="T">The type of the reference.</typeparam>
+//	/// <returns>
+//	/// <see langword="true" /> if <paramref name="left" /> is greater than <paramref name="right" />; otherwise, <see langword="false" />.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static bool IsAddressGreaterThan<T>(ref T left, ref T right) => ref left > ref right;
+
+//	/// <summary>Returns a value that indicates whether a specified reference is less than another specified reference.</summary>
+//	/// <param name="left">The first value to compare.</param>
+//	/// <param name="right">The second value to compare.</param>
+//	/// <typeparam name="T">The type of the reference.</typeparam>
+//	/// <returns>
+//	/// <see langword="true" /> if <paramref name="left" /> is less than <paramref name="right" />; otherwise, <see langword="false" />.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static bool IsAddressLessThan<T>(ref T left, ref T right) => ref left < ref right;
+
+//	/// <summary>Determines if a given reference to a value of type <typeparamref name="T" /> is a null reference.</summary>
+//	/// <param name="source">The reference to check.</param>
+//	/// <typeparam name="T">The type of the reference.</typeparam>
+//	/// <returns>
+//	/// <see langword="true" /> if <paramref name="source" /> is a null reference; otherwise, <see langword="false" />.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static bool IsNullRef<T>(ref T source)
+//	{
+//		// ISSUE: unable to decompile the method.
+//	}
+
+//	/// <summary>Returns a reference to a value of type <typeparamref name="T" /> that is a null reference.</summary>
+//	/// <typeparam name="T">The type of the reference.</typeparam>
+//	/// <returns>A reference to a value of type <typeparamref name="T" /> that is a null reference.</returns>
+//	[NonVersionable]
+//	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+//	public static ref T NullRef<T>() => (T &) IntPtr.Zero;
+//  }
+
+//internal class NonVersionableAttribute : Attribute
+//{
+//}
