@@ -630,12 +630,22 @@ public static class zz_Extensions_Dictionary
 	{
 		return ref CollectionsMarshal.GetValueRefOrNullRef(dict, key);
 	}
-	public static ref TValue _GetValueRefOrAddDefault_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, out bool exists)
+	//public static ref TValue _GetValueRefOrAddDefault_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key, out bool exists)
+	//	where TKey : notnull
+	//	where TValue : struct
+	//{
+		
+	//	ref var toReturn = ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out var existCopy);
+	//	exists = existCopy;
+	//	return ref toReturn;
+	//}
+	
+	public static unsafe ref TValue? _GetValueRefOrAddDefault_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dictionary, TKey key, out bool exists)
 		where TKey : notnull
-		where TValue : struct
 	{
-		return ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out exists);
+		return ref CollectionsMarshal.GetValueRefOrAddDefault(dictionary, key, out exists);
 	}
+	
 	public static unsafe ref TValue _GetValueRefOrAddDefault_Unsafe<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key)
 		where TKey : notnull
 		where TValue : struct
