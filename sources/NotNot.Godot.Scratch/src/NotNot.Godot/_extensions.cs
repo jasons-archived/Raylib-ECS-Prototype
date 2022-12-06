@@ -20,54 +20,7 @@ namespace NotNot.Godot;
 
 public static class _CanvasItem_Extensions
 {
-	///https://docs.godotengine.org/en/latest/tutorials/2d/custom_drawing_in_2d.html?highlight=low%20level#arc-polygon-function
-	public static void _DrawCircleArcPoly(this CanvasItem _this, Vector2 center, float radius, float angleFrom, float angleTo, Color color)
-	{
-		unsafe
-		{
-			int nbPoints = 32;
 
-			using var spanGuard = NotNot.Bcl.SpanGuard<Vector2>.Allocate(nbPoints + 1);
-			//var pointsArc =  new Vector2[nbPoints + 1];
-			var pointsArc = spanGuard.DangerousGetArray().Array;
-
-			pointsArc[0] = center;
-			var colors = new Color[] { color };
-
-			for (int i = 0; i <= nbPoints; i++) //BUG: should start at index 1, because 0 should be center?
-			{
-				float anglePoint = Mathf.DegToRad(angleFrom + i * (angleTo - angleFrom) / nbPoints - 90);
-				pointsArc[i] = center + new Vector2(Mathf.Cos(anglePoint), Mathf.Sin(anglePoint)) * radius;
-			}
-			_this.DrawPolygon(pointsArc, colors);
-		}
-	}
-
-
-	/// <summary>
-	/// example showing how to draw custom 2d
-	/// https://docs.godotengine.org/en/latest/tutorials/2d/custom_drawing_in_2d.html?highlight=low%20level
-	/// </summary>
-	public static void _DrawCircleArc(this CanvasItem _this, Vector2 center, float radius, float angleFrom, float angleTo, Color color)
-	{
-		unsafe
-		{
-			int nbPoints = 32;
-			var pointsArc = stackalloc Vector2[nbPoints + 1]; // new Vector2[nbPoints + 1];
-
-			for (int i = 0; i <= nbPoints; i++)
-			{
-
-				float anglePoint = Mathf.DegToRad(angleFrom + i * (angleTo - angleFrom) / nbPoints - 90f);
-				pointsArc[i] = center + new Vector2(Mathf.Cos(anglePoint), Mathf.Sin(anglePoint)) * radius;
-			}
-
-			for (int i = 0; i < nbPoints - 1; i++)
-			{
-				_this.DrawLine(pointsArc[i], pointsArc[i + 1], color);
-			}
-		}
-	}
 }
 
 public static class _Node_Extensions
