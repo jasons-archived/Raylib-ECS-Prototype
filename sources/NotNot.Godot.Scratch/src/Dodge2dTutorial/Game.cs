@@ -8,6 +8,7 @@
 // [!!] Would you like to know more? https://github.com/NotNotTech/NotNot 
 // [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!]  [!!] [!!] [!!] [!!]
 
+global using NotNot.Bcl;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,72 +17,203 @@ using System.Text;
 using System.Threading.Tasks;
 using Godot;
 using NotNot.Godot;
+using NotNot.Godot.Scratch.src.Dodge2dTutorial;
 //using NotNot.Godot.Scratch.Dodge2dTutorial;
 
 namespace Dodge2dTutorial;
-public class Game
+public partial class Game : Node
 {
-	public Node2D Root { get; init; }
+	//public Node2D Root { get; private set; }
 
+	public int Score;
 	public Player player;
+	public Random _rand = new();
 
-	public void Initialize()
+	/// <summary>
+	/// size of the computer screen game window is being displayed on
+	/// </summary>
+	private Vector2i ScreenSize { get; set; }
+
+
+	/// <summary>
+	/// the size of the viewport
+	/// </summary>
+	public Vector2 ViewportSize { get; private set; }
+
+	public override void _EnterTree()
 	{
-
-		//GODOT BUG:  printing doesn't work when running via VS.  a workaround: add arguments `>out.log 2>&1` to the Launch Profile,  then open in VSCode extension "Log Viewer".  then  vscode window is basically a view of stdout+stderr.  stderr is serious lagged (write buffered?) but eventually works if app keeps running.
-		{
-			Console.WriteLine("ready!");
-			GD.Print("ready TACO");
-			GD.PrintErr("boo!");
-		}
-
 		//DOCS https://docs.godotengine.org/en/latest/getting_started/first_2d_game/01.project_setup.html
 		//customize window
 		{
-			var window = Root._FindParent<Window>();
+			var window = this._FindParent<Window>();
 			window.Size = new Vector2i(1024, 768);
 			window.ContentScaleSize = window.Size; //set content view to be same as window dimensions
 												   //window.ContentScaleAspect = Window.ContentScaleAspectEnum.Ignore;
+
+			window.ContentScaleMode = Window.ContentScaleModeEnum.Viewport;
+
+			var screenId = window.CurrentScreen;
+			this.ScreenSize = DisplayServer.ScreenGetSize(screenId);
+			ViewportSize = GetViewport().GetVisibleRect().Size;
 
 			//adjust window for easier debugging
 			{
 				//always on top
 				window.AlwaysOnTop = true;
 				//all the way to the right side of screen
-				var screenId = window.CurrentScreen;
-				var screenSize = DisplayServer.ScreenGetSize(screenId);
 				var windowPos = window.Position;
-				windowPos.x = screenSize.x - window.Size.x;
+				windowPos.x = ScreenSize.x - window.Size.x;
 				window.Position = windowPos;
 			}
 
+
 		}
 
-		//var player = CreateAddPlayer();
 
-		var player = new Player();
-		player.Position = Root._FindParent<Window>().ContentScaleSize / 2; //center of screen
-		Root.AddChild(player);
 
-		var cust = new CustomNode2D();
-		Root.AddChild(cust);
+		////demo custom 2d drawing
+		//var cust = new CustomDrawingExample2D();
+		//this.AddChild(cust);
+	}
 
+	public override void _Ready()
+	{
+
+
+		player = new Player();
+		this.AddChild(player);
+
+		//player.Start(this._FindParent<Window>().ContentScaleSize / 2);//center of screen
+
+		//add props, timers (from https://docs.godotengine.org/en/latest/getting_started/first_2d_game/05.the_main_game_scene.html)
+		{
+			AddChild(MobTimer);
+			AddChild(ScoreTimer);
+			AddChild(StartTimer);
+			AddChild(StartPosition);
+		}
+
+		//spawn mobs
+		{
+			var curve = new Curve2D();
+			//create curve using the extent
+			var extent = this.ViewportSize;
+			curve.AddPoint(new Vector2(0, 0));
+			curve.AddPoint(new Vector2(extent.x, 0));
+			curve.AddPoint(new Vector2(extent.x, extent.y));
+			curve.AddPoint(new Vector2(0, extent.y));
+			curve.AddPoint(new Vector2(0, 0)); //close curve?
+			MobPath.Curve = curve;
+
+
+			var MobSpawnLocation = new PathFollow2D();
+			
+			MobPath.AddChild(MobSpawnLocation);
+
+			AddChild(MobPath);
+
+		}
+
+		//timer callbacks
+		{
+			ScoreTimer.Timeout += () => Score += 1;
+			StartTimer.Timeout += () =>
+			{
+				MobTimer.Start();
+				ScoreTimer.Start();
+			};
+			MobTimer.Timeout += () =>
+			{
+				var mob = new Mob();
+				//var spawnLocation = MobPath.GetNode<PathFollow2D>("MobSpawnLocation");
+				var spawnLocation = MobPath._FindChild<PathFollow2D>();
+				spawnLocation.ProgressRatio =(float) _rand.NextDouble();
+				mob.Position = spawnLocation.Position;
+
+				//set mob direction perpendicular to the path direction
+				var direction = spawnLocation.Rotation + MathF.PI/2;
+				//add some randomness to direction (using pi)
+				direction += _rand._NextSingle(-MathF.PI / 4, MathF.PI / 4);
+				mob.Rotation = direction;
+
+				var velocity = new Vector2(_rand._NextSingle(150, 250), 0);
+				mob.LinearVelocity = velocity.Rotated(direction);
+				
+
+				AddChild(mob);
+
+
+			};
+		}
+
+
+		NewGame();
+	}
+
+	public void GameOver()
+	{
+		MobTimer.Stop();
+		ScoreTimer.Stop();
+	}
+
+	public void NewGame()
+	{
+		Score = 0;
+		//var startPosition = StartPosition;
+		player.Start(StartPosition.Position);
+		StartTimer.Start();
+
+		//var mobTest = new Mob();
+		//AddChild(mobTest);
 
 	}
 
-	public void _Process(double delta)
+	private void ScoreTimer_Timeout()
+	{
+		throw new NotImplementedException();
+	}
+
+	[Export]
+	public Timer MobTimer { get; set; } = new()
+	{
+		WaitTime = 0.5,
+	};
+	[Export]
+	public Timer ScoreTimer { get; set; } = new()
+	{
+		WaitTime = 1,
+	};
+	[Export]
+	public Timer StartTimer { get; set; } = new()
+	{
+		WaitTime = 2,
+		OneShot = true,
+	};
+	[Export]
+	public Marker2D StartPosition { get; set; } = new()
+	{
+		Position = new(240, 450),
+	};
+
+	[Export]
+	public Path2D MobPath { get; set; } = new()
+	{
+
+	};
+
+	public override void _Process(double delta)
 	{
 
 	}
 
 
-	
+
 }
 
 /// <summary>
 /// https://docs.godotengine.org/en/latest/tutorials/2d/custom_drawing_in_2d.html
 /// </summary>
-public partial class CustomNode2D : Node2D
+public partial class CustomDrawingExample2D : Node2D
 {
 	private Texture2D _texture = new PlaceholderTexture2D() { Size = new Vector2(100, 50) };
 
@@ -105,7 +237,7 @@ public partial class CustomNode2D : Node2D
 
 	public override void _Draw()
 	{
-		DrawTexture(_texture, new Vector2(100,100));
+		DrawTexture(_texture, new Vector2(100, 100));
 
 
 		var center = new Vector2(200, 200);
@@ -147,12 +279,12 @@ public partial class CustomNode2D : Node2D
 		{
 			int nbPoints = 32;
 
-			
+
 			////sadly, can't use this because it could allocate an array bigger than what we want, and the godot `DrawPolygon` method doesn't take a length.
 			//using var spanGuard = NotNot.Bcl.SpanGuard<Vector2>.Allocate(nbPoints + 1);
 			//var pointsArc = spanGuard.DangerousGetArray().Array; 
 			var pointsArc = new Vector2[nbPoints + 1];
-			
+
 			pointsArc[0] = center;
 			var colors = new Color[] { color };
 

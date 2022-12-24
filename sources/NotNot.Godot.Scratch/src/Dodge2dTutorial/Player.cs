@@ -9,6 +9,7 @@
 // [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!] [!!]  [!!] [!!] [!!] [!!]
 
 using Godot;
+using NotNot.Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,55 +19,77 @@ using System.Threading.Tasks;
 namespace Dodge2dTutorial;
 public partial class Player : Area2D
 {
+	[Signal]
+	public delegate void PlayerHitEventHandler();
+
+
 	[Export] public int speed = 400;
 	//public Vector2 ScreenSize;
 	//[Export]
-	AnimatedSprite2D sprite;
+	AnimatedSprite2D animatedSprite2D;
 
+	Game Game;
+
+
+	private void Player_BodyEntered(Node2D body)
+	{
+		//throw new NotImplementedException();
+		Hide();
+		//EmitSignal(nameof(PlayerHitEventHandler));
+		EmitSignal(SignalName.PlayerHit);
+
+		//disable collisions from happening again, deffered as it is not safe to do so in the middle of a physics step
+		//GetNode<CollisionShape2D>("CollisionShape2D").SetDeferred("disabled", true);
+		this._FindChild<CollisionShape2D>().SetDeferred("disabled", true);
+	}
+	
 	public override void _Ready()
 	{
 		base._Ready();
 
-		var player = this;
+		this.BodyEntered += Player_BodyEntered;
 
+		var player = this;
+		Game = this._FindParent<Game>();
 
 		player.Name = "player";
 
-
-		sprite = new AnimatedSprite2D();
-		sprite.Frames = new SpriteFrames();
-		sprite.Frames.RenameAnimation("default", "walk");
-		sprite.Frames
-			.RemoveAnimation(
-				"default"); //default is still in node list, but this line doesn't seem to remove it either.....
-		sprite.Frames.AddAnimation("up");
-
-		//godot icon for player
-		var godotTx = GD.Load<Texture2D>("res://asset/icon.svg");
-
-		//bobbing in/out for idle/walk
-		var smallImg = godotTx.GetImage();
-		smallImg.Resize((int)(smallImg.GetWidth() * 0.95), (int)(smallImg.GetHeight() * 0.95));
-		var smallTx = ImageTexture.CreateFromImage(smallImg);
-		sprite.Frames.AddFrame("walk", godotTx);
-		sprite.Frames.AddFrame("walk", smallTx);
-
-		//rotating around x axis for "jump"
+		//ANIMATIONS
 		{
-			var rotImg1 = smallTx.GetImage();
-			var rotImg2 = smallTx.GetImage();
-			rotImg1.Resize((int)(godotTx.GetWidth() * 0.66), (int)(godotTx.GetHeight()));
-			rotImg2.Resize((int)(godotTx.GetWidth() * 0.18), (int)(godotTx.GetHeight()));
-			sprite.Frames.AddFrame("up", smallTx);
-			sprite.Frames.AddFrame("up", ImageTexture.CreateFromImage(rotImg1));
-			sprite.Frames.AddFrame("up", ImageTexture.CreateFromImage(rotImg2));
-			sprite.Frames.AddFrame("up", null);
-			sprite.Frames.AddFrame("up", ImageTexture.CreateFromImage(rotImg2));
-			sprite.Frames.AddFrame("up", ImageTexture.CreateFromImage(rotImg1));
+			animatedSprite2D = new AnimatedSprite2D();
+			animatedSprite2D.Frames = new SpriteFrames();
+			animatedSprite2D.Frames.RenameAnimation("default", "walk");
+			animatedSprite2D.Frames
+				.RemoveAnimation(
+					"default"); //default is still in node list, but this line doesn't seem to remove it either.....
+			animatedSprite2D.Frames.AddAnimation("up");
 
-			sprite.Frames.SetAnimationSpeed("up", 20);
+			//godot icon for player
+			var godotTx = GD.Load<Texture2D>("res://asset/icon.svg");
+
+			//bobbing in/out for idle/walk
+			var smallImg = godotTx.GetImage();
+			smallImg.Resize((int)(smallImg.GetWidth() * 0.95), (int)(smallImg.GetHeight() * 0.95));
+			var smallTx = ImageTexture.CreateFromImage(smallImg);
+			animatedSprite2D.Frames.AddFrame("walk", godotTx);
+			animatedSprite2D.Frames.AddFrame("walk", smallTx);
+
+			//rotating around x axis for "jump"
+			{
+				var rotImg1 = smallTx.GetImage();
+				var rotImg2 = smallTx.GetImage();
+				rotImg1.Resize((int)(godotTx.GetWidth() * 0.66), (int)(godotTx.GetHeight()));
+				rotImg2.Resize((int)(godotTx.GetWidth() * 0.18), (int)(godotTx.GetHeight()));
+				animatedSprite2D.Frames.AddFrame("up", smallTx);
+				animatedSprite2D.Frames.AddFrame("up", ImageTexture.CreateFromImage(rotImg1));
+				animatedSprite2D.Frames.AddFrame("up", ImageTexture.CreateFromImage(rotImg2));
+				animatedSprite2D.Frames.AddFrame("up", null);
+				animatedSprite2D.Frames.AddFrame("up", ImageTexture.CreateFromImage(rotImg2));
+				animatedSprite2D.Frames.AddFrame("up", ImageTexture.CreateFromImage(rotImg1));
+
+				animatedSprite2D.Frames.SetAnimationSpeed("up", 20);
+			}
 		}
-
 
 
 
@@ -91,17 +114,20 @@ public partial class Player : Area2D
 
 
 
-		sprite.Play("walk");
+		animatedSprite2D.Play("walk");
 		//sprite.Play("up");
 
-		player.AddChild(sprite);
+		player.AddChild(animatedSprite2D);
 
-		//Set collision shape of player
+		//COLLISIONS
 		{
-
+			//Set collision shape of player
+			
 			var col = new CollisionShape2D();
 
-			var circle = new CircleShape2D() { Radius = smallImg.GetUsedRect().Size.x / 2f };
+			var sprite = animatedSprite2D.Frames.GetFrame("walk", 0);
+			var image = sprite.GetImage();
+			var circle = new CircleShape2D() { Radius = image.GetUsedRect().Size.x / 2.1f };
 			col.Shape = circle;
 
 			//var capsule = new CapsuleShape2D()
@@ -115,17 +141,19 @@ public partial class Player : Area2D
 
 			player.AddChild(col);
 		}
-
-		//sprite.Scale = Vector2.One;
-		//player.Scale = Vector2.One;
-
-
-
-
-		//Root.AddChild(player);
-
+		
+		//hide player till ready
+		this.Hide();
 	}
 
+
+	public void Start(Vector2 pos)
+	{
+		this.Position = pos;
+		this.Show();
+		//this.GetNode<CollisionShape2D>("CollisionShape2D").Disabled = false;
+		this._FindChild<CollisionShape2D>().Disabled = false;
+	}
 
 	public override void _Process(double delta)
 	{
@@ -147,39 +175,85 @@ public partial class Player : Area2D
 			{
 				velocity += Vector2.Left;
 			}
-
+			
+	
+			
 			if (Input.IsActionPressed("move_up"))
 			{
 				velocity += Vector2.Up;
 				//GD.Print("got move_up");
 				//sprite.Play("up");
-				sprite.SetAnimation("up");
+				//sprite.SetAnimation("up");
 			}
 
 			if (Input.IsActionPressed("move_down"))
 			{
 				velocity += Vector2.Down;
-				sprite.SetAnimation("up");
+				//sprite.SetAnimation("up");
 			}
 
-			if (velocity.LengthSquared() > 1)
-			{
-				velocity = velocity.Normalized();
-			}
 
 			if (velocity.LengthSquared() > 0)
 			{
 				velocity = velocity.Normalized() * speed;
-				sprite.Play();
+				animatedSprite2D.Play();
 
 				//((AnimatedSprite2D)GetChild(0)).Play("walk");
 			}
 			else
 			{
-				sprite.SetAnimation("walk");
-				sprite.Stop();
+				animatedSprite2D.SetAnimation("walk");
+				animatedSprite2D.Stop();
 				//((AnimatedSprite2D)GetChild(0)).Play("up");
 			}
+
+			Position += velocity * (float)delta;
+			//clamp to screen
+			Position = Position.Clamp(Vector2.Zero, Game.ViewportSize);
+
+			if (velocity.LengthSquared() > 0)
+			{
+				animatedSprite2D.Rotation = velocity.Angle()+ Mathf.DegToRad(90);
+			}
+			else
+			{
+				animatedSprite2D.Rotation = 0f;
+			}
+			//if (velocity.x > 0)
+			//{
+			//	animatedSprite2D.Rotation = Mathf.DegToRad(90);
+			//}
+			//else if (velocity.x < 0)
+			//{
+			//	animatedSprite2D.Rotation = Mathf.DegToRad(-90);
+			//}
+			//else if (velocity.y < 0)
+			//{
+			//	animatedSprite2D.Rotation = Mathf.DegToRad(0);
+			//}
+			//else if (velocity.y > 0)
+			//{
+			//	animatedSprite2D.Rotation = Mathf.DegToRad(180);
+			//}
+			//else
+			//{
+			//	animatedSprite2D.Rotation = Mathf.DegToRad(0);
+			//}
+
+			////choosing animations
+			//if (velocity.x != 0)
+			//{
+			//	animatedSprite2D.Animation = "walk";
+			//	animatedSprite2D.FlipV = false;
+			//	// See the note below about boolean assignment.
+			//	animatedSprite2D.FlipH = velocity.x < 0;
+			//}
+			//else if (velocity.y != 0)
+			//{
+			//	animatedSprite2D.Animation = "up";
+			//	animatedSprite2D.FlipV = velocity.y > 0;
+			//}
+
 		}
 	}
 

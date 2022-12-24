@@ -17,7 +17,7 @@
     <PropertyGroup>
         <!--build configuration stuff-->
         <Configurations>Debug;Release;Checked</Configurations>
-        <Deterministic>False</Deterministic>
+        <Deterministic>True</Deterministic>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

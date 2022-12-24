@@ -24,6 +24,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
+using NotNot.Bcl.Advanced;
 
 namespace NotNot.Ecs;
 

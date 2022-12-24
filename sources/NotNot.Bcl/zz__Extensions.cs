@@ -34,10 +34,15 @@ public unsafe static class zz__Extensions_IntPtr
 	}
 }
 
+
 public static class zz__Extensions_List
 {
 	static ThreadLocal<Random> _rand = new(() => new());
 
+	public static T _PickRandom<T>(this IList<T> target)
+	{
+		return target[_rand.Value.Next(target.Count)];
+	}
 	public static bool _TryRemoveRandom<T>(this IList<T> target, out T value)
 	{
 		if (target.Count == 0)
