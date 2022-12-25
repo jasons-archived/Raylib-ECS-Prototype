@@ -125,20 +125,19 @@ public partial class Game : Node
 			MobTimer.Timeout += () =>
 			{
 				var mob = new Mob();
-				//var spawnLocation = MobPath.GetNode<PathFollow2D>("MobSpawnLocation");
-				var spawnLocation = MobPath._FindChild<PathFollow2D>();
-				spawnLocation.ProgressRatio =(float) _rand.NextDouble();
-				mob.Position = spawnLocation.Position;
+				//var spawnLocation = MobPath.GetNode<PathFollow2D>("MobSpawnLocation"); //doesn't work because we didn't name our node
+				var spawnPath = MobPath._FindChild<PathFollow2D>()!;
+				spawnPath.ProgressRatio = _rand.NextSingle();
+				mob.Position = spawnPath.Position;
 
 				//set mob direction perpendicular to the path direction
-				var direction = spawnLocation.Rotation + MathF.PI/2;
+				var direction = spawnPath.Rotation + MathF.PI/2;
 				//add some randomness to direction (using pi)
 				direction += _rand._NextSingle(-MathF.PI / 4, MathF.PI / 4);
 				mob.Rotation = direction;
 
 				var velocity = new Vector2(_rand._NextSingle(150, 250), 0);
 				mob.LinearVelocity = velocity.Rotated(direction);
-				
 
 				AddChild(mob);
 
@@ -147,7 +146,7 @@ public partial class Game : Node
 		}
 
 
-		NewGame();
+		//NewGame();
 	}
 
 	public void GameOver()
@@ -167,11 +166,7 @@ public partial class Game : Node
 		//AddChild(mobTest);
 
 	}
-
-	private void ScoreTimer_Timeout()
-	{
-		throw new NotImplementedException();
-	}
+	
 
 	[Export]
 	public Timer MobTimer { get; set; } = new()
