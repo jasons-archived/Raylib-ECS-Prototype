@@ -2,7 +2,7 @@
   "profiles": {
     "NotNot.Godot.Scratch": {
       "commandName": "Executable",
-      "executablePath": "..\\..\\tools\\.godot-bin\\Godot_v4.0-beta9_mono_win64\\Godot_v4.0-beta9_mono_win64.exe",
+      "executablePath": "..\\..\\tools\\.godot-bin\\Godot_v4.0-beta10_mono_win64\\Godot_v4.0-beta10_mono_win64.exe",
       "commandLineArgs": "--path . >out.log 2>&1",
       "workingDirectory": ".",
       "remoteDebugEnabled": false,

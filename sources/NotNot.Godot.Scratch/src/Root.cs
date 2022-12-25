@@ -6,26 +6,36 @@ using System.Diagnostics;
 
 public partial class Root : Node2D
 {
-
-	Game game;
+	
 	// Called when the node enters the scene tree for the first time.
 	public override void _Ready()
 	{
-		//Debugger.Launch();
-		
-		game = new Game();// {Root=this};
-		//game.Initialize();
-		this.AddChild(game);
+		this.AddChild(new Dodge2dTutorialGame());
 	}
 
+
+
+	private double elapsed = 0;
+	private double lastElapsed = 0;
+	
 	// Called every frame. 'delta' is the elapsed time since the previous frame.
 	public override void _Process(double delta)
 	{
-		Console.WriteLine($"taco {delta:0N} WasPaused? {NotNot.Bcl.Diagnostics.Advanced.DebuggerInfo.WasPaused} IsPaused? {NotNot.Bcl.Diagnostics.Advanced.DebuggerInfo.IsPaused}");
+		elapsed += delta;
 
-		GD.Print("gd.print sorcery! mango!");
-		GD.PrintErr("gd.printErr");
-		//ame._Process(delta);
+		//print to console once per second
+		if (((int)lastElapsed) != ((int)elapsed))
+		{
+			//Console.WriteLine($"taco {delta:0N} WasPaused? {NotNot.Bcl.Diagnostics.Advanced.DebuggerInfo.WasPaused} IsPaused? {NotNot.Bcl.Diagnostics.Advanced.DebuggerInfo.IsPaused}");
+			Console.WriteLine("testing Console.WriteLine()");
+			GD.Print("testing GD.Print()");
+			GD.PrintErr("testing GD.PrintErr()");
+		}
+		
+		lastElapsed = elapsed;
+		
+
+
 
 	}
 }
