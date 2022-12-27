@@ -6,7 +6,7 @@
       "commandLineArgs": "--path . >out.log 2>&1",
       "workingDirectory": ".",
       "remoteDebugEnabled": false,
-      "nativeDebugging": true
+      "nativeDebugging": false
     }
   }
 }

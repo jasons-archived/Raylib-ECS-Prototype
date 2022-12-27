@@ -28,7 +28,7 @@ public partial class Player : Area2D
 	//[Export]
 	AnimatedSprite2D animatedSprite2D;
 
-	Game Game;
+	Dodge2dTutorialGame Game;
 
 
 	private void Player_BodyEntered(Node2D body)
@@ -50,7 +50,7 @@ public partial class Player : Area2D
 		this.BodyEntered += Player_BodyEntered;
 
 		var player = this;
-		Game = this._FindParent<Game>();
+		Game = this._FindParent<Dodge2dTutorialGame>();
 
 		player.Name = "player";
 

@@ -14,7 +14,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
-using System.Threading.Tasks;
 using Godot;
 using NotNot.Godot;
 using NotNot.Godot.Scratch.src.Dodge2dTutorial;
@@ -42,6 +41,7 @@ public partial class Dodge2dTutorialGame : Node
 
 	public override void _EnterTree()
 	{
+		this.Name = "Game";
 		//DOCS https://docs.godotengine.org/en/latest/getting_started/first_2d_game/01.project_setup.html
 		//customize window
 		{
@@ -56,6 +56,9 @@ public partial class Dodge2dTutorialGame : Node
 			this.ScreenSize = DisplayServer.ScreenGetSize(screenId);
 			ViewportSize = GetViewport().GetVisibleRect().Size;
 
+			//change to fullscreen
+			//window.Mode = Window.ModeEnum.Maximized;
+
 			//adjust window for easier debugging
 			{
 				//always on top
@@ -64,6 +67,7 @@ public partial class Dodge2dTutorialGame : Node
 				var windowPos = window.Position;
 				windowPos.x = ScreenSize.x - window.Size.x;
 				window.Position = windowPos;
+				//window.CurrentScree
 			}
 
 
@@ -78,11 +82,12 @@ public partial class Dodge2dTutorialGame : Node
 
 	public override void _Ready()
 	{
-
-
-		player = new Player();
-		this.AddChild(player);
-
+		//player
+		{
+			player = new Player();
+			player.PlayerHit += () => { GameOver(); };
+			this.AddChild(player);
+		}
 		//player.Start(this._FindParent<Window>().ContentScaleSize / 2);//center of screen
 
 		//add props, timers (from https://docs.godotengine.org/en/latest/getting_started/first_2d_game/05.the_main_game_scene.html)
@@ -113,10 +118,14 @@ public partial class Dodge2dTutorialGame : Node
 			AddChild(MobPath);
 
 		}
-
 		//timer callbacks
 		{
-			ScoreTimer.Timeout += () => Score += 1;
+			ScoreTimer.Timeout += () =>
+			{
+				Score += 1;
+				//hud.ScoreLabel.Text = Score.ToString();
+				Hud.UpdateScore(Score);
+			};
 			StartTimer.Timeout += () =>
 			{
 				MobTimer.Start();
@@ -145,14 +154,31 @@ public partial class Dodge2dTutorialGame : Node
 			};
 		}
 
+		//hud
+		{
+			
+			AddChild(Hud);
 
-		NewGame();
+			Hud.StartGame += () =>
+			{
+				NewGame();
+			};
+		}
+		//NewGame();
 	}
+
+	private void Hud_StartGame()
+	{
+		throw new NotImplementedException();
+	}
+
+	public Hud Hud { get; set; } = new();
 
 	public void GameOver()
 	{
 		MobTimer.Stop();
 		ScoreTimer.Stop();
+		_ = Hud.ShowGameOver();
 	}
 
 	public void NewGame()
@@ -162,9 +188,8 @@ public partial class Dodge2dTutorialGame : Node
 		player.Start(StartPosition.Position);
 		StartTimer.Start();
 
-		//var mobTest = new Mob();
-		//AddChild(mobTest);
-
+		Hud.UpdateScore(Score);
+		Hud.ShowMessage("Get Ready!");
 	}
 	
 
@@ -204,8 +229,3 @@ public partial class Dodge2dTutorialGame : Node
 
 
 }
-
-//public partial class Hud : CanvasLayer
-//{
-
-//}

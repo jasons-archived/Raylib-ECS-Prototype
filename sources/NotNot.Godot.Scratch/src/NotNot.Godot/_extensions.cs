@@ -35,6 +35,74 @@ namespace NotNot.Godot;
 //	}
 //}
 
+public static class _Extensions_Object
+{
+	/// <summary>
+	/// syntax sugar to await signals named "timeout"
+	/// </summary>
+	/// <param name="source"></param>
+	/// <returns></returns>
+	public static SignalAwaiter _TimeoutAwaiter(this global::Godot.Object source, string signalName="timeout")
+	{
+		return source.ToSignal(source, signalName);
+	}
+
+
+	//public static SignalAwaiter _ToSignal(this global::Godot.Object source, string signalName)
+	//{
+	//	return source.ToSignal(source, signalName);
+	//}
+	//public static SignalAwaiter _ToSignal(this global::Godot.Object source, Action signal,
+	//	[CallerArgumentExpression("signal")]string signalName="")
+	//{
+
+	//	return source.ToSignal(source, signalName);
+	//}
+}
+public static class _Extensions_Control
+{
+	//set position of the node relative to screenspace
+	public static void SetPositionCenterPercentScreenSpaceX(this Control control, float xPercent)
+	{
+		var viewport = control.GetViewport();
+		var viewportSize = viewport.GetVisibleRect().Abs().Size;
+
+		var x = viewportSize.x * xPercent;
+		x -= control.Size.x / 2;
+
+		control.Position = new Vector2(x, control.Position.y);
+
+	}
+	public static void SetPositionCenterPercentScreenSpaceY(this Control control, float yPercent)
+	{
+		var viewport = control.GetViewport();
+		var viewportSize = viewport.GetVisibleRect().Abs().Size;
+
+		var y = viewportSize.y * yPercent;
+		y -= control.Size.y / 2;
+
+		control.Position = new Vector2(control.Position.x, y);
+
+	}
+
+	public static void SetPositionCenterPercentScreenSpace(this Control control, float xPercent, float yPercent)
+	{
+		control.SetPositionCenterPercentScreenSpace(new Vector2(xPercent, yPercent));
+	}
+
+	public static void SetPositionCenterPercentScreenSpace(this Control control, Vector2 percent)
+		{
+			var viewport = control.GetViewport();
+		var viewportSize = viewport.GetVisibleRect().Abs().Size;
+
+		var pos = viewportSize * percent;
+		pos -= control.Size / 2;
+
+		control.Position = pos;
+
+	}
+}
+
 public static class _Extensions_Node
 {
 	/// <summary>
@@ -70,7 +138,7 @@ public static class _Extensions_Node
 	/// <param name="depth"></param>
 	/// <param name="includInternal"></param>
 	/// <returns></returns>
-	public static T? _FindChild<T>(this Node node, string? name=null, int depth=0, bool includInternal=false) where T : Node
+	public static T? _FindChild<T>(this Node node, string? name = null, int depth = 0, bool includInternal = false) where T : Node
 	{
 		depth -= 1;
 		foreach (var child in node.GetChildren(includInternal))

@@ -57,6 +57,7 @@
         <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
         <IsPublishable>True</IsPublishable>
         <PackageIcon>[!!]-logos.jpeg</PackageIcon>
+        <AssemblyVersion>0.0.0.0</AssemblyVersion>
     </PropertyGroup>
 
     <!--coherse the MinVer package to generate timestamped nuget packages whenever a prerelease package is made.   see https://github.com/adamralph/minver/discussions/670 -->
